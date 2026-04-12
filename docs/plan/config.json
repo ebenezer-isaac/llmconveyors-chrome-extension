@@ -1,0 +1,107 @@
+{
+  "plan": "100-chrome-extension-mvp",
+  "title": "Chrome Extension POC: Plan A (extension) + Plan B (autofill engine)",
+  "version": "2.0.0",
+  "created": "2026-04-11",
+  "decisionMemo": "00-decision-memo.md",
+  "phases": 20,
+  "phaseStructure": "two-plans",
+  "description": "V1 POC build for Zovo deal demo. Plan A = Chrome extension (11 phases). Plan B = standalone autofill engine npm package (9 phases). Target demo April 20 2026.",
+  "deadline": "2026-04-17",
+  "demoDate": "2026-04-20",
+  "plans": {
+    "A": {
+      "title": "Chrome Extension (deliverable)",
+      "phaseCount": 11,
+      "phases": ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11"],
+      "repos": {
+        "chromeExtension": {
+          "path": "e:/llmconveyors-chrome-extension",
+          "github": "ebenezer-isaac/llmconveyors-chrome-extension",
+          "visibility": "public",
+          "phases": ["A1", "A5", "A6", "A7", "A8", "A9", "A10", "A11"]
+        },
+        "llmconveyors": {
+          "path": "e:/llmconveyors.com",
+          "github": "ebenezer-isaac/llmconveyors.com",
+          "visibility": "private",
+          "phases": ["A2", "A3", "A4"],
+          "note": "Backend + frontend changes stay in private repo; not shared with Michael pre-signing"
+        }
+      }
+    },
+    "B": {
+      "title": "Autofill Engine (OSS dependency)",
+      "phaseCount": 9,
+      "phases": ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9"],
+      "repo": {
+        "path": "e:/ats-autofill-engine",
+        "github": "ebenezer-isaac/ats-autofill-engine",
+        "visibility": "public",
+        "npmName": "ats-autofill-engine",
+        "initialVersion": "0.1.0-alpha.1"
+      }
+    }
+  },
+  "dependencies": {
+    "A1": [],
+    "A2": [],
+    "A3": [],
+    "A4": ["A2"],
+    "A5": ["A1"],
+    "A6": ["A5", "A2", "A4"],
+    "A7": ["A5"],
+    "A8": ["A7", "B7", "B8", "B9"],
+    "A9": ["A8", "A3", "B6"],
+    "A10": ["A6", "A7", "A9"],
+    "A11": ["A8", "A9", "A10"],
+    "B1": [],
+    "B2": ["B1"],
+    "B3": ["B2"],
+    "B4": ["B3"],
+    "B5": ["B4"],
+    "B6": ["B2", "B5"],
+    "B7": ["B5"],
+    "B8": ["B5"],
+    "B9": ["B5", "B7", "B8"]
+  },
+  "schedule": {
+    "2026-04-12": ["A1", "A2", "B1"],
+    "2026-04-13": ["A3", "A4", "A5", "B2", "B3"],
+    "2026-04-14": ["A6", "B4", "B5"],
+    "2026-04-15": ["A7", "B6"],
+    "2026-04-16": ["A8", "B7", "B8", "B9"],
+    "2026-04-17": ["A9", "A10", "A11"]
+  },
+  "parallelSafe": {
+    "Day 1 (A1 A2 B1)": true,
+    "Day 2 (A3 A4 A5 B2 B3)": true,
+    "Day 3 (A6 B4 B5)": true,
+    "Day 4 (A7 B6)": true,
+    "Day 5 (A8 B7 B8 B9)": "A8 starts AFTER B7/B8/B9 publish mid-day",
+    "Day 6 (A9 A10 A11)": "A9 first, then A10 + A11 in parallel"
+  },
+  "executor": "claude-sonnet-4-6",
+  "executorContextBudget": "64k per phase",
+  "verificationPolicy": {
+    "perPhase": "phase-local tests must pass + touched-repo typecheck + touched-repo build",
+    "perDay": "cross-repo integration smoke test at end of each day",
+    "preDemo": "full E2E flow on 3 live ATS postings (Greenhouse, Lever, Workday multi-step wizard) recorded to video"
+  },
+  "grepGate": {
+    "forbidden": [
+      "skill-taxonomy imported anywhere in ats-autofill-engine (engine must never touch the moat corpus)",
+      "@repo/shared-types imported from ats-autofill-engine (engine is standalone)",
+      "console.log in src/core/** (structured logger only)",
+      "document or window in ats-autofill-engine src/core/**",
+      "@ebenezer-isaac/ scope (we locked unscoped name)",
+      "chrome-extension-guide or chrome-extension-toolkit imports (Zovo toolkit not used)",
+      "TODO or FIXME in phase deliverables without linked issue"
+    ]
+  },
+  "flaggedKnownIssues": [
+    "Workday drag-drop file upload may silently fail via DataTransfer; B9 includes fallback toast",
+    "Keyword highlight button is disabled when signed out (Option O online-only)",
+    "SDK method client.ats.extractSkills NOT added in v0.4.0 — extension uses direct fetch for V1 POC"
+  ]
+}
