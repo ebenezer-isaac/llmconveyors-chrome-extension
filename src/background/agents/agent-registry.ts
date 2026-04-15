@@ -23,6 +23,9 @@ export interface AgentRegistryEntry {
   readonly iconSvg: string;
   readonly label: string;
   readonly shortDescription: string;
+  readonly settingsPath: string;
+  readonly dashboardPath: string;
+  readonly resumePath: string | null;
 }
 
 function deepFreeze<T extends Record<string, unknown>>(obj: T): T {
@@ -48,6 +51,9 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = deepFreeze({
       'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8',
     label: 'Job Hunter',
     shortDescription: 'Tailor CVs and cold emails to every role.',
+    settingsPath: '/settings',
+    dashboardPath: '',
+    resumePath: '/settings/resume',
   },
   'b2b-sales': {
     id: 'b2b-sales',
@@ -61,6 +67,9 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = deepFreeze({
       'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6',
     label: 'B2B Sales',
     shortDescription: 'Research companies and draft outbound email.',
+    settingsPath: '/settings',
+    dashboardPath: '',
+    resumePath: null,
   },
 } as Record<AgentId, AgentRegistryEntry>);
 
@@ -79,4 +88,40 @@ export function getAgentById(id: string): AgentRegistryEntry | undefined {
 
 export function isAgentId(id: string): id is AgentId {
   return Object.hasOwn(AGENT_REGISTRY, id);
+}
+
+// ---------------------------------------------------------------------------
+// URL builder
+// ---------------------------------------------------------------------------
+
+export type AgentUrlKind = 'dashboard' | 'settings' | 'resume';
+
+export interface BuildAgentUrlOptions {
+  readonly rootDomain: string;
+  readonly locale: string;
+  readonly scheme?: 'https' | 'http';
+}
+
+/**
+ * Build a fully-qualified URL for a given agent page kind.
+ *
+ * Returns `null` when the agent does not support the requested kind
+ * (e.g. `resume` for b2b-sales).
+ */
+export function buildAgentUrl(
+  agent: AgentRegistryEntry,
+  kind: AgentUrlKind,
+  opts: BuildAgentUrlOptions,
+): string | null {
+  const scheme = opts.scheme ?? 'https';
+  const base = `${scheme}://${agent.subdomain}.${opts.rootDomain}/${opts.locale}`;
+
+  switch (kind) {
+    case 'dashboard':
+      return agent.dashboardPath === '' ? base : `${base}${agent.dashboardPath}`;
+    case 'settings':
+      return `${base}${agent.settingsPath}`;
+    case 'resume':
+      return agent.resumePath === null ? null : `${base}${agent.resumePath}`;
+  }
 }

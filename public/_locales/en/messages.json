@@ -6,5 +6,125 @@
   "appDescription": {
     "message": "AI-powered job applications and B2B sales outreach. Generates tailored CVs, cover letters, and cold emails; auto-fills application forms.",
     "description": "Short description shown in chrome://extensions and the Chrome Web Store."
+  },
+  "header_agentLabel": {
+    "message": "Agent",
+    "description": "Label for the agent switcher in the popup header."
+  },
+  "header_signOut": {
+    "message": "Sign out",
+    "description": "Sign-out action in the popup header."
+  },
+  "userMenu_resumeCv": {
+    "message": "Resume & CV",
+    "description": "Menu item that opens the resume and CV editor."
+  },
+  "userMenu_settings": {
+    "message": "Settings",
+    "description": "Menu item that opens the agent settings page."
+  },
+  "userMenu_dashboard": {
+    "message": "Dashboard",
+    "description": "Menu item that opens the agent dashboard."
+  },
+  "userMenu_logout": {
+    "message": "Log out",
+    "description": "Menu item that signs the user out."
+  },
+  "userMenu_usage": {
+    "message": "Usage",
+    "description": "Section heading for credit usage inside the user menu."
+  },
+  "userMenu_creditsLabel": {
+    "message": "$credits$ credits",
+    "description": "Shows how many credits the user has.",
+    "placeholders": {
+      "credits": {
+        "content": "$1",
+        "example": "9723"
+      }
+    }
+  },
+  "userMenu_tierFree": {
+    "message": "Free tier",
+    "description": "Label for the free tier."
+  },
+  "userMenu_tierByo": {
+    "message": "BYO Key tier",
+    "description": "Label for the bring-your-own-key tier."
+  },
+  "userMenu_tierByoEnabled": {
+    "message": "BYO Key enabled",
+    "description": "Label shown when BYO key is active."
+  },
+  "userMenu_topUpPrompt": {
+    "message": "Need more?",
+    "description": "Prompt text inviting the user to request more credits."
+  },
+  "userMenu_topUpSubject": {
+    "message": "Credit top-up request",
+    "description": "Email subject for a credit top-up request."
+  },
+  "userMenu_topUpBody": {
+    "message": "Hi,\n\nI'd like to request additional credits for my account.\n\nUser id: $userId$\n\nThanks",
+    "description": "Email body for a credit top-up request.",
+    "placeholders": {
+      "userId": {
+        "content": "$1",
+        "example": "user-abc123"
+      }
+    }
+  },
+  "credits_remaining": {
+    "message": "$credits$ credits remaining",
+    "description": "Displays the number of credits remaining.",
+    "placeholders": {
+      "credits": {
+        "content": "$1",
+        "example": "42"
+      }
+    }
+  },
+  "credits_loading": {
+    "message": "Loading credits...",
+    "description": "Shown while credit balance is being fetched."
+  },
+  "footer_version": {
+    "message": "v$version$",
+    "description": "Extension version number shown in the popup footer.",
+    "placeholders": {
+      "version": {
+        "content": "$1",
+        "example": "0.1.0"
+      }
+    }
+  },
+  "sessionList_title": {
+    "message": "Recent sessions",
+    "description": "Title of the recent sessions panel."
+  },
+  "sessionList_viewAll": {
+    "message": "View all ->",
+    "description": "Link to view all sessions in the dashboard."
+  },
+  "sessionList_empty": {
+    "message": "No sessions yet.",
+    "description": "Empty state message when there are no sessions."
+  },
+  "sessionList_loading": {
+    "message": "Loading sessions...",
+    "description": "Shown while the session list is being fetched."
+  },
+  "agentSwitcher_label": {
+    "message": "Active agent",
+    "description": "Screen-reader label for the agent switcher dropdown."
+  },
+  "signIn_buttonLabel": {
+    "message": "Sign in",
+    "description": "Label on the sign-in button."
+  },
+  "sessionList_errorPrefix": {
+    "message": "Error loading sessions.",
+    "description": "Prefix shown when the session list fails to load."
   }
 }

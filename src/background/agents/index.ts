@@ -9,8 +9,11 @@ export {
   DEFAULT_AGENT_ID,
   getAgentById,
   isAgentId,
+  buildAgentUrl,
   type AgentId,
   type AgentRegistryEntry,
+  type AgentUrlKind,
+  type BuildAgentUrlOptions,
 } from './agent-registry';
 export {
   createAgentPreference,
