@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MIT
 /**
- * Compile-time assertion that ProtocolMap ships EXACTLY the 19 keys required
- * by the keystone contract. This file has no runtime effect; its purpose is
- * to fail `tsc --noEmit` if a key is missing or an extra one is added.
+ * Compile-time assertion that ProtocolMap ships EXACTLY the keys required by
+ * the post-101 keystone contract. This file has no runtime effect; its
+ * purpose is to fail `tsc --noEmit` if a key is missing or an extra one is
+ * added.
+ *
+ * The PROFILE_* family was removed in 101.2 when the local profile stack
+ * was replaced by the backend-owned master-resume.
  */
 
 import type { ProtocolMap } from './protocol';
@@ -12,9 +16,6 @@ type RequiredKeys =
   | 'AUTH_SIGN_OUT'
   | 'AUTH_STATUS'
   | 'AUTH_STATE_CHANGED'
-  | 'PROFILE_GET'
-  | 'PROFILE_UPDATE'
-  | 'PROFILE_UPLOAD_JSON_RESUME'
   | 'KEYWORDS_EXTRACT'
   | 'INTENT_DETECTED'
   | 'INTENT_GET'

@@ -3,7 +3,6 @@ import { describe, it, expect } from 'vitest';
 import {
   DetectedIntentPayloadSchema,
   KeywordsExtractRequestSchema,
-  validatePatchSafety,
   ExtractSkillsBackendResponseSchema,
   AuthStateSchema,
   UNAUTHED,
@@ -61,39 +60,6 @@ describe('KeywordsExtractRequestSchema', () => {
       topK: 200,
     });
     expect(r.success).toBe(false);
-  });
-});
-
-describe('validatePatchSafety', () => {
-  it('accepts a plain nested object', () => {
-    expect(validatePatchSafety({ a: { b: 1 } })).toEqual({ safe: true });
-  });
-  it('rejects __proto__ at root', () => {
-    expect(validatePatchSafety(JSON.parse('{"__proto__":{"polluted":true}}'))).toMatchObject({
-      safe: false,
-    });
-  });
-  it('rejects constructor key at nested level', () => {
-    expect(validatePatchSafety({ a: { constructor: {} } })).toMatchObject({
-      safe: false,
-    });
-  });
-  it('rejects prototype', () => {
-    expect(validatePatchSafety({ prototype: {} })).toMatchObject({ safe: false });
-  });
-  it('rejects circular references', () => {
-    const obj: { self?: unknown } = {};
-    obj.self = obj;
-    expect(validatePatchSafety(obj)).toMatchObject({ safe: false });
-  });
-  it('rejects null', () => {
-    expect(validatePatchSafety(null)).toMatchObject({ safe: false });
-  });
-  it('rejects primitive', () => {
-    expect(validatePatchSafety('oops')).toMatchObject({ safe: false });
-  });
-  it('rejects array', () => {
-    expect(validatePatchSafety([1, 2, 3])).toMatchObject({ safe: false });
   });
 });
 

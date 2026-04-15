@@ -11,9 +11,6 @@ export type {
   AuthSignInResponse,
   AuthSignOutResponse,
   StoredSession,
-  ProfileGetResponse,
-  ProfileUpdateResponse,
-  ProfileUploadJsonResumeResponse,
   DetectedIntent,
   DetectedIntentPayload,
   FillRequestResponse,
@@ -27,7 +24,6 @@ export type {
   GenerationUpdateBroadcast,
   GenerationArtifact,
   CreditsState,
-  Profile,
 } from './protocol';
 export {
   BG_HANDLED_KEYS,

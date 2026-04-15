@@ -56,12 +56,6 @@ async function loadModules(): Promise<{
   const authUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/auth.schema.ts'),
   ).href;
-  const profileMsgUrl = pathToFileURL(
-    resolve(
-      REPO_ROOT,
-      'src/background/messaging/schemas/profile-messages.schema.ts',
-    ),
-  ).href;
   const intentUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/intent.schema.ts'),
   ).href;
@@ -83,7 +77,6 @@ async function loadModules(): Promise<{
 
   type SchemaModule = Record<string, z.ZodTypeAny>;
   const auth = (await import(authUrl)) as SchemaModule;
-  const profileMsg = (await import(profileMsgUrl)) as SchemaModule;
   const intent = (await import(intentUrl)) as SchemaModule;
   const fill = (await import(fillUrl)) as SchemaModule;
   const keywords = (await import(keywordsUrl)) as SchemaModule;
@@ -120,28 +113,6 @@ async function loadModules(): Promise<{
       responseSchema: null,
       handlerLocation: 'background',
       broadcastOnly: true,
-    },
-    // Profile
-    {
-      key: 'PROFILE_GET',
-      requestSchema: profileMsg.ProfileGetRequestSchema,
-      responseSchema: profileMsg.ProfileGetResponseSchema,
-      handlerLocation: 'background',
-      broadcastOnly: false,
-    },
-    {
-      key: 'PROFILE_UPDATE',
-      requestSchema: profileMsg.ProfileUpdateRequestSchema,
-      responseSchema: profileMsg.ProfileUpdateResponseSchema,
-      handlerLocation: 'background',
-      broadcastOnly: false,
-    },
-    {
-      key: 'PROFILE_UPLOAD_JSON_RESUME',
-      requestSchema: profileMsg.ProfileUploadJsonResumeRequestSchema,
-      responseSchema: profileMsg.ProfileUploadJsonResumeResponseSchema,
-      handlerLocation: 'background',
-      broadcastOnly: false,
     },
     // Intent
     {

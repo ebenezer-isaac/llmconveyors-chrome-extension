@@ -6,7 +6,6 @@ import {
   type HandlerDeps,
 } from '../../../src/background/messaging/handlers';
 import type { StoredSession } from '../../../src/background/messaging/schemas/auth.schema';
-import type { Profile } from '../../../src/background/messaging/schemas/profile.schema';
 
 const senderStub = { tab: { id: 42 } } as chrome.runtime.MessageSender;
 
@@ -23,11 +22,6 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
       void _s;
     }),
     clearSession: vi.fn(async () => undefined),
-    readProfile: vi.fn(async (): Promise<Profile | null> => null),
-    writeProfile: vi.fn(async (_p: Profile) => {
-      void _p;
-    }),
-    clearProfile: vi.fn(async () => undefined),
   };
   const tabState = {
     getIntent: vi.fn(() => null),
@@ -59,7 +53,7 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
 }
 
 describe('HANDLERS record shape', () => {
-  it('ships exactly the 17 BG_HANDLED_KEYS', () => {
+  it('ships exactly the BG_HANDLED_KEYS post-101 (no PROFILE_* keys)', () => {
     const handlers = createHandlers(buildDeps());
     const keys = Object.keys(handlers).sort();
     expect(keys).toEqual(
@@ -68,9 +62,6 @@ describe('HANDLERS record shape', () => {
         'AUTH_SIGN_OUT',
         'AUTH_STATUS',
         'AUTH_STATE_CHANGED',
-        'PROFILE_GET',
-        'PROFILE_UPDATE',
-        'PROFILE_UPLOAD_JSON_RESUME',
         'INTENT_DETECTED',
         'INTENT_GET',
         'FILL_REQUEST',
@@ -88,6 +79,12 @@ describe('HANDLERS record shape', () => {
     const handlers = createHandlers(buildDeps());
     expect(handlers).not.toHaveProperty('HIGHLIGHT_APPLY');
     expect(handlers).not.toHaveProperty('HIGHLIGHT_CLEAR');
+  });
+  it('omits PROFILE_* keys (replaced by backend master-resume)', () => {
+    const handlers = createHandlers(buildDeps());
+    expect(handlers).not.toHaveProperty('PROFILE_GET');
+    expect(handlers).not.toHaveProperty('PROFILE_UPDATE');
+    expect(handlers).not.toHaveProperty('PROFILE_UPLOAD_JSON_RESUME');
   });
 });
 
@@ -127,62 +124,6 @@ describe('AUTH_SIGN_OUT', () => {
       data: { signedIn: false },
     });
     expect(deps.tabState.clearAll).toHaveBeenCalled();
-  });
-});
-
-describe('PROFILE_UPDATE', () => {
-  const existingProfile: Profile = {
-    profileVersion: '1.0',
-    updatedAtMs: 1,
-    basics: {
-      firstName: 'Jane',
-      lastName: 'Doe',
-      email: 'jane@example.com',
-      phone: '+1-000',
-      location: { city: 'SF', region: 'CA', countryCode: 'US', postalCode: '94000' },
-      website: '',
-      linkedin: '',
-      github: '',
-    },
-    work: [],
-    education: [],
-    skills: [],
-  };
-  it('rejects __proto__ patches', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => existingProfile);
-    const handlers = createHandlers(deps);
-    const patch = JSON.parse('{"__proto__":{"polluted":true}}');
-    const r = await handlers.PROFILE_UPDATE({
-      data: { patch },
-      sender: senderStub,
-    });
-    expect(r.ok).toBe(false);
-    expect(deps.storage.writeProfile).not.toHaveBeenCalled();
-  });
-  it('rejects when no profile exists', async () => {
-    const handlers = createHandlers(buildDeps());
-    const r = await handlers.PROFILE_UPDATE({
-      data: { patch: { basics: { phone: '1' } } },
-      sender: senderStub,
-    });
-    expect(r.ok).toBe(false);
-  });
-  it('merges and writes a fresh profile on success', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => existingProfile);
-    const handlers = createHandlers(deps);
-    const r = await handlers.PROFILE_UPDATE({
-      data: { patch: { basics: { phone: '+1-555-9999' } } },
-      sender: senderStub,
-    });
-    expect(r.ok).toBe(true);
-    expect(deps.storage.writeProfile).toHaveBeenCalledTimes(1);
-    const written = (deps.storage.writeProfile as ReturnType<typeof vi.fn>).mock
-      .calls[0]?.[0] as Profile;
-    expect(written.basics.phone).toBe('+1-555-9999');
-    expect(written.basics.firstName).toBe('Jane');
-    expect(written.updatedAtMs).toBe(1_713_000_000_000);
   });
 });
 
@@ -329,28 +270,18 @@ describe('INTENT_DETECTED', () => {
 });
 
 describe('FILL_REQUEST', () => {
-  it('returns profile-missing when no profile', async () => {
-    const handlers = createHandlers(buildDeps());
+  it('returns content-script-not-loaded when sendToTab yields non-object', async () => {
+    const deps = buildDeps();
+    deps.broadcast.sendToTab = vi.fn(async () => null);
+    const handlers = createHandlers(deps);
     const r = await handlers.FILL_REQUEST({
       data: { tabId: 7, url: 'https://boards.greenhouse.io/x/jobs/1' },
       sender: senderStub,
     });
-    expect(r).toMatchObject({ ok: false, aborted: true, abortReason: 'profile-missing' });
+    expect(r).toMatchObject({ ok: false, aborted: true, abortReason: 'content-script-not-loaded' });
   });
   it('returns content-script-not-loaded when forward throws', async () => {
     const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => ({
-      profileVersion: '1.0' as const,
-      updatedAtMs: 1,
-      basics: {
-        firstName: 'A', lastName: 'B', email: 'a@b.com', phone: '',
-        location: { city: '', region: '', countryCode: '', postalCode: '' },
-        website: '', linkedin: '', github: '',
-      },
-      work: [] as never[],
-      education: [] as never[],
-      skills: [] as never[],
-    }));
     deps.broadcast.sendToTab = vi.fn(async () => {
       throw new Error('no listener');
     });
@@ -360,6 +291,24 @@ describe('FILL_REQUEST', () => {
       sender: senderStub,
     });
     expect(r).toMatchObject({ ok: false, aborted: true, abortReason: 'content-script-not-loaded' });
+  });
+  it('forwards resp from content script when shape matches', async () => {
+    const deps = buildDeps();
+    deps.broadcast.sendToTab = vi.fn(async () => ({
+      ok: true,
+      planId: 'p1',
+      executedAt: new Date().toISOString(),
+      filled: [],
+      skipped: [],
+      failed: [],
+      aborted: false,
+    }));
+    const handlers = createHandlers(deps);
+    const r = await handlers.FILL_REQUEST({
+      data: { tabId: 7, url: 'https://boards.greenhouse.io/x/jobs/1' },
+      sender: senderStub,
+    });
+    expect(r).toMatchObject({ ok: true });
   });
 });
 

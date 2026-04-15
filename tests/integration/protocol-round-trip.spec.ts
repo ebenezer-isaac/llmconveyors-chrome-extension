@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: MIT
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 import { createFakeChrome, seedStorage, readStorage } from './_lib/fake-chrome';
-import {
-  CANONICAL_PROFILE,
-  cloneProfile,
-  PROFILE_STORAGE_KEY,
-  type CanonicalProfile,
-} from './_lib/canonical-profile';
 import { createMockBackend, type MockBackend } from './_lib/mock-backend';
 
 /**
- * Protocol round-trip integration tests against the real handlers A5 ships.
- * Each suite mounts fake-browser, dynamically imports the handler registrar
- * AFTER the fake runtime is in place, and tears down in afterEach.
+ * Protocol round-trip integration tests against the real handlers.
  *
- * Owner -> unskip mapping:
- *   AUTH round-trip     -> A5 ships handlers, A6 replaces sign-in stub
- *   PROFILE round-trip  -> A5 ships handlers, A7 extends JSON Resume
- *   FILL round-trip     -> A5 forwards to content, A8 executes fill
+ * Post 101.2: the PROFILE round-trip suite was removed when local profile
+ * storage was replaced by the backend master-resume. The master-resume
+ * round-trip lives alongside the master-resume module (commit 101.3).
  */
 
 const BACKEND_URL = 'https://api.llmconveyors.local';
@@ -121,63 +112,11 @@ describe('AUTH round-trip', () => {
   });
 });
 
-describe('PROFILE round-trip', () => {
-  let fake: ReturnType<typeof createFakeChrome>;
-
-  beforeEach(async () => {
-    fake = createFakeChrome();
-    await freshRegister();
-  });
-
-  it('PROFILE_GET returns canonical profile when seeded', async () => {
-    await seedStorage(PROFILE_STORAGE_KEY, CANONICAL_PROFILE);
-    const response = await fake.runtime.sendMessage({ key: 'PROFILE_GET', data: {} });
-    expect(response).toMatchObject({
-      ok: true,
-      profile: {
-        profileVersion: '1.0',
-        basics: { firstName: 'Jane', lastName: 'Doe', email: 'jane.doe@example.com' },
-      },
-    });
-  });
-
-  it('PROFILE_UPDATE merges patch and bumps updatedAtMs', async () => {
-    await seedStorage(PROFILE_STORAGE_KEY, cloneProfile());
-    const before = Date.now();
-    const response = await fake.runtime.sendMessage({
-      key: 'PROFILE_UPDATE',
-      data: { patch: { basics: { phone: '+1-415-555-9999' } } },
-    });
-    expect(response).toMatchObject({ ok: true });
-    const stored = await readStorage<CanonicalProfile>(PROFILE_STORAGE_KEY);
-    expect(stored?.basics.phone).toBe('+1-415-555-9999');
-    expect(stored?.basics.firstName).toBe('Jane');
-    expect(stored?.updatedAtMs ?? 0).toBeGreaterThanOrEqual(before);
-  });
-
-  it('PROFILE_UPLOAD_JSON_RESUME parses and stores the converted profile', async () => {
-    const jsonResume = {
-      basics: { name: 'New User', email: 'new@example.com' },
-      work: [{ company: 'Test Co', position: 'Engineer' }],
-    };
-    const response = await fake.runtime.sendMessage({
-      key: 'PROFILE_UPLOAD_JSON_RESUME',
-      data: { jsonResume },
-    });
-    expect(response).toMatchObject({ ok: true });
-    const stored = await readStorage<CanonicalProfile>(PROFILE_STORAGE_KEY);
-    expect(stored?.basics.email).toBe('new@example.com');
-    expect(stored?.work?.[0]?.company).toBe('Test Co');
-    expect(stored?.profileVersion).toBe('1.0');
-  });
-});
-
 describe('FILL round-trip', () => {
   let fake: ReturnType<typeof createFakeChrome>;
 
   beforeEach(async () => {
     fake = createFakeChrome();
-    await seedStorage(PROFILE_STORAGE_KEY, CANONICAL_PROFILE);
     await seedStorage('llmc.session.v1', {
       accessToken: 'at_test_001',
       refreshToken: 'rt_test_001',
@@ -219,8 +158,11 @@ describe('FILL round-trip', () => {
     expect((response as { filled: readonly unknown[] }).filled).toHaveLength(3);
   });
 
-  it('FILL_REQUEST returns aborted result when profile missing', async () => {
-    await fake.storage.local.remove(PROFILE_STORAGE_KEY);
+  it('FILL_REQUEST returns content-script-not-loaded when the content worker is absent', async () => {
+    const stubTabsSendMessage = async (): Promise<unknown> => {
+      throw new Error('no listener');
+    };
+    fake.tabs.sendMessage = stubTabsSendMessage as unknown as typeof fake.tabs.sendMessage;
     const response = await fake.runtime.sendMessage({
       key: 'FILL_REQUEST',
       data: { tabId: 1, url: 'https://boards.greenhouse.io/airbnb/jobs/1234' },
@@ -228,7 +170,7 @@ describe('FILL round-trip', () => {
     expect(response).toMatchObject({
       ok: false,
       aborted: true,
-      abortReason: 'profile-missing',
+      abortReason: 'content-script-not-loaded',
     });
   });
 });

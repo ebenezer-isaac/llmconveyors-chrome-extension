@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 /**
- * Adversarial tests for background message handlers (D19 six categories).
+ * Adversarial tests for background message handlers (post-101).
  *
  * Surface: src/background/messaging/handlers.ts.
  *
+ * PROFILE_* handlers and their tests were removed in 101.2 when the local
+ * profile stack was replaced by the backend-owned master-resume. Adversarial
+ * coverage for the master-resume client lives alongside that module.
+ *
  * Covers:
  *  1. Null / undefined / NaN / Infinity at every handler boundary
- *  2. Empty + max-size payloads (50KB jdText, etc.)
+ *  2. Empty + max-size payloads
  *  3. Unicode -- RTL / combining / null-byte / surrogate-pair strings
- *  4. Injection -- __proto__, constructor.prototype, script-tag in strings,
- *     SQL-style, path traversal
+ *  4. Injection -- path traversal, tampered URLs
  *  5. Concurrent re-entry -- AUTH_SIGN_OUT fired concurrently,
  *     KEYWORDS_EXTRACT x10 in parallel
  *  6. Adversarial state -- storage that throws, fetch that throws async,
@@ -22,7 +25,6 @@ import {
   type HandlerDeps,
 } from '../../../src/background/messaging/handlers';
 import type { StoredSession } from '../../../src/background/messaging/schemas/auth.schema';
-import type { Profile } from '../../../src/background/messaging/schemas/profile.schema';
 
 const sender = { tab: { id: 42 } } as chrome.runtime.MessageSender;
 
@@ -44,11 +46,6 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
         void _s;
       }),
       clearSession: vi.fn(async () => undefined),
-      readProfile: vi.fn(async (): Promise<Profile | null> => null),
-      writeProfile: vi.fn(async (_p: Profile) => {
-        void _p;
-      }),
-      clearProfile: vi.fn(async () => undefined),
     },
     tabState: {
       getIntent: vi.fn(() => null),
@@ -76,31 +73,6 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
   };
 }
 
-function validProfile(): Profile {
-  return {
-    profileVersion: '1.0',
-    updatedAtMs: 1,
-    basics: {
-      firstName: 'Jane',
-      lastName: 'Doe',
-      email: 'jane@example.com',
-      phone: '+1-000',
-      location: {
-        city: 'SF',
-        region: 'CA',
-        countryCode: 'US',
-        postalCode: '94000',
-      },
-      website: '',
-      linkedin: '',
-      github: '',
-    },
-    work: [],
-    education: [],
-    skills: [],
-  };
-}
-
 const validSession: StoredSession = {
   accessToken: 'AT',
   refreshToken: 'RT',
@@ -118,31 +90,6 @@ describe('handlers adversarial -- null/undefined/NaN at boundaries', () => {
       sender,
     });
     expect(r).toEqual({ signedIn: false });
-  });
-
-  it('PROFILE_UPDATE rejects undefined data', async () => {
-    const h = createHandlers(buildDeps());
-    const r = await h.PROFILE_UPDATE({
-      data: undefined as unknown as { patch: Record<string, unknown> },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-  });
-
-  it('PROFILE_UPDATE rejects non-string firstName (number) via Zod ProfileSchema', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const r = await h.PROFILE_UPDATE({
-      data: {
-        patch: {
-          basics: { firstName: 42 } as unknown as Record<string, unknown>,
-        },
-      },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-    expect(deps.storage.writeProfile).not.toHaveBeenCalled();
   });
 
   it('INTENT_DETECTED drops payload with tabId Infinity', async () => {
@@ -271,64 +218,11 @@ describe('handlers adversarial -- empty + max-size payloads', () => {
     });
     expect(r.ok).toBe(false);
   });
-
-  it('PROFILE_UPDATE accepts empty {} patch but rejects at ProfileSchema when existing profile is minimal', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const r = await h.PROFILE_UPDATE({
-      data: { patch: {} as Record<string, unknown> },
-      sender,
-    });
-    // validatePatchSafety allows {}; ProfileSchema re-validates the merge.
-    // Either outcome is acceptable; we assert no throw + typed envelope.
-    expect(typeof r.ok).toBe('boolean');
-  });
 });
 
 // ---------- Category 3: Unicode edge cases ----------
 
 describe('handlers adversarial -- Unicode edge cases', () => {
-  it('PROFILE_UPDATE with RTL-override firstName is stored verbatim', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const rtl = '\u202eEvil\u202c';
-    const r = await h.PROFILE_UPDATE({
-      data: { patch: { basics: { firstName: rtl } } },
-      sender,
-    });
-    expect(r.ok).toBe(true);
-    const written = (
-      deps.storage.writeProfile as ReturnType<typeof vi.fn>
-    ).mock.calls[0]?.[0] as Profile;
-    expect(written.basics.firstName).toBe(rtl);
-  });
-
-  it('PROFILE_UPDATE with combining-char lastName passes through', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const combining = 'Doe\u0301';
-    const r = await h.PROFILE_UPDATE({
-      data: { patch: { basics: { lastName: combining } } },
-      sender,
-    });
-    expect(r.ok).toBe(true);
-  });
-
-  it('PROFILE_UPDATE with surrogate-pair emoji in firstName passes through', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const name = 'Jane\ud83d\ude00';
-    const r = await h.PROFILE_UPDATE({
-      data: { patch: { basics: { firstName: name } } },
-      sender,
-    });
-    expect(r.ok).toBe(true);
-  });
-
   it('KEYWORDS_EXTRACT with jd text of Unicode combining marks accepted', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
@@ -337,7 +231,7 @@ describe('handlers adversarial -- Unicode edge cases', () => {
         new Response(
           JSON.stringify({
             success: true,
-            data: { keywords: [], tookMs: 1 },
+            data: { keywords: [], tookMs: 0 },
           }),
           {
             status: 200,
@@ -346,9 +240,11 @@ describe('handlers adversarial -- Unicode edge cases', () => {
         ),
     ) as unknown as typeof fetch;
     const h = createHandlers(deps);
-    const text = 'e\u0301clair '.repeat(100);
     const r = await h.KEYWORDS_EXTRACT({
-      data: { text, url: 'https://job.example/1' },
+      data: {
+        text: 'a\u0301b\u0308c',
+        url: 'https://job.example/1',
+      },
       sender,
     });
     expect(r.ok).toBe(true);
@@ -357,102 +253,8 @@ describe('handlers adversarial -- Unicode edge cases', () => {
 
 // ---------- Category 4: Injection ----------
 
-describe('handlers adversarial -- prototype pollution + injection', () => {
-  it('PROFILE_UPDATE rejects __proto__ top-level key', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const patch = JSON.parse('{"__proto__":{"polluted":true}}') as unknown;
-    const r = await h.PROFILE_UPDATE({
-      data: { patch: patch as Record<string, unknown> },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-    expect(deps.storage.writeProfile).not.toHaveBeenCalled();
-    // Object prototype MUST NOT be polluted.
-    expect(
-      (Object.prototype as unknown as { polluted?: unknown }).polluted,
-    ).toBeUndefined();
-  });
-
-  it('PROFILE_UPDATE rejects deeply nested __proto__', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const patch = JSON.parse(
-      '{"basics":{"__proto__":{"polluted":true},"phone":"9"}}',
-    ) as unknown;
-    const r = await h.PROFILE_UPDATE({
-      data: { patch: patch as Record<string, unknown> },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-    expect(
-      (Object.prototype as unknown as { polluted?: unknown }).polluted,
-    ).toBeUndefined();
-  });
-
-  it('PROFILE_UPDATE rejects constructor key', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const r = await h.PROFILE_UPDATE({
-      data: {
-        patch: {
-          constructor: { prototype: { polluted: true } },
-        } as Record<string, unknown>,
-      },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-  });
-
-  it('PROFILE_UPDATE rejects prototype key at nested level', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const r = await h.PROFILE_UPDATE({
-      data: {
-        patch: {
-          basics: { prototype: { polluted: true } },
-        } as Record<string, unknown>,
-      },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-  });
-
-  it('PROFILE_UPDATE with basics: null is rejected by ProfileSchema', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    const r = await h.PROFILE_UPDATE({
-      data: {
-        patch: { basics: null } as unknown as Record<string, unknown>,
-      },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-  });
-
-  it('PROFILE_UPDATE with script-tag email is stored literal (no eval)', async () => {
-    const deps = buildDeps();
-    deps.storage.readProfile = vi.fn(async () => validProfile());
-    const h = createHandlers(deps);
-    // Email zod validator will reject non-email; assert rejection and
-    // verify no unexpected side effects.
-    const r = await h.PROFILE_UPDATE({
-      data: {
-        patch: {
-          basics: { email: '<script>alert(1)</script>@x' },
-        } as Record<string, unknown>,
-      },
-      sender,
-    });
-    expect(r.ok).toBe(false);
-  });
-
-  it('INTENT_DETECTED with path-traversal URL is rejected (Zod url)', async () => {
+describe('handlers adversarial -- injection', () => {
+  it('INTENT_DETECTED with path-traversal URL does not throw', async () => {
     const deps = buildDeps();
     const h = createHandlers(deps);
     await h.INTENT_DETECTED({
@@ -491,7 +293,6 @@ describe('handlers adversarial -- concurrent re-entry', () => {
 
   it('AUTH_SIGN_IN + AUTH_SIGN_OUT in parallel each produce typed envelope', async () => {
     const deps = buildDeps();
-    // Force cookie-jar path to avoid real chrome.identity calls.
     (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => new Response('{}', { status: 500 })) as
       unknown as typeof fetch;
     const h = createHandlers(deps);
@@ -667,7 +468,6 @@ describe('handlers adversarial -- storage + fetch errors', () => {
       data: { cookieJar: 'jar' },
       sender,
     });
-    // Schema accepts any non-negative expiresAt; refresh handled later.
     expect(typeof r.ok).toBe('boolean');
   });
 });

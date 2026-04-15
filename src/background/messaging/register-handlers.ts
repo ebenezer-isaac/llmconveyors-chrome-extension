@@ -30,11 +30,6 @@ import {
   clearSession,
 } from '../storage/session-storage';
 import {
-  readProfile,
-  writeProfile,
-  clearProfile,
-} from '../storage/profile-storage';
-import {
   clearAllTabState,
   getTabState,
   setIntent,
@@ -56,9 +51,6 @@ function buildProductionDeps(): HandlerDeps {
       readSession,
       writeSession,
       clearSession,
-      readProfile,
-      writeProfile,
-      clearProfile,
     },
     tabState: {
       getIntent: (tabId: number): DetectedIntent | null => getTabState(tabId).intent,

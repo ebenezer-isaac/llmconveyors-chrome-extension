@@ -1,9 +1,5 @@
 // SPDX-License-Identifier: MIT
 import type { BrowserContext, Page } from '@playwright/test';
-import {
-  CANONICAL_PROFILE,
-  PROFILE_STORAGE_KEY,
-} from '../../integration/_lib/canonical-profile';
 
 /**
  * Retrieve the extension id from the background service-worker URL. Playwright
@@ -82,29 +78,16 @@ export async function getExtensionId(context: BrowserContext): Promise<string> {
 }
 
 /**
- * Seed the canonical profile into chrome.storage.local via an extension-page
- * helper. The helper page is shipped under public/e2e/seed.html by A1.
+ * No-op profile seed. The 101 pivot moved the user profile to the backend-owned
+ * master-resume; there is no longer a `llmc.profile.v1` key to seed. Existing
+ * E2E specs that call this function keep compiling while their autofill
+ * assertions are rewritten to mock the master-resume fetch.
  */
 export async function seedProfile(
-  context: BrowserContext,
-  extensionId: string,
+  _context: BrowserContext,
+  _extensionId: string,
 ): Promise<void> {
-  const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
-  await page.evaluate(
-    ({ key, profile }) =>
-      new Promise<void>((resolve, reject) => {
-        chrome.storage.local.set({ [key]: profile }, () => {
-          if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
-            return;
-          }
-          resolve();
-        });
-      }),
-    { key: PROFILE_STORAGE_KEY, profile: CANONICAL_PROFILE },
-  );
-  await page.close();
+  // intentionally empty; backend master-resume replaces local storage
 }
 
 /**

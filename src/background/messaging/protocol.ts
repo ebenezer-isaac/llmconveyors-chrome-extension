@@ -3,12 +3,8 @@
  * ProtocolMap - the single owner of every cross-context message in the
  * extension (D2).
  *
- * Only Phase A5 edits this file. Downstream phases replace stubbed HANDLERS
- * entries with real implementations of the SAME signature. If a downstream
- * phase needs a new key, that is an A5 bug - a corrective plan amends this
- * file before that phase runs.
- *
- * 19 keys total; matches 03-keystone-contracts.md 1.1 verbatim.
+ * Post 101.2: the PROFILE_* keys were removed when the local profile
+ * storage was scrapped in favor of the backend-owned master-resume.
  */
 
 import { defineExtensionMessaging } from '@webext-core/messaging';
@@ -19,12 +15,6 @@ import type {
   AuthSignInResponse,
   AuthSignOutResponse,
   AuthState,
-  ProfileGetRequest,
-  ProfileGetResponse,
-  ProfileUpdateRequest,
-  ProfileUpdateResponse,
-  ProfileUploadJsonResumeRequest,
-  ProfileUploadJsonResumeResponse,
   DetectedIntentPayload,
   IntentGetRequest,
   IntentGetResponse,
@@ -55,13 +45,6 @@ export interface ProtocolMap {
   AUTH_STATUS: (data: AuthStatusRequest) => AuthState;
   AUTH_STATE_CHANGED: (data: AuthState) => void;
 
-  // --- Profile (3) ---
-  PROFILE_GET: (data: ProfileGetRequest) => ProfileGetResponse;
-  PROFILE_UPDATE: (data: ProfileUpdateRequest) => ProfileUpdateResponse;
-  PROFILE_UPLOAD_JSON_RESUME: (
-    data: ProfileUploadJsonResumeRequest,
-  ) => ProfileUploadJsonResumeResponse;
-
   // --- Intent (2) ---
   INTENT_DETECTED: (data: DetectedIntentPayload) => void;
   INTENT_GET: (data: IntentGetRequest) => IntentGetResponse;
@@ -90,7 +73,7 @@ export interface ProtocolMap {
 }
 
 /**
- * The 17 keys the background worker registers handlers for. HIGHLIGHT_APPLY
+ * The keys the background worker registers handlers for. HIGHLIGHT_APPLY
  * and HIGHLIGHT_CLEAR are registered by the content script (A9); the bg
  * never receives them directly.
  */
@@ -99,9 +82,6 @@ export const BG_HANDLED_KEYS = [
   'AUTH_SIGN_OUT',
   'AUTH_STATUS',
   'AUTH_STATE_CHANGED',
-  'PROFILE_GET',
-  'PROFILE_UPDATE',
-  'PROFILE_UPLOAD_JSON_RESUME',
   'INTENT_DETECTED',
   'INTENT_GET',
   'FILL_REQUEST',
@@ -117,7 +97,7 @@ export const BG_HANDLED_KEYS = [
 export type BgHandledKey = (typeof BG_HANDLED_KEYS)[number];
 
 /**
- * All 19 ProtocolMap keys enumerated at runtime. Used by the schema
+ * All ProtocolMap keys enumerated at runtime. Used by the schema
  * generator and validators.
  */
 export const ALL_PROTOCOL_KEYS = [
@@ -137,9 +117,6 @@ export type {
   AuthSignInResponse,
   AuthSignOutResponse,
   StoredSession,
-  ProfileGetResponse,
-  ProfileUpdateResponse,
-  ProfileUploadJsonResumeResponse,
   DetectedIntent,
   DetectedIntentPayload,
   FillRequestResponse,
@@ -152,6 +129,5 @@ export type {
   GenerationStartResponse,
   GenerationUpdateBroadcast,
   CreditsState,
-  Profile,
 } from './protocol-types';
 export type { GenerationArtifact } from './schemas/generation.schema';

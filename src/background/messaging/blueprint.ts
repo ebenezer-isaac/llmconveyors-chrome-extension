@@ -13,7 +13,8 @@ export const blueprint: ModuleBlueprint = {
   label: 'Background Messaging Surface',
   description:
     'Single API surface between content, background, popup, sidepanel, options. ' +
-    '19 ProtocolMap keys routed through typed sendMessage/onMessage. Every handler ' +
+    '16 ProtocolMap keys (post-101; PROFILE_* removed in favor of backend ' +
+    'master-resume) routed through typed sendMessage/onMessage. Every handler ' +
     'validates its payload with Zod before business logic. Broadcast-only keys ' +
     'register inert handlers so the exhaustive HANDLERS record type-checks.',
   category: 'messaging',
@@ -69,36 +70,6 @@ export const blueprint: ModuleBlueprint = {
       requestSchemaRef: './schemas/auth.schema',
       responseSchemaRef: './schemas/auth.schema',
       broadcastOnly: true,
-      invariants: [],
-      sourceRef: { file: 'handlers.ts', line: 1 },
-    },
-    {
-      key: 'PROFILE_GET',
-      description: 'Load Profile from chrome.storage.local',
-      handlerLocation: 'background',
-      requestSchemaRef: './schemas/profile-messages.schema',
-      responseSchemaRef: './schemas/profile-messages.schema',
-      broadcastOnly: false,
-      invariants: [],
-      sourceRef: { file: 'handlers.ts', line: 1 },
-    },
-    {
-      key: 'PROFILE_UPDATE',
-      description: 'Deep-merge patch into stored Profile',
-      handlerLocation: 'background',
-      requestSchemaRef: './schemas/profile-messages.schema',
-      responseSchemaRef: './schemas/profile-messages.schema',
-      broadcastOnly: false,
-      invariants: [],
-      sourceRef: { file: 'handlers.ts', line: 1 },
-    },
-    {
-      key: 'PROFILE_UPLOAD_JSON_RESUME',
-      description: 'Parse JSON Resume, convert to Profile, store',
-      handlerLocation: 'background',
-      requestSchemaRef: './schemas/profile-messages.schema',
-      responseSchemaRef: './schemas/profile-messages.schema',
-      broadcastOnly: false,
       invariants: [],
       sourceRef: { file: 'handlers.ts', line: 1 },
     },

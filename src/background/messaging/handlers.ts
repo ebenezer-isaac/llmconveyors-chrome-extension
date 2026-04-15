@@ -10,15 +10,11 @@
 
 import type { Logger } from '../log';
 import type { StoredSession } from './schemas/auth.schema';
-import type { Profile } from './schemas/profile.schema';
 import type { DetectedIntent } from './schemas/intent.schema';
 import type {
   AuthState,
   AuthSignInResponse,
   AuthSignOutResponse,
-  ProfileGetResponse,
-  ProfileUpdateResponse,
-  ProfileUploadJsonResumeResponse,
   IntentGetResponse,
   FillRequestResponse,
   KeywordsExtractResponse,
@@ -36,9 +32,6 @@ import type {
   AuthSignOutRequest,
   AuthStatusRequest,
   CreditsGetRequest,
-  ProfileGetRequest,
-  ProfileUpdateRequest,
-  ProfileUploadJsonResumeRequest,
   GenerationUpdateBroadcast,
   DetectedJobBroadcast,
   HighlightStatusRequest,
@@ -51,13 +44,6 @@ import {
   UNAUTHED,
   StoredSessionSchema,
 } from './schemas/auth.schema';
-import {
-  ProfileGetRequestSchema,
-  ProfileUpdateRequestSchema,
-  ProfileUploadJsonResumeRequestSchema,
-  validatePatchSafety,
-} from './schemas/profile-messages.schema';
-import { ProfileSchema } from './schemas/profile.schema';
 import {
   DetectedIntentPayloadSchema,
   IntentGetRequestSchema,
@@ -81,7 +67,6 @@ import {
   newGenerationId,
   newSessionId,
 } from '../types/brands';
-import { jsonResumeToProfile } from './json-resume-converter';
 import {
   AuthError,
   createSignInOrchestrator,
@@ -99,9 +84,6 @@ export interface HandlerStorage {
   readSession: () => Promise<StoredSession | null>;
   writeSession: (s: StoredSession) => Promise<void>;
   clearSession: () => Promise<void>;
-  readProfile: () => Promise<Profile | null>;
-  writeProfile: (p: Profile) => Promise<void>;
-  clearProfile: () => Promise<void>;
 }
 
 export interface HandlerTabState {
@@ -145,15 +127,6 @@ export type HandlerFor<K extends BgHandledKey> = (msg: {
 }) => Promise<ReturnType<ProtocolMap[K]>>;
 
 export type Handlers = { readonly [K in BgHandledKey]: HandlerFor<K> };
-
-function issueList(
-  err: { readonly issues: ReadonlyArray<{ readonly path: ReadonlyArray<string | number>; readonly message: string }> },
-): { path: string; message: string }[] {
-  return err.issues.map((i) => ({
-    path: i.path.join('.'),
-    message: i.message,
-  }));
-}
 
 async function safeSignedIn(storage: HandlerStorage): Promise<StoredSession | null> {
   try {
@@ -318,78 +291,6 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     return undefined;
   };
 
-  // ---- PROFILE_GET ----
-  const handleProfileGet: HandlerFor<'PROFILE_GET'> = async ({ data }) => {
-    const parsed = ProfileGetRequestSchema.safeParse(data ?? {});
-    if (!parsed.success) {
-      log.warn('PROFILE_GET: invalid payload, proceeding');
-    }
-    const profile = await deps.storage.readProfile();
-    if (profile === null) {
-      return { ok: false, reason: 'not-found' };
-    }
-    return { ok: true, profile };
-  };
-
-  // ---- PROFILE_UPDATE ----
-  const handleProfileUpdate: HandlerFor<'PROFILE_UPDATE'> = async ({ data }) => {
-    // Safety check BEFORE zod parses. zod's z.record strips __proto__ silently
-    // since ES2024; we need to see the raw shape to reject pollution attempts.
-    const rawPatch =
-      data !== null && typeof data === 'object' && !Array.isArray(data)
-        ? (data as Record<string, unknown>).patch
-        : undefined;
-    const safety = validatePatchSafety(rawPatch);
-    if (!safety.safe) {
-      log.warn('PROFILE_UPDATE: rejected unsafe patch', { reason: safety.reason });
-      return {
-        ok: false,
-        errors: [{ path: 'patch', message: safety.reason }],
-      };
-    }
-    const parsed = ProfileUpdateRequestSchema.safeParse(data);
-    if (!parsed.success) {
-      return { ok: false, errors: issueList(parsed.error) };
-    }
-    const existing = await deps.storage.readProfile();
-    if (existing === null) {
-      return {
-        ok: false,
-        errors: [
-          { path: '', message: 'no profile; upload JSON Resume first' },
-        ],
-      };
-    }
-    const merged = deepMerge<Profile>(existing, parsed.data.patch);
-    const nextUpdatedAtMs = deps.now();
-    const withTimestamp: Profile = {
-      ...merged,
-      updatedAtMs: nextUpdatedAtMs,
-    };
-    const valid = ProfileSchema.safeParse(withTimestamp);
-    if (!valid.success) {
-      return { ok: false, errors: issueList(valid.error) };
-    }
-    await deps.storage.writeProfile(valid.data);
-    return { ok: true };
-  };
-
-  // ---- PROFILE_UPLOAD_JSON_RESUME ----
-  const handleProfileUploadJsonResume: HandlerFor<'PROFILE_UPLOAD_JSON_RESUME'> = async ({
-    data,
-  }) => {
-    const parsed = ProfileUploadJsonResumeRequestSchema.safeParse(data);
-    if (!parsed.success) {
-      return { ok: false, errors: issueList(parsed.error) };
-    }
-    const converted = jsonResumeToProfile(parsed.data.jsonResume, deps.now());
-    if (!converted.ok) {
-      return { ok: false, errors: converted.errors };
-    }
-    await deps.storage.writeProfile(converted.profile);
-    return { ok: true, profile: converted.profile };
-  };
-
   // ---- INTENT_DETECTED ----
   const handleIntentDetected: HandlerFor<'INTENT_DETECTED'> = async ({ data, sender }) => {
     const parsed = DetectedIntentPayloadSchema.safeParse(data);
@@ -426,14 +327,13 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   };
 
   // ---- FILL_REQUEST (forwarder) ----
+  // Post-101: profile-missing is no longer enforced here. The content-script
+  // autofill-controller pulls the master-resume from the backend and returns
+  // aborted 'profile-missing' if the resume is absent.
   const handleFillRequest: HandlerFor<'FILL_REQUEST'> = async ({ data }) => {
     const parsed = FillRequestSchema.safeParse(data);
     if (!parsed.success) {
       return { ok: false, aborted: true, abortReason: 'no-tab' };
-    }
-    const profile = await deps.storage.readProfile();
-    if (profile === null) {
-      return { ok: false, aborted: true, abortReason: 'profile-missing' };
     }
     try {
       const resp = await deps.broadcast.sendToTab(parsed.data.tabId, {
@@ -635,9 +535,6 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     AUTH_SIGN_OUT: handleAuthSignOut,
     AUTH_STATUS: handleAuthStatus,
     AUTH_STATE_CHANGED: handleAuthStateChanged,
-    PROFILE_GET: handleProfileGet,
-    PROFILE_UPDATE: handleProfileUpdate,
-    PROFILE_UPLOAD_JSON_RESUME: handleProfileUploadJsonResume,
     INTENT_DETECTED: handleIntentDetected,
     INTENT_GET: handleIntentGet,
     FILL_REQUEST: handleFillRequest,
@@ -694,9 +591,6 @@ export type _AllHandlerInputs =
   | AuthSignOutRequest
   | AuthStatusRequest
   | AuthState
-  | ProfileGetRequest
-  | ProfileUpdateRequest
-  | ProfileUploadJsonResumeRequest
   | DetectedIntentPayload
   | IntentGetRequest
   | FillRequest
@@ -712,9 +606,6 @@ export type _AllHandlerOutputs =
   | AuthSignInResponse
   | AuthSignOutResponse
   | AuthState
-  | ProfileGetResponse
-  | ProfileUpdateResponse
-  | ProfileUploadJsonResumeResponse
   | IntentGetResponse
   | FillRequestResponse
   | KeywordsExtractResponse

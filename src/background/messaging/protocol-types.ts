@@ -16,14 +16,6 @@ import type {
   StoredSessionSchema,
 } from './schemas/auth.schema';
 import type {
-  ProfileGetRequestSchema,
-  ProfileGetResponseSchema,
-  ProfileUpdateRequestSchema,
-  ProfileUpdateResponseSchema,
-  ProfileUploadJsonResumeRequestSchema,
-  ProfileUploadJsonResumeResponseSchema,
-} from './schemas/profile-messages.schema';
-import type {
   DetectedIntentSchema,
   DetectedIntentPayloadSchema,
   IntentGetRequestSchema,
@@ -66,18 +58,6 @@ export type AuthSignOutResponse = z.infer<typeof AuthSignOutResponseSchema>;
 export type AuthState = z.infer<typeof AuthStateSchema>;
 export type StoredSession = z.infer<typeof StoredSessionSchema>;
 
-// Profile messaging
-export type ProfileGetRequest = z.infer<typeof ProfileGetRequestSchema>;
-export type ProfileGetResponse = z.infer<typeof ProfileGetResponseSchema>;
-export type ProfileUpdateRequest = z.infer<typeof ProfileUpdateRequestSchema>;
-export type ProfileUpdateResponse = z.infer<typeof ProfileUpdateResponseSchema>;
-export type ProfileUploadJsonResumeRequest = z.infer<
-  typeof ProfileUploadJsonResumeRequestSchema
->;
-export type ProfileUploadJsonResumeResponse = z.infer<
-  typeof ProfileUploadJsonResumeResponseSchema
->;
-
 // Intent
 export type DetectedIntent = z.infer<typeof DetectedIntentSchema>;
 export type DetectedIntentPayload = z.infer<typeof DetectedIntentPayloadSchema>;
@@ -113,5 +93,3 @@ export type GenerationCancelResponse = z.infer<typeof GenerationCancelResponseSc
 // Credits
 export type CreditsGetRequest = z.infer<typeof CreditsGetRequestSchema>;
 export type CreditsState = z.infer<typeof CreditsStateSchema>;
-
-export type { Profile } from './schemas/profile.schema';
