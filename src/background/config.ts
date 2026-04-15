@@ -5,23 +5,14 @@
  * API base URLs come from WXT via import.meta.env at build time. Tests can
  * stub via module mocking. Every URL lives here so downstream phases find
  * them in one place.
+ *
+ * API_BASE_URL is sourced from extensionEnv so all env reads are centralised
+ * in src/shared/env.ts.
  */
 
-function readEnv(key: string, fallback: string): string {
-  try {
-    const env = (import.meta as unknown as { env?: Record<string, unknown> }).env;
-    const v = env?.[key];
-    if (typeof v === 'string' && v.length > 0) return v;
-  } catch {
-    // ignore
-  }
-  return fallback;
-}
+import { extensionEnv } from '../shared/env';
 
-export const API_BASE_URL: string = readEnv(
-  'VITE_LLMC_API_BASE_URL',
-  'https://api.llmconveyors.com',
-);
+export const API_BASE_URL: string = extensionEnv.apiBaseUrl;
 
 export const AUTH_EXCHANGE_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/extension-token-exchange';
 export const AUTH_SIGN_OUT_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/sign-out';
