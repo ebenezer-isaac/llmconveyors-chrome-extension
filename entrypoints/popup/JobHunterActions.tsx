@@ -39,7 +39,7 @@ export function JobHunterActions({
   const isApplicationForm =
     intent?.pageKind === 'application-form' && intent.kind !== 'unknown';
   const jdAvailable = isJobPosting || hasGenericJd;
-  const outOfCredits = (credits?.balance ?? 0) <= 0;
+  const outOfCredits = (credits?.credits ?? 0) <= 0;
 
   let generateDisabledReason: string | undefined;
   if (outOfCredits) {

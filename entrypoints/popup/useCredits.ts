@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 /**
- * React hook that exposes the current user's credit balance in the popup.
+ * React hook that exposes the current user's credit balance and tier in the
+ * popup.
  *
  * On mount, dispatches a CREDITS_GET runtime message to the background worker,
- * which calls the backend /api/v1/settings/usage-summary endpoint (see the A5
- * handler in src/background/messaging/handlers.ts). A background broadcast on
- * the CREDITS_UPDATED key, if delivered, will trigger a refresh; the hook also
- * re-fetches on window focus so the popup picks up post-fill debits the next
- * time the user opens it.
+ * which calls the backend /api/v1/settings/profile endpoint. A background
+ * broadcast on the CREDITS_UPDATED / CREDITS_STATE key, if delivered, will
+ * trigger a refresh; the hook also re-fetches on window focus so the popup
+ * picks up post-fill debits the next time the user opens it.
  *
  * Defensive: the hook tolerates a missing chrome.runtime (non-extension test
  * pages), sendMessage rejections, and malformed responses by remaining in the
- * `loading === true, balance === null` state rather than crashing.
+ * `loading === true, credits === null` state rather than crashing.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -37,10 +37,14 @@ function getRuntime(): RuntimeMessenger | null {
 
 function isCreditsState(value: unknown): value is CreditsState {
   if (value === null || typeof value !== 'object') return false;
-  const v = value as { balance?: unknown; plan?: unknown; resetAt?: unknown };
-  if (typeof v.balance !== 'number' || !Number.isFinite(v.balance)) return false;
-  if (typeof v.plan !== 'string') return false;
-  if (v.resetAt !== null && typeof v.resetAt !== 'number') return false;
+  const v = value as {
+    credits?: unknown;
+    tier?: unknown;
+    byoKeyEnabled?: unknown;
+  };
+  if (typeof v.credits !== 'number' || !Number.isFinite(v.credits)) return false;
+  if (v.tier !== 'free' && v.tier !== 'byo') return false;
+  if (typeof v.byoKeyEnabled !== 'boolean') return false;
   return true;
 }
 
@@ -114,4 +118,13 @@ export function useCredits(): UseCreditsResult {
   }, [fetchCredits]);
 
   return { credits, loading, error, refresh: fetchCredits };
+}
+
+/** Stable display label for the tier badge shown in the popup. */
+export function getTierLabel(
+  tier: CreditsState['tier'],
+  byoKeyEnabled: boolean,
+): string {
+  if (tier === 'byo' || byoKeyEnabled) return 'BYO Key tier';
+  return 'Free tier';
 }

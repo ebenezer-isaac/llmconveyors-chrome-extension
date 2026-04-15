@@ -47,6 +47,9 @@ Request schema:
     "cookieJar": {
       "type": "string",
       "maxLength": 16384
+    },
+    "interactive": {
+      "type": "boolean"
     }
   },
   "additionalProperties": false,
@@ -1421,31 +1424,26 @@ Response schema:
 {
   "type": "object",
   "properties": {
-    "balance": {
+    "credits": {
       "type": "number",
       "minimum": 0,
       "maximum": 1000000000
     },
-    "plan": {
+    "tier": {
       "type": "string",
-      "minLength": 1,
-      "maxLength": 64
-    },
-    "resetAt": {
-      "anyOf": [
-        {
-          "type": "integer"
-        },
-        {
-          "type": "null"
-        }
+      "enum": [
+        "free",
+        "byo"
       ]
+    },
+    "byoKeyEnabled": {
+      "type": "boolean"
     }
   },
   "required": [
-    "balance",
-    "plan",
-    "resetAt"
+    "credits",
+    "tier",
+    "byoKeyEnabled"
   ],
   "additionalProperties": false,
   "$schema": "http://json-schema.org/draft-07/schema#"
@@ -1466,20 +1464,10 @@ Request schema:
       "minimum": 1,
       "maximum": 50
     },
-    "offset": {
-      "type": "integer",
-      "minimum": 0,
-      "maximum": 10000
-    },
-    "status": {
+    "cursor": {
       "type": "string",
-      "enum": [
-        "active",
-        "completed",
-        "failed",
-        "awaiting_input",
-        "cancelled"
-      ]
+      "minLength": 1,
+      "maxLength": 128
     },
     "forceRefresh": {
       "type": "boolean"
@@ -1516,17 +1504,6 @@ Response schema:
                 "enum": [
                   "job-hunter",
                   "b2b-sales"
-                ]
-              },
-              "title": {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "maxLength": 500
-                  },
-                  {
-                    "type": "null"
-                  }
                 ]
               },
               "status": {
@@ -1590,11 +1567,16 @@ Response schema:
             ],
             "additionalProperties": false
           },
-          "maxItems": 100
+          "maxItems": 200
         },
-        "total": {
-          "type": "integer",
-          "minimum": 0
+        "hasMore": {
+          "type": "boolean"
+        },
+        "nextCursor": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "fetchedAt": {
           "type": "integer",
@@ -1607,7 +1589,8 @@ Response schema:
       "required": [
         "ok",
         "items",
-        "total",
+        "hasMore",
+        "nextCursor",
         "fetchedAt",
         "fromCache"
       ],
@@ -1691,17 +1674,6 @@ Response schema:
               "enum": [
                 "job-hunter",
                 "b2b-sales"
-              ]
-            },
-            "title": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "maxLength": 500
-                },
-                {
-                  "type": "null"
-                }
               ]
             },
             "status": {

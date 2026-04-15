@@ -84,7 +84,7 @@ async function flush(): Promise<void> {
 
 describe('useCredits', () => {
   it('fetches credits on mount and exposes the response', async () => {
-    const credits: CreditsState = { balance: 100, plan: 'free', resetAt: null };
+    const credits: CreditsState = { credits: 100, tier: 'free', byoKeyEnabled: false };
     const sendMessage = vi.fn(async (msg: unknown) => {
       const env = msg as { key?: string };
       if (env.key === 'CREDITS_GET') return credits;
@@ -97,7 +97,7 @@ describe('useCredits', () => {
       expect.objectContaining({ key: 'CREDITS_GET' }),
     );
     expect(capture.current?.loading).toBe(false);
-    expect(capture.current?.credits?.balance).toBe(100);
+    expect(capture.current?.credits?.credits).toBe(100);
     expect(capture.current?.error).toBeNull();
   });
 
@@ -114,7 +114,19 @@ describe('useCredits', () => {
   });
 
   it('collapses to an error state when the response shape is invalid', async () => {
-    installFakeChrome(async () => ({ balance: 'not a number', plan: 42 }));
+    installFakeChrome(async () => ({ credits: 'not a number', tier: 42 }));
+    await mount();
+    await flush();
+    expect(capture.current?.credits).toBeNull();
+    expect(capture.current?.error).toMatch(/invalid/i);
+  });
+
+  it('rejects unknown tier values', async () => {
+    installFakeChrome(async () => ({
+      credits: 10,
+      tier: 'enterprise',
+      byoKeyEnabled: false,
+    }));
     await mount();
     await flush();
     expect(capture.current?.credits).toBeNull();
@@ -125,40 +137,41 @@ describe('useCredits', () => {
     let n = 0;
     const sendMessage = vi.fn(async (): Promise<CreditsState> => {
       n++;
-      return { balance: n * 10, plan: 'free', resetAt: null };
+      return { credits: n * 10, tier: 'free', byoKeyEnabled: false };
     });
     installFakeChrome(sendMessage);
     await mount();
     await flush();
-    expect(capture.current?.credits?.balance).toBe(10);
+    expect(capture.current?.credits?.credits).toBe(10);
     await act(async () => {
       globalThis.dispatchEvent(new Event('focus'));
       await Promise.resolve();
       await Promise.resolve();
     });
     expect(sendMessage).toHaveBeenCalledTimes(2);
-    expect(capture.current?.credits?.balance).toBe(20);
+    expect(capture.current?.credits?.credits).toBe(20);
   });
 
   it('updates via CREDITS_UPDATED broadcast', async () => {
     const { listeners } = installFakeChrome(async () => ({
-      balance: 5,
-      plan: 'free',
-      resetAt: null,
+      credits: 5,
+      tier: 'free',
+      byoKeyEnabled: false,
     }));
     await mount();
     await flush();
-    expect(capture.current?.credits?.balance).toBe(5);
+    expect(capture.current?.credits?.credits).toBe(5);
     await act(async () => {
       for (const fn of listeners) {
         fn({
           key: 'CREDITS_UPDATED',
-          data: { balance: 17, plan: 'pro', resetAt: 99 } as CreditsState,
+          data: { credits: 17, tier: 'byo', byoKeyEnabled: true } as CreditsState,
         });
       }
       await Promise.resolve();
     });
-    expect(capture.current?.credits?.balance).toBe(17);
+    expect(capture.current?.credits?.credits).toBe(17);
+    expect(capture.current?.credits?.tier).toBe('byo');
   });
 
   it('reports runtime unavailable error when chrome.runtime is missing', async () => {

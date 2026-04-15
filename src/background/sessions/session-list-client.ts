@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: MIT
 /**
- * Session list client. Wraps GET /api/v1/sessions into a bg-friendly
- * discriminated union.
+ * Session list client. Wraps GET /api/v1/sessions (cursor-paginated) into a
+ * bg-friendly discriminated union.
  *
- * The backend envelope is `{ success: true, data: { items, total, page?, limit? } }`;
- * this client normalizes the `data.*` fields and propagates auth / network
- * failures as typed outcomes so the handler can react without throwing.
+ * Wire contract (see api/src/modules/sessions/sessions.controller.ts):
+ *   GET /api/v1/sessions?limit=N&cursor=ISO-8601
+ *   -> global envelope: { success, data: { sessions, pagination } }
+ *
+ * The bare `sessions[]` items carry `metadata.{agentType,companyName,jobTitle}`;
+ * this client normalizes them via `normalizeBackendSession` into the flat
+ * `SessionListItem` shape the popup consumes. Entries with unknown agent
+ * types or invalid timestamps are dropped.
  */
 
 import type { Logger } from '../log';
 import {
   SessionListResponseSchema,
+  normalizeBackendSession,
   type SessionListItem,
 } from '../messaging/schemas/session-list.schema';
 
@@ -18,7 +24,8 @@ export type SessionListClientOutcome =
   | {
       readonly kind: 'ok';
       readonly items: readonly SessionListItem[];
-      readonly total: number;
+      readonly hasMore: boolean;
+      readonly nextCursor: string | null;
     }
   | { readonly kind: 'unauthenticated' }
   | { readonly kind: 'network-error' }
@@ -34,15 +41,15 @@ export interface SessionListClientDeps {
 
 export interface SessionListQuery {
   readonly limit?: number;
-  readonly offset?: number;
-  readonly status?: 'active' | 'completed' | 'failed' | 'awaiting_input' | 'cancelled';
+  readonly cursor?: string;
 }
 
 function buildQueryString(q: SessionListQuery): string {
   const params = new URLSearchParams();
   if (typeof q.limit === 'number') params.set('limit', String(q.limit));
-  if (typeof q.offset === 'number') params.set('offset', String(q.offset));
-  if (typeof q.status === 'string') params.set('status', q.status);
+  if (typeof q.cursor === 'string' && q.cursor.length > 0) {
+    params.set('cursor', q.cursor);
+  }
   const s = params.toString();
   return s.length > 0 ? `?${s}` : '';
 }
@@ -75,17 +82,28 @@ export function createSessionListClient(
       } catch {
         return { kind: 'shape-mismatch' };
       }
-      const parsed = SessionListResponseSchema.safeParse(body);
+      // Peel the global `{ success, data }` envelope if present; otherwise
+      // accept the bare shape (test fixtures commonly skip the envelope).
+      if (body === null || typeof body !== 'object') return { kind: 'shape-mismatch' };
+      const asRecord = body as Record<string, unknown>;
+      const payload = (asRecord.data as Record<string, unknown> | undefined) ?? asRecord;
+      const parsed = SessionListResponseSchema.safeParse(payload);
       if (!parsed.success) {
         deps.logger.warn('session-list: envelope drift', {
           issues: parsed.error.issues.length,
         });
         return { kind: 'shape-mismatch' };
       }
+      const items: SessionListItem[] = [];
+      for (const raw of parsed.data.sessions) {
+        const item = normalizeBackendSession(raw);
+        if (item !== null) items.push(item);
+      }
       return {
         kind: 'ok',
-        items: parsed.data.data.items,
-        total: parsed.data.data.total,
+        items,
+        hasMore: parsed.data.pagination.hasMore,
+        nextCursor: parsed.data.pagination.nextCursor,
       };
     },
   };

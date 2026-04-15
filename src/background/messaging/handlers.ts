@@ -117,7 +117,7 @@ export interface HandlerEndpoints {
   readonly authExchange: string;
   readonly authSignOut: string;
   readonly extractSkills: string;
-  readonly usageSummary: string;
+  readonly settingsProfile: string;
   readonly generationStart: string;
   readonly generationCancel: string;
 }
@@ -149,15 +149,15 @@ export interface SessionHandlerAdapters {
   readonly client: {
     list: (q: {
       limit?: number;
-      offset?: number;
-      status?: 'active' | 'completed' | 'failed' | 'awaiting_input' | 'cancelled';
+      cursor?: string;
     }) => Promise<SessionListClientOutcome>;
   };
   readonly cache: {
     read: () => Promise<CachedSessionList | null>;
     write: (entry: {
       items: readonly SessionListItem[];
-      total: number;
+      hasMore: boolean;
+      nextCursor: string | null;
     }) => Promise<CachedSessionList>;
     clear: () => Promise<void>;
     isFresh: (entry: CachedSessionList) => boolean;
@@ -246,7 +246,8 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (typeof jar === 'string' && jar.length > 0) {
       return cookieJarExchange(jar);
     }
-    return webAuthFlowSignIn();
+    const interactive = parsed.data.interactive !== false;
+    return webAuthFlowSignIn(interactive);
   };
 
   async function cookieJarExchange(cookieJar: string): Promise<AuthSignInResponse> {
@@ -294,7 +295,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
   }
 
-  async function webAuthFlowSignIn(): Promise<AuthSignInResponse> {
+  async function webAuthFlowSignIn(
+    interactive: boolean,
+  ): Promise<AuthSignInResponse> {
     const orchestrator = createSignInOrchestrator({
       webAuthFlow: defaultWebAuthFlowDeps,
       storage: {
@@ -311,7 +314,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       launch: defaultLaunchWebAuthFlow,
     });
     try {
-      const state = await orchestrator();
+      const state = await orchestrator({ interactive });
       if (!state.signedIn) {
         return { ok: false, reason: 'sign-in returned unauthenticated state' };
       }
@@ -321,6 +324,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
         log.warn('AUTH_SIGN_IN: web-auth-flow failed', {
           errName: err.name,
           errMessage: err.message,
+          interactive,
         });
         return { ok: false, reason: `${err.name}: ${err.message}` };
       }
@@ -549,16 +553,23 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   };
 
   // ---- CREDITS_GET ----
+  // Reads /api/v1/settings/profile. Backend returns the global envelope
+  // `{ success, data: { credits, tier, byoKeyEnabled, ... } }`; we defensively
+  // also accept an un-enveloped object so test fixtures stay compact.
   const handleCreditsGet: HandlerFor<'CREDITS_GET'> = async ({ data }) => {
     const parsed = CreditsGetRequestSchema.safeParse(data ?? {});
     if (!parsed.success) {
       log.warn('CREDITS_GET: invalid payload');
     }
-    const fallback: CreditsState = { balance: 0, plan: 'unknown', resetAt: null };
+    const fallback: CreditsState = {
+      credits: 0,
+      tier: 'free',
+      byoKeyEnabled: false,
+    };
     const session = await safeSignedIn(deps.storage);
     if (session === null) return fallback;
     try {
-      const res = await deps.fetch(deps.endpoints.usageSummary, {
+      const res = await deps.fetch(deps.endpoints.settingsProfile, {
         method: 'GET',
         headers: { authorization: `Bearer ${session.accessToken}` },
       });
@@ -572,10 +583,17 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       if (typeof body !== 'object' || body === null) return fallback;
       const obj = body as Record<string, unknown>;
       const dataObj = (obj.data as Record<string, unknown> | undefined) ?? obj;
-      const balance = typeof dataObj.balance === 'number' ? dataObj.balance : 0;
-      const plan = typeof dataObj.plan === 'string' ? dataObj.plan : 'unknown';
-      const resetAt = typeof dataObj.resetAt === 'number' ? dataObj.resetAt : null;
-      return { balance, plan, resetAt };
+      const credits =
+        typeof dataObj.credits === 'number' && Number.isFinite(dataObj.credits)
+          ? Math.max(0, dataObj.credits)
+          : 0;
+      const tier: 'free' | 'byo' =
+        dataObj.tier === 'byo' ? 'byo' : 'free';
+      const byoKeyEnabled =
+        typeof dataObj.byoKeyEnabled === 'boolean'
+          ? dataObj.byoKeyEnabled
+          : tier === 'byo';
+      return { credits, tier, byoKeyEnabled };
     } catch (err) {
       log.warn('CREDITS_GET: network', { error: String(err) });
       return fallback;

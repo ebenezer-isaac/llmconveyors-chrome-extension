@@ -20,7 +20,12 @@ function item(id: string, extra: Partial<SessionListItem> = {}): SessionListItem
 
 describe('SESSION_LIST handler', () => {
   it('returns cached items when the cache is fresh', async () => {
-    const cached = { items: [item('s1')], total: 1, fetchedAt: 100 };
+    const cached = {
+      items: [item('s1')],
+      hasMore: false,
+      nextCursor: null,
+      fetchedAt: 100,
+    };
     const cache = {
       read: vi.fn(async () => cached),
       write: vi.fn(async () => cached),
@@ -39,21 +44,38 @@ describe('SESSION_LIST handler', () => {
     if (r.ok) {
       expect(r.fromCache).toBe(true);
       expect(r.items).toHaveLength(1);
+      expect(r.hasMore).toBe(false);
+      expect(r.nextCursor).toBeNull();
     }
     expect(client.list).not.toHaveBeenCalled();
   });
 
   it('forces refresh when forceRefresh=true even with fresh cache', async () => {
-    const cached = { items: [item('s1')], total: 1, fetchedAt: 100 };
+    const cached = {
+      items: [item('s1')],
+      hasMore: false,
+      nextCursor: null,
+      fetchedAt: 100,
+    };
     const fresh = [item('s2')];
     const cache = {
       read: vi.fn(async () => cached),
-      write: vi.fn(async () => ({ items: fresh, total: 1, fetchedAt: 200 })),
+      write: vi.fn(async () => ({
+        items: fresh,
+        hasMore: true,
+        nextCursor: '2026-04-15T00:00:00.000Z',
+        fetchedAt: 200,
+      })),
       clear: vi.fn(),
       isFresh: vi.fn(() => true),
     };
     const client = {
-      list: vi.fn(async () => ({ kind: 'ok' as const, items: fresh, total: 1 })),
+      list: vi.fn(async () => ({
+        kind: 'ok' as const,
+        items: fresh,
+        hasMore: true,
+        nextCursor: '2026-04-15T00:00:00.000Z',
+      })),
     };
     const h = createSessionHandlers({
       client,
@@ -67,6 +89,8 @@ describe('SESSION_LIST handler', () => {
     if (r.ok) {
       expect(r.items[0]?.sessionId).toBe('s2');
       expect(r.fromCache).toBe(false);
+      expect(r.hasMore).toBe(true);
+      expect(r.nextCursor).toBe('2026-04-15T00:00:00.000Z');
     }
   });
 
@@ -108,11 +132,50 @@ describe('SESSION_LIST handler', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('shape-mismatch');
   });
+
+  it('forwards cursor query parameter to the client', async () => {
+    const cache = {
+      read: vi.fn(async () => null),
+      write: vi.fn(async (entry: {
+        items: readonly SessionListItem[];
+        hasMore: boolean;
+        nextCursor: string | null;
+      }) => ({ ...entry, fetchedAt: 0 })),
+      clear: vi.fn(),
+      isFresh: vi.fn(() => false),
+    };
+    const client = {
+      list: vi.fn(async () => ({
+        kind: 'ok' as const,
+        items: [],
+        hasMore: false,
+        nextCursor: null,
+      })),
+    };
+    const h = createSessionHandlers({
+      client,
+      cache,
+      now: () => 0,
+      logger: logger(),
+    });
+    await h.SESSION_LIST({
+      data: { limit: 10, cursor: '2026-04-01T00:00:00.000Z' },
+    });
+    expect(client.list).toHaveBeenCalledWith({
+      limit: 10,
+      cursor: '2026-04-01T00:00:00.000Z',
+    });
+  });
 });
 
 describe('SESSION_GET handler', () => {
   it('returns from cache when sessionId matches', async () => {
-    const cached = { items: [item('s1')], total: 1, fetchedAt: 0 };
+    const cached = {
+      items: [item('s1')],
+      hasMore: false,
+      nextCursor: null,
+      fetchedAt: 0,
+    };
     const cache = {
       read: vi.fn(async () => cached),
       write: vi.fn(),
@@ -135,12 +198,22 @@ describe('SESSION_GET handler', () => {
   it('falls back to list when cache missing, returns not-found when absent', async () => {
     const cache = {
       read: vi.fn(async () => null),
-      write: vi.fn(async () => ({ items: [item('other')], total: 1, fetchedAt: 1 })),
+      write: vi.fn(async () => ({
+        items: [item('other')],
+        hasMore: false,
+        nextCursor: null,
+        fetchedAt: 1,
+      })),
       clear: vi.fn(),
       isFresh: vi.fn(() => false),
     };
     const client = {
-      list: vi.fn(async () => ({ kind: 'ok' as const, items: [item('other')], total: 1 })),
+      list: vi.fn(async () => ({
+        kind: 'ok' as const,
+        items: [item('other')],
+        hasMore: false,
+        nextCursor: null,
+      })),
     };
     const h = createSessionHandlers({
       client,

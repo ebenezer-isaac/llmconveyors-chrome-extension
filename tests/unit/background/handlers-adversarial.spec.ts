@@ -65,7 +65,7 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
       authExchange: 'https://api.test/exchange',
       authSignOut: 'https://api.test/sign-out',
       extractSkills: 'https://api.test/extract',
-      usageSummary: 'https://api.test/usage',
+      settingsProfile: 'https://api.test/profile',
       generationStart: 'https://api.test/start',
       generationCancel: 'https://api.test/cancel',
     },
@@ -107,7 +107,8 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
         read: vi.fn(async () => null),
         write: vi.fn(async (entry) => ({
           items: entry.items,
-          total: entry.total,
+          hasMore: entry.hasMore,
+          nextCursor: entry.nextCursor,
           fetchedAt: 1_713_000_000_000,
         })),
         clear: vi.fn(async () => undefined),
@@ -481,7 +482,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
     ) as unknown as typeof fetch;
     const h = createHandlers(deps);
     const r = await h.CREDITS_GET({ data: {}, sender });
-    expect(r).toEqual({ balance: 0, plan: 'unknown', resetAt: null });
+    expect(r).toEqual({ credits: 0, tier: 'free', byoKeyEnabled: false });
   });
 
   it('AUTH_SIGN_IN cookieJar exchange with tampered userId (empty) is rejected', async () => {

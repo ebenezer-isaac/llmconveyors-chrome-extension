@@ -4,6 +4,9 @@
  * session-list-client + cache to serve the popup's "Recent sessions" section
  * with a 30s TTL and a forceRefresh escape hatch used by
  * GENERATION_COMPLETE-driven invalidations.
+ *
+ * Post-104: cursor-based pagination; `hasMore` and `nextCursor` replace the
+ * old `total` count which the cursor backend no longer emits.
  */
 
 import type { Logger } from '../log';
@@ -21,15 +24,15 @@ export interface SessionHandlerDeps {
   readonly client: {
     list: (q: {
       limit?: number;
-      offset?: number;
-      status?: 'active' | 'completed' | 'failed' | 'awaiting_input' | 'cancelled';
+      cursor?: string;
     }) => Promise<SessionListClientOutcome>;
   };
   readonly cache: {
     read: () => Promise<CachedSessionList | null>;
     write: (entry: {
       items: readonly SessionListItem[];
-      total: number;
+      hasMore: boolean;
+      nextCursor: string | null;
     }) => Promise<CachedSessionList>;
     clear: () => Promise<void>;
     isFresh: (entry: CachedSessionList) => boolean;
@@ -75,7 +78,8 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
           return {
             ok: true,
             items: [...cached.items],
-            total: cached.total,
+            hasMore: cached.hasMore,
+            nextCursor: cached.nextCursor,
             fetchedAt: cached.fetchedAt,
             fromCache: true,
           };
@@ -84,18 +88,19 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
 
       const outcome = await deps.client.list({
         limit: req.limit ?? 5,
-        offset: req.offset,
-        status: req.status,
+        cursor: req.cursor,
       });
       if (outcome.kind === 'ok') {
         const written = await deps.cache.write({
           items: outcome.items,
-          total: outcome.total,
+          hasMore: outcome.hasMore,
+          nextCursor: outcome.nextCursor,
         });
         return {
           ok: true,
           items: [...written.items],
-          total: written.total,
+          hasMore: written.hasMore,
+          nextCursor: written.nextCursor,
           fetchedAt: written.fetchedAt,
           fromCache: false,
         };
@@ -124,7 +129,8 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
         const match = outcome.items.find((it) => it.sessionId === parsed.data.sessionId);
         await deps.cache.write({
           items: outcome.items,
-          total: outcome.total,
+          hasMore: outcome.hasMore,
+          nextCursor: outcome.nextCursor,
         });
         if (match) return { ok: true, session: match };
         return { ok: false, reason: 'not-found' };

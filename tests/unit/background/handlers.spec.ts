@@ -65,7 +65,7 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
       authExchange: 'https://api.test/exchange',
       authSignOut: 'https://api.test/sign-out',
       extractSkills: 'https://api.test/extract',
-      usageSummary: 'https://api.test/usage',
+      settingsProfile: 'https://api.test/profile',
       generationStart: 'https://api.test/start',
       generationCancel: 'https://api.test/cancel',
     },
@@ -87,7 +87,8 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
         read: vi.fn(async () => null),
         write: vi.fn(async (entry) => ({
           items: entry.items,
-          total: entry.total,
+          hasMore: entry.hasMore,
+          nextCursor: entry.nextCursor,
           fetchedAt: 1_713_000_000_000,
         })),
         clear: vi.fn(async () => undefined),

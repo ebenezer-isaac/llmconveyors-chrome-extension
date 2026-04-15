@@ -6,6 +6,10 @@
  *
  * Invalidation: explicit `clear()` call from the GENERATION_COMPLETE broadcast
  * handler, or when the cache's writeAt falls outside the TTL window.
+ *
+ * The backend now returns cursor-based pagination; we persist `hasMore` and
+ * `nextCursor` instead of the old `total` so the "View all" link can hide
+ * when the list is exhausted.
  */
 
 import type { Logger } from '../log';
@@ -14,7 +18,8 @@ import type { SessionListItem } from '../messaging/schemas/session-list.schema';
 
 export interface CachedSessionList {
   readonly items: readonly SessionListItem[];
-  readonly total: number;
+  readonly hasMore: boolean;
+  readonly nextCursor: string | null;
   readonly fetchedAt: number;
 }
 
@@ -32,7 +37,8 @@ export function createSessionListCache(deps: SessionListCacheDeps): {
   read: () => Promise<CachedSessionList | null>;
   write: (entry: {
     readonly items: readonly SessionListItem[];
-    readonly total: number;
+    readonly hasMore: boolean;
+    readonly nextCursor: string | null;
   }) => Promise<CachedSessionList>;
   clear: () => Promise<void>;
   isFresh: (entry: CachedSessionList) => boolean;
@@ -46,10 +52,12 @@ export function createSessionListCache(deps: SessionListCacheDeps): {
         if (typeof entry !== 'object' || entry === null) return null;
         const obj = entry as Record<string, unknown>;
         const fetchedAt = typeof obj.fetchedAt === 'number' ? obj.fetchedAt : 0;
-        const total = typeof obj.total === 'number' ? obj.total : 0;
+        const hasMore = obj.hasMore === true;
+        const nextCursor =
+          typeof obj.nextCursor === 'string' ? obj.nextCursor : null;
         const items = Array.isArray(obj.items) ? (obj.items as SessionListItem[]) : [];
         if (fetchedAt === 0) return null;
-        return { items, total, fetchedAt };
+        return { items, hasMore, nextCursor, fetchedAt };
       } catch (err: unknown) {
         deps.logger.warn('session-list-cache: read failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -60,7 +68,8 @@ export function createSessionListCache(deps: SessionListCacheDeps): {
     async write(entry): Promise<CachedSessionList> {
       const payload: CachedSessionList = {
         items: entry.items,
-        total: entry.total,
+        hasMore: entry.hasMore,
+        nextCursor: entry.nextCursor,
         fetchedAt: deps.now(),
       };
       try {

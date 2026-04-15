@@ -18,7 +18,7 @@ const EXTENSION_PATH = join(__dirname, '..', '..', '.output', 'chrome-mv3');
  *
  * Scenario 1 -- popup shows credits remaining when signed in
  *   Seeds an auth session, installs a backend stub that returns 25 credits
- *   on the usage-summary endpoint, opens the popup, and asserts the
+ *   on the settings-profile endpoint, opens the popup, and asserts the
  *   [data-testid="credits-remaining"] element is visible with the expected
  *   balance text.
  *
@@ -50,8 +50,9 @@ async function launchExtensionContext(): Promise<BrowserContext> {
 
 /**
  * Install a backend stub that returns a fixed credit balance from the
- * usage-summary endpoint. The CREDITS_GET bg handler calls this URL and
- * reads `data.balance` from the envelope.
+ * settings-profile endpoint. The CREDITS_GET bg handler calls this URL and
+ * reads `data.credits`, `data.tier`, and `data.byoKeyEnabled` from the
+ * envelope.
  */
 async function installCreditsBackendStub(
   context: BrowserContext,
@@ -60,12 +61,12 @@ async function installCreditsBackendStub(
   await context.route('https://api.llmconveyors.com/**', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
-    if (url.pathname.endsWith('/api/v1/settings/usage/summary')) {
+    if (url.pathname.endsWith('/api/v1/settings/profile')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: { balance, plan: 'free', resetAt: null },
+          data: { credits: balance, tier: 'free', byoKeyEnabled: false },
         }),
       });
       return;
@@ -75,12 +76,12 @@ async function installCreditsBackendStub(
   await context.route('https://api.llmconveyors.local/**', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
-    if (url.pathname.endsWith('/api/v1/settings/usage/summary')) {
+    if (url.pathname.endsWith('/api/v1/settings/profile')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: { balance, plan: 'free', resetAt: null },
+          data: { credits: balance, tier: 'free', byoKeyEnabled: false },
         }),
       });
       return;

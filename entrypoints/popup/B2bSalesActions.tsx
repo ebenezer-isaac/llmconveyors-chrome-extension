@@ -59,7 +59,7 @@ export function B2bSalesActions({
   tabUrl,
   credits,
 }: B2bSalesActionsProps): React.ReactElement {
-  const outOfCredits = (credits?.balance ?? 0) <= 0;
+  const outOfCredits = (credits?.credits ?? 0) <= 0;
   const hasTabUrl =
     tabUrl !== null && (tabUrl.startsWith('http://') || tabUrl.startsWith('https://'));
   const isProfile = isLinkedInProfileUrl(tabUrl);

@@ -27,6 +27,7 @@ function getRuntime(): RuntimeMessenger | null {
 
 export interface UseSessionListResult {
   readonly items: readonly SessionListItem[];
+  readonly hasMore: boolean;
   readonly loading: boolean;
   readonly error: string | null;
   readonly refresh: (opts?: { readonly force?: boolean }) => Promise<void>;
@@ -43,6 +44,7 @@ export function useSessionList(
   limit: number = 5,
 ): UseSessionListResult {
   const [items, setItems] = useState<readonly SessionListItem[]>([]);
+  const [hasMore, setHasMore] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(enabled);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef<boolean>(true);
@@ -73,12 +75,14 @@ export function useSessionList(
           const rawItems = Array.isArray(env.items) ? env.items : [];
           const filtered = rawItems.filter(isListItem) as SessionListItem[];
           setItems(filtered);
+          setHasMore(env.hasMore === true);
           setError(null);
           return;
         }
         const reason = typeof env.reason === 'string' ? env.reason : 'unknown';
         if (reason === 'signed-out') {
           setItems([]);
+          setHasMore(false);
           setError(null);
           return;
         }
@@ -99,6 +103,7 @@ export function useSessionList(
     if (!enabled) {
       setLoading(false);
       setItems([]);
+      setHasMore(false);
       return () => {
         mountedRef.current = false;
       };
@@ -119,5 +124,5 @@ export function useSessionList(
     };
   }, [enabled, refresh]);
 
-  return { items, loading, error, refresh };
+  return { items, hasMore, loading, error, refresh };
 }

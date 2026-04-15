@@ -42,7 +42,7 @@ async function freshRegister(): Promise<void> {
       authExchange: `${BACKEND_URL}/api/v1/auth/extension-token-exchange`,
       authSignOut: `${BACKEND_URL}/api/v1/auth/sign-out`,
       extractSkills: `${BACKEND_URL}/api/v1/ats/extract-skills`,
-      usageSummary: `${BACKEND_URL}/api/v1/settings/usage/summary`,
+      settingsProfile: `${BACKEND_URL}/api/v1/settings/profile`,
       generationStart: `${BACKEND_URL}/api/v1/agents/generate`,
       generationCancel: `${BACKEND_URL}/api/v1/agents/cancel`,
     },

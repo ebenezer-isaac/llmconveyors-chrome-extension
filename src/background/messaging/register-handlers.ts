@@ -20,7 +20,7 @@ import {
   AUTH_EXCHANGE_ENDPOINT,
   AUTH_SIGN_OUT_ENDPOINT,
   EXTRACT_SKILLS_ENDPOINT,
-  USAGE_SUMMARY_ENDPOINT,
+  SETTINGS_PROFILE_ENDPOINT,
   GENERATION_START_ENDPOINT,
   MASTER_RESUME_ENDPOINT,
 } from '../config';
@@ -215,7 +215,7 @@ function buildProductionDeps(): HandlerDeps {
       authExchange: AUTH_EXCHANGE_ENDPOINT,
       authSignOut: AUTH_SIGN_OUT_ENDPOINT,
       extractSkills: EXTRACT_SKILLS_ENDPOINT,
-      usageSummary: USAGE_SUMMARY_ENDPOINT,
+      settingsProfile: SETTINGS_PROFILE_ENDPOINT,
       generationStart: GENERATION_START_ENDPOINT,
       generationCancel: GENERATION_CANCEL_ENDPOINT,
     },

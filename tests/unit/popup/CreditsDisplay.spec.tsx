@@ -58,38 +58,42 @@ describe('CreditsDisplay', () => {
     expect(el?.textContent).toMatch(/unavailable/i);
   });
 
-  it('renders "N credits remaining" when credits are loaded', async () => {
-    const credits: CreditsState = { balance: 42, plan: 'free', resetAt: null };
+  it('renders "N credits" + tier label on free tier', async () => {
+    const credits: CreditsState = { credits: 42, tier: 'free', byoKeyEnabled: false };
     await render(credits, false, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-state')).toBe('ready');
     expect(el?.getAttribute('data-balance')).toBe('42');
-    expect(el?.textContent).toMatch(/42 credits remaining/);
+    expect(el?.getAttribute('data-tier')).toBe('free');
+    expect(el?.textContent).toMatch(/42 credits/);
+    expect(el?.textContent).toMatch(/Free tier/);
   });
 
   it('floors fractional balances and clamps negatives to zero', async () => {
-    const credits: CreditsState = { balance: -5, plan: 'free', resetAt: null };
+    const credits: CreditsState = { credits: -5, tier: 'free', byoKeyEnabled: false };
     await render(credits, false, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-balance')).toBe('0');
-    expect(el?.textContent).toMatch(/0 credits remaining/);
+    expect(el?.textContent).toMatch(/0 credits/);
   });
 
   it('keeps rendering ready state when loading resolves with cached credits', async () => {
-    const credits: CreditsState = { balance: 10, plan: 'free', resetAt: null };
+    const credits: CreditsState = { credits: 10, tier: 'free', byoKeyEnabled: false };
     // loading=true + credits present should still show the ready state so
     // the UI never flashes back to a shimmer after the first fetch.
     await render(credits, true, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-state')).toBe('ready');
-    expect(el?.textContent).toMatch(/10 credits remaining/);
+    expect(el?.textContent).toMatch(/10 credits/);
   });
 
-  it('renders a live data-balance attribute matching the displayed number', async () => {
-    const credits: CreditsState = { balance: 25, plan: 'pro', resetAt: 12345 };
+  it('renders "BYO Key tier" label when tier is byo', async () => {
+    const credits: CreditsState = { credits: 25, tier: 'byo', byoKeyEnabled: true };
     await render(credits, false, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-balance')).toBe('25');
+    expect(el?.getAttribute('data-tier')).toBe('byo');
     expect(el?.textContent).toContain('25');
+    expect(el?.textContent).toMatch(/BYO Key tier/);
   });
 });

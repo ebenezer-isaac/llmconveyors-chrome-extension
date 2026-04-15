@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 /**
- * Credits display: renders the user's remaining credit balance.
+ * Credits display: renders the user's remaining credit balance and tier
+ * inline at the top of the popup, mirroring the web UserMenu's "X credits"
+ * + tier label style.
  *
  * Visual states:
  *   - loading: shimmer placeholder
- *   - ready: "N credits remaining" with the integer balance
+ *   - ready: "N credits" badge + tier label
  *   - error: compact inline error that does not block other popup UI
  *
  * The component is a presentational stub; the data comes from the useCredits
@@ -13,6 +15,7 @@
 
 import React from 'react';
 import type { CreditsState } from '@/src/background/messaging/protocol';
+import { getTierLabel } from './useCredits';
 
 export interface CreditsDisplayProps {
   readonly credits: CreditsState | null;
@@ -50,21 +53,30 @@ export function CreditsDisplay({
     );
   }
 
-  const balance = credits?.balance ?? 0;
-  const displayBalance = Number.isFinite(balance) ? Math.max(0, Math.floor(balance)) : 0;
+  const rawCredits = credits?.credits ?? 0;
+  const displayCredits = Number.isFinite(rawCredits)
+    ? Math.max(0, Math.floor(rawCredits))
+    : 0;
+  const tier = credits?.tier ?? 'free';
+  const byoKeyEnabled = credits?.byoKeyEnabled ?? false;
+  const tierLabel = getTierLabel(tier, byoKeyEnabled);
 
   return (
     <div
       data-testid="credits-remaining"
       data-state="ready"
-      data-balance={String(displayBalance)}
-      className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+      data-balance={String(displayCredits)}
+      data-tier={tier}
+      className="mb-3 inline-flex items-center gap-2 rounded-pill bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
     >
       <span
         aria-hidden="true"
         className="inline-block h-2 w-2 rounded-pill bg-brand-500"
       />
-      <span>{displayBalance} credits remaining</span>
+      <span>{displayCredits} credits</span>
+      <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
+        {tierLabel}
+      </span>
     </div>
   );
 }
