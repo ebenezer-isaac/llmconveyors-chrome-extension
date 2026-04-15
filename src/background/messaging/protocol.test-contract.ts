@@ -29,7 +29,11 @@ type RequiredKeys =
   | 'DETECTED_JOB_BROADCAST'
   | 'CREDITS_GET'
   | 'MASTER_RESUME_GET'
-  | 'MASTER_RESUME_PUT';
+  | 'MASTER_RESUME_PUT'
+  | 'AGENT_PREFERENCE_GET'
+  | 'AGENT_PREFERENCE_SET'
+  | 'AGENT_REGISTRY_LIST'
+  | 'AGENT_MANIFEST_GET';
 
 type RequiredPresent = RequiredKeys extends keyof ProtocolMap ? true : false;
 type NoExtras = Exclude<keyof ProtocolMap, RequiredKeys> extends never ? true : false;

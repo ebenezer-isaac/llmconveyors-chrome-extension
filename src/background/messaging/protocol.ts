@@ -43,6 +43,16 @@ import type {
   MasterResumePutRequest,
   MasterResumePutResponse,
 } from '../master-resume';
+import type {
+  AgentPreferenceGetRequest,
+  AgentPreferenceGetResponse,
+  AgentPreferenceSetRequest,
+  AgentPreferenceSetResponse,
+  AgentRegistryListRequest,
+  AgentRegistryListResponse,
+  AgentManifestGetRequest,
+  AgentManifestGetResponse,
+} from '../agents';
 
 export interface ProtocolMap {
   // --- Auth (4) ---
@@ -80,6 +90,12 @@ export interface ProtocolMap {
   // --- Master Resume (2) ---
   MASTER_RESUME_GET: (data: MasterResumeGetRequest) => MasterResumeGetResponse;
   MASTER_RESUME_PUT: (data: MasterResumePutRequest) => MasterResumePutResponse;
+
+  // --- Agents (4) ---
+  AGENT_PREFERENCE_GET: (data: AgentPreferenceGetRequest) => AgentPreferenceGetResponse;
+  AGENT_PREFERENCE_SET: (data: AgentPreferenceSetRequest) => AgentPreferenceSetResponse;
+  AGENT_REGISTRY_LIST: (data: AgentRegistryListRequest) => AgentRegistryListResponse;
+  AGENT_MANIFEST_GET: (data: AgentManifestGetRequest) => AgentManifestGetResponse;
 }
 
 /**
@@ -104,6 +120,10 @@ export const BG_HANDLED_KEYS = [
   'CREDITS_GET',
   'MASTER_RESUME_GET',
   'MASTER_RESUME_PUT',
+  'AGENT_PREFERENCE_GET',
+  'AGENT_PREFERENCE_SET',
+  'AGENT_REGISTRY_LIST',
+  'AGENT_MANIFEST_GET',
 ] as const;
 
 export type BgHandledKey = (typeof BG_HANDLED_KEYS)[number];

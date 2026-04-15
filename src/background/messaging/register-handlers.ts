@@ -39,6 +39,11 @@ import {
   createMasterResumeCache,
   createMasterResumeClient,
 } from '../master-resume';
+import {
+  createAgentManifestClient,
+  createAgentPreference,
+} from '../agents';
+import { API_BASE_URL } from '../config';
 import type { BgHandledKey } from './protocol';
 import { BG_HANDLED_KEYS } from './protocol';
 import { createHandlers, type Handlers, type HandlerDeps } from './handlers';
@@ -70,6 +75,20 @@ function buildProductionDeps(): HandlerDeps {
     fetch: fetchFn,
     logger,
     endpoint: MASTER_RESUME_ENDPOINT,
+    accessToken: async () => {
+      const session = await readSession();
+      return session?.accessToken ?? null;
+    },
+  });
+  const agentPreference = createAgentPreference({
+    storage: chromeStorage,
+    logger,
+    now: () => Date.now(),
+  });
+  const agentManifestClient = createAgentManifestClient({
+    fetch: fetchFn,
+    logger,
+    buildUrl: (agentId) => `${API_BASE_URL}/api/v1/agents/${agentId}/manifest`,
     accessToken: async () => {
       const session = await readSession();
       return session?.accessToken ?? null;
@@ -115,6 +134,10 @@ function buildProductionDeps(): HandlerDeps {
     masterResume: {
       client: masterResumeClient,
       cache: masterResumeCache,
+    },
+    agents: {
+      preference: agentPreference,
+      manifestClient: agentManifestClient,
     },
   };
 }
@@ -174,6 +197,7 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
         broadcast: { ...baseDeps.broadcast, ...(customDeps.broadcast ?? {}) },
         endpoints: { ...baseDeps.endpoints, ...(customDeps.endpoints ?? {}) },
         masterResume: customDeps.masterResume ?? baseDeps.masterResume,
+        agents: customDeps.agents ?? baseDeps.agents,
       }
     : baseDeps;
   const handlers = createHandlers(deps);

@@ -90,6 +90,15 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
         clear: vi.fn(async () => undefined),
       },
     },
+    agents: {
+      preference: {
+        read: vi.fn(async () => ({ agentId: 'job-hunter' as const, selectedAt: 1 })),
+        write: vi.fn(async (id) => ({ agentId: id, selectedAt: 2 })),
+      },
+      manifestClient: {
+        get: vi.fn(async () => ({ kind: 'not-found' as const })),
+      },
+    },
     ...over,
   };
 }

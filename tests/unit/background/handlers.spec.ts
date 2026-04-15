@@ -70,6 +70,15 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
       generationCancel: 'https://api.test/cancel',
     },
     masterResume,
+    agents: {
+      preference: {
+        read: vi.fn(async () => ({ agentId: 'job-hunter' as const, selectedAt: 1 })),
+        write: vi.fn(async (id) => ({ agentId: id, selectedAt: 2 })),
+      },
+      manifestClient: {
+        get: vi.fn(async () => ({ kind: 'not-found' as const })),
+      },
+    },
     ...overrides,
   };
 }
@@ -96,6 +105,10 @@ describe('HANDLERS record shape', () => {
         'CREDITS_GET',
         'MASTER_RESUME_GET',
         'MASTER_RESUME_PUT',
+        'AGENT_PREFERENCE_GET',
+        'AGENT_PREFERENCE_SET',
+        'AGENT_REGISTRY_LIST',
+        'AGENT_MANIFEST_GET',
       ].sort(),
     );
   });

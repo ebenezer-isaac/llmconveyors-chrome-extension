@@ -43,6 +43,12 @@ import type {
   MasterResumeUpsert,
 } from '../master-resume';
 import { createMasterResumeHandlers } from '../master-resume';
+import type {
+  AgentId,
+  AgentManifestOutcome,
+  AgentPreferenceEntry,
+} from '../agents';
+import { createAgentHandlers } from '../agents';
 import {
   AuthSignInRequestSchema,
   AuthSignOutRequestSchema,
@@ -127,6 +133,16 @@ export interface MasterResumeHandlerAdapters {
   };
 }
 
+export interface AgentHandlerAdapters {
+  readonly preference: {
+    read: () => Promise<AgentPreferenceEntry>;
+    write: (agentId: AgentId) => Promise<AgentPreferenceEntry>;
+  };
+  readonly manifestClient: {
+    get: (agentId: AgentId) => Promise<AgentManifestOutcome>;
+  };
+}
+
 export interface HandlerDeps {
   readonly logger: Logger;
   readonly fetch: typeof globalThis.fetch;
@@ -136,6 +152,7 @@ export interface HandlerDeps {
   readonly broadcast: HandlerBroadcast;
   readonly endpoints: HandlerEndpoints;
   readonly masterResume: MasterResumeHandlerAdapters;
+  readonly agents: AgentHandlerAdapters;
 }
 
 /**
@@ -551,6 +568,12 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
   };
 
+  const agentHandlers = createAgentHandlers({
+    preference: deps.agents.preference,
+    manifestClient: deps.agents.manifestClient,
+    logger: log,
+  });
+
   const masterResumeHandlers = createMasterResumeHandlers({
     client: deps.masterResume.client,
     cache: deps.masterResume.cache,
@@ -585,6 +608,10 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     CREDITS_GET: handleCreditsGet,
     MASTER_RESUME_GET: masterResumeHandlers.MASTER_RESUME_GET,
     MASTER_RESUME_PUT: masterResumeHandlers.MASTER_RESUME_PUT,
+    AGENT_PREFERENCE_GET: agentHandlers.AGENT_PREFERENCE_GET,
+    AGENT_PREFERENCE_SET: agentHandlers.AGENT_PREFERENCE_SET,
+    AGENT_REGISTRY_LIST: agentHandlers.AGENT_REGISTRY_LIST,
+    AGENT_MANIFEST_GET: agentHandlers.AGENT_MANIFEST_GET,
   });
 }
 
