@@ -214,7 +214,7 @@ describe('handlers adversarial -- empty + max-size payloads', () => {
   it('KEYWORDS_EXTRACT with 50K text is accepted (at max boundary)', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
@@ -332,7 +332,7 @@ describe('handlers adversarial -- Unicode edge cases', () => {
   it('KEYWORDS_EXTRACT with jd text of Unicode combining marks accepted', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
@@ -492,7 +492,7 @@ describe('handlers adversarial -- concurrent re-entry', () => {
   it('AUTH_SIGN_IN + AUTH_SIGN_OUT in parallel each produce typed envelope', async () => {
     const deps = buildDeps();
     // Force cookie-jar path to avoid real chrome.identity calls.
-    deps.fetch = vi.fn(async () => new Response('{}', { status: 500 })) as
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => new Response('{}', { status: 500 })) as
       unknown as typeof fetch;
     const h = createHandlers(deps);
     const [si, so] = await Promise.all([
@@ -506,7 +506,7 @@ describe('handlers adversarial -- concurrent re-entry', () => {
   it('KEYWORDS_EXTRACT x10 in parallel all return typed envelope', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
@@ -550,7 +550,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
   it('KEYWORDS_EXTRACT returns network-error when fetch rejects', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(async () => {
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => {
       throw new TypeError('disconnected');
     }) as unknown as typeof fetch;
     const h = createHandlers(deps);
@@ -564,7 +564,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
   it('KEYWORDS_EXTRACT returns signed-out on 403', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(async () => new Response('', { status: 403 })) as
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => new Response('', { status: 403 })) as
       unknown as typeof fetch;
     const h = createHandlers(deps);
     const r = await h.KEYWORDS_EXTRACT({
@@ -577,7 +577,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
   it('KEYWORDS_EXTRACT returns api-error on invalid JSON', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response('not-json at all', {
           status: 200,
@@ -611,7 +611,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
   it('CREDITS_GET returns fallback on API shape drift', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response('not-json', { status: 200 }),
     ) as unknown as typeof fetch;
@@ -622,7 +622,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
 
   it('AUTH_SIGN_IN cookieJar exchange with tampered userId (empty) is rejected', async () => {
     const deps = buildDeps();
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
@@ -647,7 +647,7 @@ describe('handlers adversarial -- storage + fetch errors', () => {
 
   it('AUTH_SIGN_IN cookieJar exchange with expired session is accepted per schema (expiresAt enforcement downstream)', async () => {
     const deps = buildDeps();
-    deps.fetch = vi.fn(
+    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
       async () =>
         new Response(
           JSON.stringify({

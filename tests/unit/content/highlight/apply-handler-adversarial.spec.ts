@@ -109,17 +109,20 @@ function build(args: BuildArgs = {}): {
     if (args.sendReturns !== undefined) {
       return args.sendReturns as KeywordsExtractResponse;
     }
+    const keywords = args.keywords
+      ? [...args.keywords]
+      : [
+          {
+            term: 'TypeScript',
+            category: 'tool' as const,
+            score: 1,
+            occurrences: 1,
+            canonicalForm: 'typescript',
+          },
+        ];
     return {
       ok: true,
-      keywords: args.keywords ?? [
-        {
-          term: 'TypeScript',
-          category: 'tool',
-          score: 1,
-          occurrences: 1,
-          canonicalForm: 'typescript',
-        },
-      ],
+      keywords,
       tookMs: 5,
     } satisfies KeywordsExtractResponse;
   });
