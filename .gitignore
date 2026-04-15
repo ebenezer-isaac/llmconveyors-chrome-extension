@@ -29,5 +29,9 @@ dist/
 coverage/
 .nyc_output/
 
+# E2E test artifacts
+tests/e2e/.test-results/
+tests/e2e/fixture-server/.dist/
+
 # Orig
 .orig

@@ -9,7 +9,7 @@ HITS=$(grep -rl $'\xe2\x80\x94' \
   --include='*.mjs' --include='*.cjs' \
   --include='*.html' --include='*.css' \
   --include='*.yml' --include='*.yaml' \
-  --exclude-dir=node_modules --exclude-dir=.output --exclude-dir=.wxt --exclude-dir=dist --exclude-dir=coverage --exclude-dir=plan \
+  --exclude-dir=node_modules --exclude-dir=.output --exclude-dir=.wxt --exclude-dir=dist --exclude-dir=coverage --exclude-dir=plan --exclude-dir=.test-results --exclude-dir=.dist \
   entrypoints src tests scripts .github .claude docs/rigor \
   README.md LICENSE CLAUDE.md MEMORY.md package.json tsconfig.json wxt.config.ts vitest.config.ts eslint.config.mjs 2>/dev/null || true)
 

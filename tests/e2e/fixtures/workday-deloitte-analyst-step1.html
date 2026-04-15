@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Deloitte - Analyst - My Information</title>
+  </head>
+  <body>
+    <div data-automation-id="applicationOverview">
+      <h1 data-automation-id="wizardStepTitle">My Information</h1>
+      <ol data-automation-id="progressBar">
+        <li data-automation-id="progressBarStepActive" aria-current="step">My Information</li>
+        <li data-automation-id="progressBarStep">My Experience</li>
+        <li data-automation-id="progressBarStep">Application Questions</li>
+        <li data-automation-id="progressBarStep">Review</li>
+      </ol>
+    </div>
+
+    <form id="applicationForm">
+      <fieldset data-automation-id="legalName">
+        <legend>Legal Name</legend>
+        <label for="name-first">First Name <span aria-hidden="true">*</span></label>
+        <input type="text" id="name-first" data-automation-id="legalNameSection_firstName" name="firstName" required />
+
+        <label for="name-last">Last Name <span aria-hidden="true">*</span></label>
+        <input type="text" id="name-last" data-automation-id="legalNameSection_lastName" name="lastName" required />
+      </fieldset>
+
+      <fieldset data-automation-id="address">
+        <legend>Address</legend>
+        <label for="addr-country">Country <span aria-hidden="true">*</span></label>
+        <select id="addr-country" data-automation-id="addressSection_country" required>
+          <option value="">Select</option>
+          <option value="US">United States</option>
+          <option value="IN">India</option>
+          <option value="UK">United Kingdom</option>
+        </select>
+
+        <label for="addr-line1">Address Line 1 <span aria-hidden="true">*</span></label>
+        <input type="text" id="addr-line1" data-automation-id="addressSection_addressLine1" required />
+
+        <label for="addr-city">City <span aria-hidden="true">*</span></label>
+        <input type="text" id="addr-city" data-automation-id="addressSection_city" required />
+
+        <label for="addr-state">State / Region <span aria-hidden="true">*</span></label>
+        <input type="text" id="addr-state" data-automation-id="addressSection_countryRegion" required />
+
+        <label for="addr-postal">Postal Code <span aria-hidden="true">*</span></label>
+        <input type="text" id="addr-postal" data-automation-id="addressSection_postalCode" required />
+      </fieldset>
+
+      <fieldset data-automation-id="contactInformation">
+        <legend>Contact Information</legend>
+        <label for="contact-email">Email <span aria-hidden="true">*</span></label>
+        <input type="email" id="contact-email" data-automation-id="contactInformationSection_email" required />
+
+        <label for="contact-phone-country">Phone Country Code</label>
+        <input type="text" id="contact-phone-country" data-automation-id="contactInformationSection_phoneCountryCode" />
+
+        <label for="contact-phone">Phone Number</label>
+        <input type="tel" id="contact-phone" data-automation-id="contactInformationSection_phoneNumber" />
+      </fieldset>
+
+      <button type="button" data-automation-id="pageFooterNextButton">Save and Continue</button>
+    </form>
+  </body>
+</html>

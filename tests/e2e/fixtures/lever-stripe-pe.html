@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Stripe - Payments Engineer - Apply</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        "title": "Payments Engineer",
+        "hiringOrganization": { "@type": "Organization", "name": "Stripe" },
+        "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": "Dublin", "addressCountry": "IE" } },
+        "datePosted": "2026-04-03"
+      }
+    </script>
+  </head>
+  <body>
+    <div class="posting-headline"><h2>Payments Engineer</h2></div>
+    <form id="application-form" data-qa="application-form" method="post" enctype="multipart/form-data">
+      <div class="application-field">
+        <label data-qa="full-name" for="full-name">Full name</label>
+        <input type="text" id="full-name" name="name" required />
+      </div>
+
+      <div class="application-field">
+        <label data-qa="email" for="email">Email</label>
+        <input type="email" id="email" name="email" required />
+      </div>
+
+      <div class="application-field">
+        <label data-qa="phone" for="phone">Phone</label>
+        <input type="tel" id="phone" name="phone" />
+      </div>
+
+      <div class="application-field">
+        <label data-qa="resume" for="resume">Resume/CV</label>
+        <input type="file" id="resume" name="resume" accept=".pdf,.doc,.docx" required />
+      </div>
+
+      <div class="application-field">
+        <label data-qa="urls-linkedin" for="urls-linkedin">LinkedIn URL</label>
+        <input type="url" id="urls-linkedin" name="urls[LinkedIn]" />
+      </div>
+
+      <div class="application-field">
+        <label data-qa="urls-github" for="urls-github">GitHub URL</label>
+        <input type="url" id="urls-github" name="urls[GitHub]" />
+      </div>
+
+      <div class="application-question">
+        <label for="q-payments-experience">Describe your experience with payment systems</label>
+        <textarea id="q-payments-experience" name="cards[0][answer]" rows="5"></textarea>
+      </div>
+
+      <button type="submit" data-qa="btn-submit">Submit Application</button>
+    </form>
+  </body>
+</html>

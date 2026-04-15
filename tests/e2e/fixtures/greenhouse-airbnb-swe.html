@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Airbnb - Software Engineer - Apply</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "JobPosting",
+        "title": "Software Engineer",
+        "description": "Help us build the future of travel. Looking for engineers with TypeScript, React, and distributed systems experience.",
+        "hiringOrganization": { "@type": "Organization", "name": "Airbnb" },
+        "jobLocation": { "@type": "Place", "address": { "@type": "PostalAddress", "addressLocality": "San Francisco", "addressRegion": "CA", "addressCountry": "US" } },
+        "datePosted": "2026-04-01",
+        "employmentType": "FULL_TIME"
+      }
+    </script>
+  </head>
+  <body>
+    <main id="main_fields">
+      <h1>Apply for Software Engineer</h1>
+      <form id="application_form" action="/apply" method="post" enctype="multipart/form-data">
+        <label for="first_name">First Name <span class="required">*</span></label>
+        <input type="text" id="first_name" name="job_application[first_name]" required />
+
+        <label for="last_name">Last Name <span class="required">*</span></label>
+        <input type="text" id="last_name" name="job_application[last_name]" required />
+
+        <label for="email">Email <span class="required">*</span></label>
+        <input type="email" id="email" name="job_application[email]" required />
+
+        <label for="phone">Phone</label>
+        <input type="tel" id="phone" name="job_application[phone]" />
+
+        <label for="resume">Resume / CV <span class="required">*</span></label>
+        <input type="file" id="resume" name="job_application[resume]" accept=".pdf,.doc,.docx" required />
+
+        <label for="cover_letter">Cover Letter</label>
+        <textarea id="cover_letter" name="job_application[cover_letter]" rows="6"></textarea>
+
+        <label for="linkedin">LinkedIn Profile</label>
+        <input type="url" id="linkedin" name="job_application[linkedin]" />
+
+        <label for="website">Personal Website</label>
+        <input type="url" id="website" name="job_application[website]" />
+
+        <fieldset>
+          <legend>Voluntary Self-Identification</legend>
+          <label for="gender">Gender</label>
+          <select id="gender" name="job_application[gender]">
+            <option value="">Decline to self-identify</option>
+            <option value="female">Female</option>
+            <option value="male">Male</option>
+            <option value="nonbinary">Non-binary</option>
+          </select>
+
+          <label for="race">Race / Ethnicity</label>
+          <select id="race" name="job_application[race]">
+            <option value="">Decline to self-identify</option>
+            <option value="asian">Asian</option>
+            <option value="black">Black or African American</option>
+            <option value="hispanic">Hispanic or Latino</option>
+            <option value="white">White</option>
+            <option value="two_or_more">Two or more races</option>
+          </select>
+        </fieldset>
+
+        <button type="submit">Submit Application</button>
+      </form>
+    </main>
+  </body>
+</html>
