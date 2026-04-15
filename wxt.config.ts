@@ -67,6 +67,9 @@ export default defineConfig({
 
   vite: () => ({
     plugins: [tailwindcss()],
+    // Mirror the web app's NEXT_PUBLIC_* convention; WXT's own WXT_* prefix is
+    // kept so internal WXT tooling still resolves.
+    envPrefix: ['NEXT_PUBLIC_', 'WXT_', 'WXT_PUBLIC_'],
     build: {
       sourcemap: true,
       minify: 'esbuild',

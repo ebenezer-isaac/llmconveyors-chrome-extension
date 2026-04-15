@@ -6,13 +6,13 @@
  * stub via module mocking. Every URL lives here so downstream phases find
  * them in one place.
  *
- * API_BASE_URL is sourced from extensionEnv so all env reads are centralised
- * in src/shared/env.ts.
+ * API_BASE_URL is sourced from clientEnv so all env reads are centralised
+ * in src/shared/env.ts (mirrors the web app's clientEnv export).
  */
 
-import { extensionEnv } from '../shared/env';
+import { clientEnv } from '../shared/env';
 
-export const API_BASE_URL: string = extensionEnv.apiBaseUrl;
+export const API_BASE_URL: string = clientEnv.apiBaseUrl;
 
 export const AUTH_EXCHANGE_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/extension-token-exchange';
 export const AUTH_SIGN_OUT_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/sign-out';

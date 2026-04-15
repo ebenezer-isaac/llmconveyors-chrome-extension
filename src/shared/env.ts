@@ -2,13 +2,17 @@
 /**
  * Build-time environment configuration for the Chrome extension.
  *
- * WXT exposes variables prefixed with WXT_PUBLIC_* via import.meta.env at
- * build time (Vite under the hood). Each field falls back to a safe default
- * so the extension always has a valid configuration even without a .env file.
+ * Mirrors the web app's `src/lib/env-client.ts` so the same env variable
+ * names (NEXT_PUBLIC_*) and the same exported identifier (`clientEnv`) work
+ * on both surfaces. WXT is configured to forward NEXT_PUBLIC_* into
+ * import.meta.env at build time (see wxt.config.ts envPrefix).
+ *
+ * Each field falls back to a safe default so the extension always has a
+ * valid configuration even when no .env file is present.
  *
  * Usage:
- *   import { extensionEnv } from '@/src/shared/env';
- *   const url = extensionEnv.apiBaseUrl;
+ *   import { clientEnv } from '@/src/shared/env';
+ *   const url = clientEnv.apiBaseUrl;
  */
 
 function readEnv(key: string, fallback: string): string {
@@ -22,7 +26,7 @@ function readEnv(key: string, fallback: string): string {
   return fallback;
 }
 
-export interface ExtensionEnv {
+export interface ClientEnv {
   readonly contactEmail: string;
   readonly rootDomain: string;
   readonly defaultLocale: string;
@@ -30,10 +34,10 @@ export interface ExtensionEnv {
   readonly webBaseUrl: string;
 }
 
-export const extensionEnv: ExtensionEnv = Object.freeze({
-  contactEmail: readEnv('WXT_PUBLIC_CONTACT_EMAIL', 'ebnezr.isaac@gmail.com'),
-  rootDomain: readEnv('WXT_PUBLIC_ROOT_DOMAIN', 'llmconveyors.com'),
-  defaultLocale: readEnv('WXT_PUBLIC_DEFAULT_LOCALE', 'en'),
-  apiBaseUrl: readEnv('WXT_PUBLIC_API_BASE_URL', 'https://api.llmconveyors.com'),
-  webBaseUrl: readEnv('WXT_PUBLIC_WEB_BASE_URL', 'https://llmconveyors.com'),
+export const clientEnv: ClientEnv = Object.freeze({
+  contactEmail: readEnv('NEXT_PUBLIC_CONTACT_EMAIL', 'ebnezr.isaac@gmail.com'),
+  rootDomain: readEnv('NEXT_PUBLIC_ROOT_DOMAIN', 'llmconveyors.com'),
+  defaultLocale: readEnv('NEXT_PUBLIC_DEFAULT_LOCALE', 'en'),
+  apiBaseUrl: readEnv('NEXT_PUBLIC_API_BASE_URL', 'https://api.llmconveyors.com'),
+  webBaseUrl: readEnv('NEXT_PUBLIC_WEB_BASE_URL', 'https://llmconveyors.com'),
 });
