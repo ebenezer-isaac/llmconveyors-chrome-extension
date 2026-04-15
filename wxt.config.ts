@@ -2,6 +2,15 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 
+/**
+ * Dev-only host_permissions. Included only when WXT is building in dev mode
+ * (NODE_ENV !== 'production'); production packages exclude localhost URLs so
+ * the extension cannot be tricked into talking to a local attacker API if a
+ * developer leaves a rogue service running.
+ */
+const DEV_HOST_PERMISSIONS: readonly string[] =
+  process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5174/*'];
+
 export default defineConfig({
   srcDir: '.',
   outDir: '.output',
@@ -30,8 +39,14 @@ export default defineConfig({
       'https://*.myworkdayjobs.com/*',
       'https://api.llmconveyors.com/*',
       'https://llmconveyors.com/*',
-      'http://localhost:5174/*',
+      ...DEV_HOST_PERMISSIONS,
     ],
+    content_security_policy: {
+      // Lock the extension runtime: no remote scripts, no eval, no inline.
+      // Chrome MV3 already enforces this by default but documenting it here
+      // prevents accidental relaxation later.
+      extension_pages: "script-src 'self'; object-src 'self'; base-uri 'self'",
+    },
     action: {
       default_title: 'LLM Conveyors Job Assistant',
       default_icon: {
