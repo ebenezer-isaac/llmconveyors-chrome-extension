@@ -1,0 +1,20 @@
+/* entrypoints/popup/style.css */
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme {
+  --color-brand-50: oklch(0.98 0.02 250);
+  --color-brand-500: oklch(0.60 0.18 250);
+  --color-brand-900: oklch(0.25 0.10 250);
+
+  --font-display: "Inter", system-ui, sans-serif;
+  --radius-card: 0.75rem;
+}
+
+html,
+body {
+  min-width: 360px;
+  margin: 0;
+  padding: 0;
+}

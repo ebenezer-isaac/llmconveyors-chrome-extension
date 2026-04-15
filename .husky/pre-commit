@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+set -e
+pnpm validate:grep-gates --staged-only
+pnpm validate:blueprints --staged-only

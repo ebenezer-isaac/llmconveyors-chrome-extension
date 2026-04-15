@@ -1,0 +1,50 @@
+name: Compliance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  compliance:
+    name: Typecheck + Lint + Test + Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.10.0'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compliance (typecheck + lint + test + validators)
+        run: pnpm compliance
+
+      - name: Build Chrome MV3
+        run: pnpm build
+
+      - name: Anti-drift gate - no em-dash
+        run: bash scripts/check-no-em-dash.sh
+
+      - name: Anti-drift gate - no console outside logger
+        run: bash scripts/check-no-console.sh
+
+      - name: Anti-drift gate - no forbidden tokens
+        run: bash scripts/check-forbidden-tokens.sh
+
+      - name: Upload chrome-mv3 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-mv3
+          path: .output/chrome-mv3/
+          retention-days: 7

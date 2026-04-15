@@ -1,10 +1,33 @@
-node_modules/
-dist/
+# WXT
 .output/
 .wxt/
-coverage/
-*.tsbuildinfo
+stats.html
+stats-*.json
+web-ext.config.ts
+web-ext-artifacts/
+
+# Node
+node_modules/
+*.log
+.pnpm-debug.log*
 .env
 .env.*
 !.env.example
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+dist/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Orig
 .orig
