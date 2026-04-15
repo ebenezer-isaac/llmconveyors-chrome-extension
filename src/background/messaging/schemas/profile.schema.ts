@@ -76,6 +76,9 @@ export const ProfileSchema = z
 export type Profile = z.infer<typeof ProfileSchema>;
 export type ProfileBasics = z.infer<typeof ProfileBasicsSchema>;
 export type ProfileWorkEntry = z.infer<typeof ProfileWorkEntrySchema>;
+export type ProfileEducationEntry = z.infer<typeof ProfileEducationEntrySchema>;
+export type ProfileSkill = z.infer<typeof ProfileSkillSchema>;
+export type ProfileLocation = z.infer<typeof ProfileLocationSchema>;
 
 export type DeepPartial<T> = {
   readonly [K in keyof T]?: T[K] extends ReadonlyArray<infer U>
