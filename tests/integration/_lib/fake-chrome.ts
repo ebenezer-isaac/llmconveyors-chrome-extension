@@ -5,9 +5,15 @@ import { fakeBrowser } from '@webext-core/fake-browser';
  * Return a fresh fake-browser instance with storage pre-cleared and no cookies.
  * Call this in `beforeEach` for every integration test; state is process-local
  * so cross-test leakage is impossible when each test resets.
+ *
+ * We also wire `globalThis.browser` and `globalThis.chrome` so modules that
+ * reach through `wxt/browser` (which reads `globalThis.browser`) or the raw
+ * `chrome` global end up talking to the fake.
  */
 export function createFakeChrome(): typeof fakeBrowser {
   fakeBrowser.reset();
+  (globalThis as unknown as { browser: typeof fakeBrowser }).browser = fakeBrowser;
+  (globalThis as unknown as { chrome: typeof fakeBrowser }).chrome = fakeBrowser;
   return fakeBrowser;
 }
 

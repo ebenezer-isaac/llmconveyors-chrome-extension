@@ -10,30 +10,42 @@ import {
 import { createMockBackend, type MockBackend } from './_lib/mock-backend';
 
 /**
- * Protocol round-trip integration tests. Every scenario is fully written
- * against the real ProtocolMap handlers A5 ships. Each suite is wrapped in
- * `describe.skip` until the owning phase lands real handlers; at that point
- * the phase's acceptance criteria REMOVE the `.skip` suffix.
+ * Protocol round-trip integration tests against the real handlers A5 ships.
+ * Each suite mounts fake-browser, dynamically imports the handler registrar
+ * AFTER the fake runtime is in place, and tears down in afterEach.
  *
- * Owner -> unskip phase mapping:
- *   AUTH round-trip     -> A5 registers handlers, A6 wires real SuperTokens
- *   PROFILE round-trip  -> A5 registers handlers, A7 ships Profile storage
+ * Owner -> unskip mapping:
+ *   AUTH round-trip     -> A5 ships handlers, A6 replaces sign-in stub
+ *   PROFILE round-trip  -> A5 ships handlers, A7 extends JSON Resume
  *   FILL round-trip     -> A5 forwards to content, A8 executes fill
  */
 
 const BACKEND_URL = 'https://api.llmconveyors.local';
 
-/**
- * Module specifier for the A5 handler registration entry point. Stored in a
- * variable so the dynamic `import()` expression is typed as `Promise<unknown>`
- * and does not require the module to exist at typecheck time. This lets the
- * harness ship BEFORE A5 lands the implementation; the `.skip` guard keeps
- * these bodies unreachable at runtime until the owner phase unskips them.
- */
 const REGISTER_HANDLERS_MODULE: string =
   '../../src/background/messaging/register-handlers';
 
-describe.skip('AUTH round-trip', () => {
+interface RegisterHandlersModule {
+  readonly registerHandlers: (customDeps?: unknown) => unknown;
+  readonly __resetRegistration: () => void;
+}
+
+async function freshRegister(): Promise<void> {
+  const mod = (await import(REGISTER_HANDLERS_MODULE)) as RegisterHandlersModule;
+  mod.__resetRegistration();
+  mod.registerHandlers({
+    endpoints: {
+      authExchange: `${BACKEND_URL}/api/v1/auth/extension-token-exchange`,
+      authSignOut: `${BACKEND_URL}/api/v1/auth/sign-out`,
+      extractSkills: `${BACKEND_URL}/api/v1/ats/extract-skills`,
+      usageSummary: `${BACKEND_URL}/api/v1/settings/usage/summary`,
+      generationStart: `${BACKEND_URL}/api/v1/agents/generate`,
+      generationCancel: `${BACKEND_URL}/api/v1/agents/cancel`,
+    },
+  });
+}
+
+describe('AUTH round-trip', () => {
   let fake: ReturnType<typeof createFakeChrome>;
   let backend: MockBackend;
 
@@ -41,8 +53,7 @@ describe.skip('AUTH round-trip', () => {
     fake = createFakeChrome();
     backend = createMockBackend();
     backend.mount(BACKEND_URL);
-    // Import A5 handlers AFTER fake-browser is mounted; they register against fakeBrowser.runtime.onMessage.
-    await import(REGISTER_HANDLERS_MODULE);
+    await freshRegister();
   });
 
   afterEach(() => {
@@ -110,12 +121,12 @@ describe.skip('AUTH round-trip', () => {
   });
 });
 
-describe.skip('PROFILE round-trip', () => {
+describe('PROFILE round-trip', () => {
   let fake: ReturnType<typeof createFakeChrome>;
 
   beforeEach(async () => {
     fake = createFakeChrome();
-    await import(REGISTER_HANDLERS_MODULE);
+    await freshRegister();
   });
 
   it('PROFILE_GET returns canonical profile when seeded', async () => {
@@ -161,7 +172,7 @@ describe.skip('PROFILE round-trip', () => {
   });
 });
 
-describe.skip('FILL round-trip', () => {
+describe('FILL round-trip', () => {
   let fake: ReturnType<typeof createFakeChrome>;
 
   beforeEach(async () => {
@@ -173,13 +184,10 @@ describe.skip('FILL round-trip', () => {
       expiresAt: 1_713_003_600_000,
       userId: 'user_test_001',
     });
-    await import(REGISTER_HANDLERS_MODULE);
+    await freshRegister();
   });
 
   it('FILL_REQUEST forwards to content-script and returns aggregated FillPlanResult', async () => {
-    // Simulate content-script handler by registering a listener on the fake-browser
-    // tabs.sendMessage call. A5 forwards FILL_REQUEST to the active tab; we stub
-    // the content side with a success result matching the canonical profile.
     const stubTabsSendMessage = async (
       _tabId: number,
       msg: unknown,

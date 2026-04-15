@@ -2,12 +2,18 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
 
+const sharedAliases = {
+  '@': resolve(__dirname, '.'),
+  '~': resolve(__dirname, '.'),
+  // Redirect the real webextension-polyfill to the in-memory fake so any
+  // module that imports it during tests gets the mock. Required by
+  // @webext-core/messaging and wxt/browser.
+  'webextension-polyfill': '@webext-core/fake-browser',
+};
+
 export default defineConfig({
   resolve: {
-    alias: {
-      '@': resolve(__dirname, '.'),
-      '~': resolve(__dirname, '.'),
-    },
+    alias: sharedAliases,
   },
   test: {
     coverage: {
@@ -24,15 +30,22 @@ export default defineConfig({
     projects: [
       {
         extends: true,
+        resolve: { alias: sharedAliases },
         test: {
           name: 'unit',
           include: ['tests/unit/**/*.spec.ts', 'src/**/*.spec.ts'],
           exclude: ['node_modules', '.wxt', '.output', 'dist', 'tests/harness/**'],
           environment: 'happy-dom',
+          server: {
+            deps: {
+              inline: ['@webext-core/messaging'],
+            },
+          },
         },
       },
       {
         extends: true,
+        resolve: { alias: sharedAliases },
         test: {
           name: 'integration',
           include: ['tests/integration/**/*.spec.ts'],
