@@ -93,7 +93,13 @@ export class AutofillController {
    * once from content-script main. NEVER throws.
    */
   async bootstrap(): Promise<void> {
-    const url = this.deps.document.location.href;
+    let url: string;
+    try {
+      url = this.deps.document.location.href;
+    } catch (err: unknown) {
+      this.deps.logger.error('autofill bootstrap: document.location threw', err);
+      return;
+    }
     this.deps.logger.info('autofill bootstrap start', { url });
 
     const adapter = await this.ensureAdapter(url);
@@ -158,7 +164,13 @@ export class AutofillController {
    * produces a typed FillRequestResponse.
    */
   async executeFill(): Promise<FillRequestResponse> {
-    const url = this.deps.document.location.href;
+    let url: string;
+    try {
+      url = this.deps.document.location.href;
+    } catch (err: unknown) {
+      this.deps.logger.error('executeFill: document.location threw', err);
+      return aborted('no-adapter');
+    }
     const startedAt = this.deps.now();
     this.deps.logger.info('executeFill start', { url });
 
