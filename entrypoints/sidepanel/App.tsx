@@ -110,6 +110,18 @@ function SidepanelBody(): React.ReactElement {
   }
 
   const src = buildIframeUrl(agent, tabUrl, reloadKey);
+  const dashboardUrl = `https://${agent.subdomain}.${ROOT_DOMAIN}`;
+
+  function openInTab(): void {
+    const g = globalThis as unknown as {
+      chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
+    };
+    if (g.chrome?.tabs?.create) {
+      g.chrome.tabs.create({ url: dashboardUrl });
+    } else {
+      window.open(dashboardUrl, '_blank', 'noopener');
+    }
+  }
 
   return (
     <div
@@ -117,6 +129,19 @@ function SidepanelBody(): React.ReactElement {
       data-active-agent={agent.id}
       className="flex h-screen w-full flex-col bg-white dark:bg-zinc-900"
     >
+      <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          If the dashboard does not load, third-party cookies may be blocked.
+        </span>
+        <button
+          type="button"
+          onClick={openInTab}
+          className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
+          data-testid="sidepanel-open-in-tab"
+        >
+          Open in tab
+        </button>
+      </div>
       {iframeError ? (
         <div
           data-testid="sidepanel-iframe-error"
