@@ -202,6 +202,86 @@ describe('useIntent', () => {
     expect(capture.current?.intent?.kind).toBe('workday');
   });
 
+  it('honors ?tabId=<n> URL query override and bypasses active-tab query', async () => {
+    const pinned: DetectedIntent = {
+      kind: 'workday',
+      pageKind: 'application-form',
+      url: 'https://pinned.example',
+      detectedAt: 42,
+    };
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string; data?: { tabId?: number } };
+      if (env.key === 'INTENT_GET' && env.data?.tabId === 123) return pinned;
+      return null;
+    });
+    // Install tabs.query that returns a COMPETING active tab so the
+    // test fails if the override is not honored.
+    const tabsQueryFn = vi.fn(async () => [{ id: 999, url: 'chrome-extension://x/popup.html' }]);
+    const listeners: Listener[] = [];
+    const tabListeners: TabsListener[] = [];
+    const fake: FakeChrome = {
+      runtime: {
+        sendMessage,
+        onMessage: {
+          addListener: (fn) => listeners.push(fn),
+          removeListener: (fn) => {
+            const i = listeners.indexOf(fn);
+            if (i !== -1) listeners.splice(i, 1);
+          },
+        },
+      },
+      tabs: {
+        query: tabsQueryFn,
+        onActivated: {
+          addListener: (fn) => tabListeners.push(fn),
+          removeListener: (fn) => {
+            const i = tabListeners.indexOf(fn);
+            if (i !== -1) tabListeners.splice(i, 1);
+          },
+        },
+      },
+    };
+    (globalThis as unknown as { chrome: FakeChrome }).chrome = fake;
+    // Seed happy-dom location.search so the hook sees the override.
+    const originalHref = window.location.href;
+    try {
+      // happy-dom supports assigning href to set search.
+      window.history.pushState({}, '', '/?tabId=123');
+      await mount();
+      await flush();
+      expect(capture.current?.tabId).toBe(123);
+      expect(capture.current?.intent?.kind).toBe('workday');
+      expect(tabsQueryFn).not.toHaveBeenCalled();
+    } finally {
+      window.history.pushState({}, '', originalHref);
+    }
+  });
+
+  it('falls back to active-tab query when ?tabId is absent or invalid', async () => {
+    const intent: DetectedIntent = {
+      kind: 'lever',
+      pageKind: 'job-posting',
+      url: 'https://fallback.example',
+      detectedAt: 9,
+    };
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string; data?: { tabId?: number } };
+      if (env.key === 'INTENT_GET' && env.data?.tabId === 44) return intent;
+      return null;
+    });
+    install(sendMessage, [{ id: 44, url: intent.url }]);
+    const originalHref = window.location.href;
+    try {
+      window.history.pushState({}, '', '/?tabId=not-a-number');
+      await mount();
+      await flush();
+      expect(capture.current?.tabId).toBe(44);
+      expect(capture.current?.intent?.kind).toBe('lever');
+    } finally {
+      window.history.pushState({}, '', originalHref);
+    }
+  });
+
   it('ignores broadcasts for other tab ids', async () => {
     const other: DetectedIntent = {
       kind: 'lever',

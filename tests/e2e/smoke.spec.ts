@@ -49,13 +49,16 @@ async function launchExtensionContext(): Promise<BrowserContext> {
   return context;
 }
 
-test.skip('popup renders with placeholder sign-in button', async () => {
+test('popup renders with signed-out sign-in button by default', async () => {
   const context = await launchExtensionContext();
   try {
+    await installBackendStubs(context);
     const extId = await getExtensionId(context);
     const popup = await openPopup(context, extId);
     await expect(popup.locator('[data-testid="sign-in-button"]')).toBeVisible();
-    await expect(popup.locator('[data-testid="sign-in-button"]')).toHaveText(/sign in/i);
+    await expect(popup.locator('[data-testid="sign-in-button"]')).toHaveText(
+      /sign in/i,
+    );
     await popup.close();
   } finally {
     await context.close();

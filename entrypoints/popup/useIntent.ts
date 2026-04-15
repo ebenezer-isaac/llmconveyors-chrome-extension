@@ -113,33 +113,54 @@ export function useIntent(): UseIntentResult {
     }
   }, []);
 
-  const refresh = useCallback(async (): Promise<void> => {
-    const tabs = getTabs();
-    if (tabs === null) {
-      if (mountedRef.current) setLoading(false);
-      return;
+  const resolveTargetTabId = useCallback(async (): Promise<number | null> => {
+    // Honor an explicit tabId from the page URL query string first. The
+    // sidepanel and E2E harnesses pass ?tabId=<n> to pin state to a
+    // specific ATS tab even when a newly-opened extension page is the
+    // currently-active tab in the window (which would otherwise win the
+    // chrome.tabs.query({active:true}) race). Production popup opens
+    // from a browser action and never carries this query, so the active
+    // tab path remains the default.
+    try {
+      const loc = (globalThis as { location?: { search?: string } }).location;
+      if (loc && typeof loc.search === 'string' && loc.search.length > 0) {
+        const params = new URLSearchParams(loc.search);
+        const raw = params.get('tabId');
+        if (raw !== null) {
+          const parsed = Number.parseInt(raw, 10);
+          if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        }
+      }
+    } catch {
+      // ignore malformed URL parse and fall through to active-tab query.
     }
+
+    const tabs = getTabs();
+    if (tabs === null) return null;
     try {
       const list = await tabs.query({ active: true, currentWindow: true });
       const active = list[0];
-      if (!active || typeof active.id !== 'number') {
-        if (mountedRef.current) {
-          setTabId(null);
-          setIntent(null);
-          setLoading(false);
-        }
-        return;
-      }
-      currentTabIdRef.current = active.id;
-      if (mountedRef.current) setTabId(active.id);
-      await fetchFor(active.id);
+      if (!active || typeof active.id !== 'number') return null;
+      return active.id;
     } catch {
-      if (mountedRef.current) {
-        setLoading(false);
-        setIntent(null);
-      }
+      return null;
     }
-  }, [fetchFor]);
+  }, []);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    const id = await resolveTargetTabId();
+    if (id === null) {
+      if (mountedRef.current) {
+        setTabId(null);
+        setIntent(null);
+        setLoading(false);
+      }
+      return;
+    }
+    currentTabIdRef.current = id;
+    if (mountedRef.current) setTabId(id);
+    await fetchFor(id);
+  }, [fetchFor, resolveTargetTabId]);
 
   useEffect(() => {
     mountedRef.current = true;

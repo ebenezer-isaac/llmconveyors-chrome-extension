@@ -192,7 +192,13 @@ test('popup state updates when intent changes on active tab', async () => {
     });
 
     await atsTab.bringToFront();
-    const popup = await openPopup(context, extId);
+    // Pin the popup to the fixture tab id. Under Playwright, opening a
+    // new page for the popup makes that page the active tab in the
+    // window; chrome.tabs.query({active:true,currentWindow:true}) then
+    // returns the popup page itself. The ?tabId=<n> override makes
+    // useIntent bypass the active-tab race and consult background state
+    // for the caller-chosen ATS tab.
+    const popup = await openPopup(context, extId, tabIdResult);
     await popup.waitForSelector('[data-testid="intent-badge"]', {
       timeout: 10_000,
     });
@@ -209,18 +215,16 @@ test('popup state updates when intent changes on active tab', async () => {
     );
     await popup.close();
 
-    // Switch to a blank tab that has no seeded intent and reopen the popup.
-    const blankTab = await context.newPage();
-    await blankTab.goto('about:blank');
-    await blankTab.bringToFront();
-
-    const popup2 = await openPopup(context, extId);
+    // Pin the popup to a tab id for which no intent was seeded. Any
+    // id that is not the fixture tab id and is not currently in the
+    // background's per-tab intent map suffices; `tabIdResult + 10_000`
+    // is safely out-of-range for the ephemeral ids Chromium assigns.
+    const unseededTabId = tabIdResult + 10_000;
+    const popup2 = await openPopup(context, extId, unseededTabId);
     await popup2.waitForSelector('[data-testid="intent-badge"]', {
       timeout: 10_000,
     });
     const badge2 = popup2.locator('[data-testid="intent-badge"]');
-    // Either loading then none, or none directly. Accept either terminal
-    // state by waiting for data-state to become "none".
     await expect(badge2).toHaveAttribute('data-state', 'none', { timeout: 10_000 });
     await expect(badge2).toContainText(/No JD detected/i);
     await popup2.close();

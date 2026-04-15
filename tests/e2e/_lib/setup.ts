@@ -142,12 +142,40 @@ export async function seedAuthSession(
 
 /**
  * Open the extension popup in a new page. Returns the popup Page object.
+ *
+ * Optional `targetTabId` appends `?tabId=<n>` to the popup URL so the
+ * useIntent hook pins to that tab rather than querying the currently-
+ * active tab (which, under Playwright, is the just-opened popup page
+ * itself). Production popup usage never needs this override; it is a
+ * test-only ergonomic hook.
  */
 export async function openPopup(
   context: BrowserContext,
   extensionId: string,
+  targetTabId?: number,
 ): Promise<Page> {
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/popup.html`);
+  const suffix =
+    typeof targetTabId === 'number' ? `?tabId=${targetTabId}` : '';
+  await page.goto(`chrome-extension://${extensionId}/popup.html${suffix}`);
+  return page;
+}
+
+/**
+ * Open the extension side panel as a standalone page for E2E purposes.
+ * Chrome's side panel API is not drivable through Playwright, so tests
+ * load `sidepanel.html` directly and pin it to a target tab via the
+ * ?tabId=<n> query. The side panel's useIntent + useAutofillHistory
+ * hooks both honor the override.
+ */
+export async function openSidepanel(
+  context: BrowserContext,
+  extensionId: string,
+  targetTabId?: number,
+): Promise<Page> {
+  const page = await context.newPage();
+  const suffix =
+    typeof targetTabId === 'number' ? `?tabId=${targetTabId}` : '';
+  await page.goto(`chrome-extension://${extensionId}/sidepanel.html${suffix}`);
   return page;
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 // entrypoints/sidepanel/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';

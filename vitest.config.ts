@@ -52,7 +52,10 @@ export default defineConfig({
         resolve: { alias: sharedAliases },
         test: {
           name: 'integration',
-          include: ['tests/integration/**/*.spec.ts'],
+          include: [
+            'tests/integration/**/*.spec.ts',
+            'tests/integration/**/*.spec.tsx',
+          ],
           exclude: ['node_modules', '.wxt', '.output', 'dist', 'tests/harness/**'],
           environment: 'happy-dom',
           testTimeout: 15_000,
