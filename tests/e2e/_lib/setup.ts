@@ -148,8 +148,8 @@ export async function openPopup(
  * Open the extension side panel as a standalone page for E2E purposes.
  * Chrome's side panel API is not drivable through Playwright, so tests
  * load `sidepanel.html` directly and pin it to a target tab via the
- * ?tabId=<n> query. The side panel's useIntent + useAutofillHistory
- * hooks both honor the override.
+ * ?tabId=<n> query. Post-101 pivot: the panel embeds an iframe of the
+ * llmconveyors.com web app, so Playwright interacts with the shell only.
  */
 export async function openSidepanel(
   context: BrowserContext,
