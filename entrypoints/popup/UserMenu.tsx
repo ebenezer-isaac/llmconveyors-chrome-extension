@@ -4,20 +4,30 @@
  * UserMenu (src/components/auth/UserMenu.tsx), adapted for the extension
  * popup surface.
  *
- * Contents:
- *   - avatar circle with initials fallback
+ * Avatar rendering:
+ *   1. If `profile.photoURL` is a non-empty string, render an <img>. Falls
+ *      back to initials on onError (e.g. 403 / network). Uses
+ *      referrerPolicy="no-referrer" so Google CDN images work.
+ *   2. Otherwise, initials derived from displayName -> email -> userId
+ *      (first letter of first two whitespace-separated tokens, uppercase).
+ *
+ * Dropdown contents:
+ *   - identity card (displayName or email or "Signed in")
  *   - usage section (credits + tier) with a mailto top-up link for free tier
- *   - Resume & CV  -> new tab at the active agent's resume editor (hidden
+ *   - Resume & CV -> new tab at the active agent's resume editor (hidden
  *     when the active agent declares no resume surface, e.g. b2b-sales)
- *   - Settings     -> new tab at the active agent's subdomain settings page
- *   - Dashboard    -> new tab at the active agent's subdomain root
- *   - Logout       -> existing signOut flow
+ *   - Settings   -> new tab at the active agent's subdomain settings page
+ *   - Dashboard  -> new tab at the active agent's subdomain root
+ *   - Logout     -> existing signOut flow
  *
  * Closes on outside click or Escape. Keyboard arrows navigate menu items.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
+import type {
+  ClientCreditsSnapshot,
+  ClientProfileSnapshot,
+} from '@/src/background/messaging/protocol-types';
 import {
   buildAgentUrl,
   type AgentRegistryEntry,
@@ -39,9 +49,10 @@ function openExternal(url: string): void {
 }
 
 function initialsFor(source: string | null): string {
-  if (!source || source.length === 0) return '?';
+  if (source === null || source.length === 0) return '?';
   const parts = source.split(/\s+/).filter(Boolean);
   const letters = parts
+    .slice(0, 2)
     .map((part) => {
       const iter = [...part];
       return iter[0] ?? '';
@@ -68,8 +79,7 @@ function resolveAgentUrl(
 
 export interface UserMenuProps {
   readonly userId: string;
-  readonly displayName: string | null;
-  readonly email: string | null;
+  readonly profile: ClientProfileSnapshot | null;
   readonly credits: ClientCreditsSnapshot | null;
   readonly activeAgent: AgentRegistryEntry | null;
   readonly onSignOut: () => void;
@@ -78,17 +88,25 @@ export interface UserMenuProps {
 
 export function UserMenu({
   userId,
-  displayName,
-  email,
+  profile,
   credits,
   activeAgent,
   onSignOut,
   signOutDisabled = false,
 }: UserMenuProps): React.ReactElement {
   const [open, setOpen] = useState<boolean>(false);
+  const [photoFailed, setPhotoFailed] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const photoURL = profile?.photoURL ?? null;
+  const displayName = profile?.displayName ?? null;
+  const email = profile?.email ?? null;
+
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [photoURL]);
 
   useEffect(() => {
     if (!open) return;
@@ -186,6 +204,9 @@ export function UserMenu({
     t('userMenu_topUpSubject'),
   )}&body=${encodeURIComponent(t('userMenu_topUpBody', [userId]))}`;
 
+  const showPhoto =
+    photoURL !== null && photoURL.length > 0 && !photoFailed;
+
   return (
     <div className="relative" ref={menuRef} data-testid="user-menu">
       <button
@@ -195,10 +216,23 @@ export function UserMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={toggleMenu}
-        title={displaySource ?? undefined}
+        title={displaySource}
         className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-zinc-300 bg-zinc-100 text-xs font-semibold text-zinc-700 transition hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:border-zinc-500"
       >
-        <span aria-hidden="true">{initials}</span>
+        {showPhoto ? (
+          <img
+            data-testid="user-menu-photo"
+            src={photoURL ?? ''}
+            alt=""
+            referrerPolicy="no-referrer"
+            onError={() => setPhotoFailed(true)}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span data-testid="user-menu-initials" aria-hidden="true">
+            {initials}
+          </span>
+        )}
       </button>
       {open ? (
         <div
@@ -207,11 +241,17 @@ export function UserMenu({
           role="menu"
         >
           <div className="mb-2 rounded-card bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-900">
-            <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+            <p
+              data-testid="user-menu-display-name"
+              className="font-semibold text-zinc-900 dark:text-zinc-100"
+            >
               {displayName ?? email ?? 'Signed in'}
             </p>
             {email !== null && email !== displayName ? (
-              <p className="truncate text-[11px] text-zinc-500 dark:text-zinc-400">
+              <p
+                data-testid="user-menu-email"
+                className="truncate text-[11px] text-zinc-500 dark:text-zinc-400"
+              >
                 {email}
               </p>
             ) : null}

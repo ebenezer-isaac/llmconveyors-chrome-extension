@@ -6,17 +6,19 @@ import {
 } from '../../../src/background/messaging/protocol';
 
 /**
- * Post-101 key registry. The PROFILE_* family was removed when the local
- * profile storage was replaced by the backend-owned master-resume, so
- * BG_HANDLED_KEYS has 14 entries and ALL_PROTOCOL_KEYS has 16.
+ * ProtocolMap key registry. The legacy local-profile storage was removed in
+ * 101.2 in favor of the backend-owned master-resume, so the PROFILE_UPDATE /
+ * PROFILE_UPLOAD_JSON_RESUME writer keys stay absent. A separate PROFILE_GET
+ * was reintroduced later to surface the backend's identity fields (email,
+ * displayName, photoURL) to the popup avatar.
  */
 describe('ProtocolMap key registry', () => {
-  it('BG_HANDLED_KEYS has exactly 27 entries post-102/103', () => {
-    expect(BG_HANDLED_KEYS).toHaveLength(27);
+  it('BG_HANDLED_KEYS has exactly 28 entries', () => {
+    expect(BG_HANDLED_KEYS).toHaveLength(28);
   });
 
-  it('ALL_PROTOCOL_KEYS has exactly 29 entries post-102/103', () => {
-    expect(ALL_PROTOCOL_KEYS).toHaveLength(29);
+  it('ALL_PROTOCOL_KEYS has exactly 30 entries', () => {
+    expect(ALL_PROTOCOL_KEYS).toHaveLength(30);
   });
 
   it('ALL_PROTOCOL_KEYS is a superset of BG_HANDLED_KEYS', () => {
@@ -26,7 +28,7 @@ describe('ProtocolMap key registry', () => {
     }
   });
 
-  it('ALL_PROTOCOL_KEYS contains the required 29 post-102/103 keys', () => {
+  it('ALL_PROTOCOL_KEYS contains the required set of keys', () => {
     const required = [
       'AUTH_SIGN_IN',
       'AUTH_SIGN_OUT',
@@ -48,6 +50,7 @@ describe('ProtocolMap key registry', () => {
       'GENERATION_COMPLETE',
       'DETECTED_JOB_BROADCAST',
       'CREDITS_GET',
+      'PROFILE_GET',
       'MASTER_RESUME_GET',
       'MASTER_RESUME_PUT',
       'AGENT_PREFERENCE_GET',
@@ -68,9 +71,8 @@ describe('ProtocolMap key registry', () => {
     expect(bgSet.has('HIGHLIGHT_CLEAR')).toBe(false);
   });
 
-  it('PROFILE_* keys are NOT in ALL_PROTOCOL_KEYS (replaced by master-resume)', () => {
+  it('the deprecated PROFILE writer keys stay removed (master-resume owns writes)', () => {
     const allSet = new Set(ALL_PROTOCOL_KEYS as readonly string[]);
-    expect(allSet.has('PROFILE_GET')).toBe(false);
     expect(allSet.has('PROFILE_UPDATE')).toBe(false);
     expect(allSet.has('PROFILE_UPLOAD_JSON_RESUME')).toBe(false);
   });

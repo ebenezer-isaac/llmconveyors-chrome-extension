@@ -118,7 +118,7 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
 }
 
 describe('HANDLERS record shape', () => {
-  it('ships exactly the BG_HANDLED_KEYS post-101 (no PROFILE_* keys)', () => {
+  it('ships exactly the BG_HANDLED_KEYS set (CREDITS + PROFILE, no legacy PROFILE writers)', () => {
     const handlers = createHandlers(buildDeps());
     const keys = Object.keys(handlers).sort();
     expect(keys).toEqual(
@@ -137,6 +137,7 @@ describe('HANDLERS record shape', () => {
         'GENERATION_CANCEL',
         'DETECTED_JOB_BROADCAST',
         'CREDITS_GET',
+        'PROFILE_GET',
         'MASTER_RESUME_GET',
         'MASTER_RESUME_PUT',
         'AGENT_PREFERENCE_GET',
@@ -158,9 +159,8 @@ describe('HANDLERS record shape', () => {
     expect(handlers).not.toHaveProperty('HIGHLIGHT_APPLY');
     expect(handlers).not.toHaveProperty('HIGHLIGHT_CLEAR');
   });
-  it('omits PROFILE_* keys (replaced by backend master-resume)', () => {
+  it('omits the legacy PROFILE writer keys (master-resume owns writes)', () => {
     const handlers = createHandlers(buildDeps());
-    expect(handlers).not.toHaveProperty('PROFILE_GET');
     expect(handlers).not.toHaveProperty('PROFILE_UPDATE');
     expect(handlers).not.toHaveProperty('PROFILE_UPLOAD_JSON_RESUME');
   });

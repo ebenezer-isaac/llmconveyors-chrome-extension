@@ -74,6 +74,9 @@ async function loadModules(): Promise<{
   const creditsUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/credits.schema.ts'),
   ).href;
+  const profileUrl = pathToFileURL(
+    resolve(REPO_ROOT, 'src/background/messaging/schemas/profile.schema.ts'),
+  ).href;
   const sessionListUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/session-list.schema.ts'),
   ).href;
@@ -89,6 +92,7 @@ async function loadModules(): Promise<{
   const highlight = (await import(highlightUrl)) as SchemaModule;
   const generation = (await import(generationUrl)) as SchemaModule;
   const credits = (await import(creditsUrl)) as SchemaModule;
+  const profile = (await import(profileUrl)) as SchemaModule;
   const sessionList = (await import(sessionListUrl)) as SchemaModule;
   const genericIntent = (await import(genericIntentUrl)) as SchemaModule;
 
@@ -238,6 +242,14 @@ async function loadModules(): Promise<{
       key: 'CREDITS_GET',
       requestSchema: credits.CreditsGetRequestSchema,
       responseSchema: credits.ClientCreditsSnapshotSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    // Profile
+    {
+      key: 'PROFILE_GET',
+      requestSchema: profile.ProfileGetRequestSchema,
+      responseSchema: profile.ClientProfileSnapshotSchema,
       handlerLocation: 'background',
       broadcastOnly: false,
     },

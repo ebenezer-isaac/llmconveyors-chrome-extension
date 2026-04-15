@@ -3,7 +3,7 @@
 **Generated file.** Edit source schemas at `src/background/messaging/schemas/**` and run `pnpm generate:protocol-schema`.
 
 Schema version: 1.0.0
-Total keys: 23
+Total keys: 24
 
 ## Key Table
 
@@ -29,6 +29,7 @@ Total keys: 23
 | `GENERATION_COMPLETE` | background | yes |
 | `DETECTED_JOB_BROADCAST` | background | yes |
 | `CREDITS_GET` | background | no |
+| `PROFILE_GET` | background | no |
 | `SESSION_LIST` | background | no |
 | `SESSION_GET` | background | no |
 | `GENERIC_INTENT_DETECT` | background | no |
@@ -1444,6 +1445,54 @@ Response schema:
     "credits",
     "tier",
     "byoKeyEnabled"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### PROFILE_GET
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "email": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "displayName": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "photoURL": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "email",
+    "displayName",
+    "photoURL"
   ],
   "additionalProperties": false,
   "$schema": "http://json-schema.org/draft-07/schema#"

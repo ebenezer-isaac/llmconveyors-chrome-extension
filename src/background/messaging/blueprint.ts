@@ -13,8 +13,7 @@ export const blueprint: ModuleBlueprint = {
   label: 'Background Messaging Surface',
   description:
     'Single API surface between content, background, popup, sidepanel, options. ' +
-    '16 ProtocolMap keys (post-101; PROFILE_* removed in favor of backend ' +
-    'master-resume) routed through typed sendMessage/onMessage. Every handler ' +
+    'All ProtocolMap keys routed through typed sendMessage/onMessage. Every handler ' +
     'validates its payload with Zod before business logic. Broadcast-only keys ' +
     'register inert handlers so the exhaustive HANDLERS record type-checks.',
   category: 'messaging',
@@ -189,6 +188,16 @@ export const blueprint: ModuleBlueprint = {
       handlerLocation: 'background',
       requestSchemaRef: './schemas/credits.schema',
       responseSchemaRef: './schemas/credits.schema',
+      broadcastOnly: false,
+      invariants: [],
+      sourceRef: { file: 'handlers.ts', line: 1 },
+    },
+    {
+      key: 'PROFILE_GET',
+      description: 'Read profile identity (email, displayName, photoURL) from backend',
+      handlerLocation: 'background',
+      requestSchemaRef: './schemas/profile.schema',
+      responseSchemaRef: './schemas/profile.schema',
       broadcastOnly: false,
       invariants: [],
       sourceRef: { file: 'handlers.ts', line: 1 },

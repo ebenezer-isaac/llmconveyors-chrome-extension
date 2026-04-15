@@ -40,6 +40,8 @@ import type {
   GenerationInteractResponse,
   CreditsGetRequest,
   ClientCreditsSnapshot,
+  ProfileGetRequest,
+  ClientProfileSnapshot,
   SessionListRequest,
   SessionListResult,
   SessionGetRequest,
@@ -101,6 +103,9 @@ export interface ProtocolMap {
   // --- Credits (1) ---
   CREDITS_GET: (data: CreditsGetRequest) => ClientCreditsSnapshot;
 
+  // --- Profile (1) ---
+  PROFILE_GET: (data: ProfileGetRequest) => ClientProfileSnapshot;
+
   // --- Master Resume (2) ---
   MASTER_RESUME_GET: (data: MasterResumeGetRequest) => MasterResumeGetResponse;
   MASTER_RESUME_PUT: (data: MasterResumePutRequest) => MasterResumePutResponse;
@@ -143,6 +148,7 @@ export const BG_HANDLED_KEYS = [
   'GENERATION_COMPLETE',
   'DETECTED_JOB_BROADCAST',
   'CREDITS_GET',
+  'PROFILE_GET',
   'MASTER_RESUME_GET',
   'MASTER_RESUME_PUT',
   'AGENT_PREFERENCE_GET',
@@ -189,5 +195,6 @@ export type {
   GenerationStartResponse,
   GenerationUpdateBroadcast,
   ClientCreditsSnapshot,
+  ClientProfileSnapshot,
 } from './protocol-types';
 export type { GenerationArtifact } from './schemas/generation.schema';

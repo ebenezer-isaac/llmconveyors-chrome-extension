@@ -1279,6 +1279,47 @@
       }
     },
     {
+      "key": "PROFILE_GET",
+      "handlerLocation": "background",
+      "broadcastOnly": false,
+      "request": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "photoURL": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "displayName",
+          "photoURL"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "key": "SESSION_LIST",
       "handlerLocation": "background",
       "broadcastOnly": false,

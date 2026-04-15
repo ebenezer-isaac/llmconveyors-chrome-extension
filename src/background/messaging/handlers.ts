@@ -22,6 +22,7 @@ import type {
   GenerationStartResponse,
   GenerationCancelResponse,
   ClientCreditsSnapshot,
+  ClientProfileSnapshot,
   DetectedIntentPayload,
   KeywordsExtractRequest,
   GenerationStartRequest,
@@ -32,6 +33,7 @@ import type {
   AuthSignOutRequest,
   AuthStatusRequest,
   CreditsGetRequest,
+  ProfileGetRequest,
   GenerationUpdateBroadcast,
   DetectedJobBroadcast,
   HighlightStatusRequest,
@@ -80,6 +82,7 @@ import {
 import { HighlightStatusRequestSchema } from './schemas/highlight.schema';
 import { GenerationUpdateBroadcastSchema } from './schemas/generation.schema';
 import { CreditsGetRequestSchema } from './schemas/credits.schema';
+import { ProfileGetRequestSchema } from './schemas/profile.schema';
 import { SessionExpiredError } from './errors';
 import type { BgHandledKey, ProtocolMap } from './protocol';
 import {
@@ -552,10 +555,37 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     return undefined;
   };
 
-  // ---- CREDITS_GET ----
-  // Reads /api/v1/settings/profile. Backend returns the global envelope
-  // `{ success, data: { credits, tier, byoKeyEnabled, ... } }`; we defensively
-  // also accept an un-enveloped object so test fixtures stay compact.
+  // ---- CREDITS_GET / PROFILE_GET shared fetcher ----
+  // Both handlers hit /api/v1/settings/profile. Backend returns the global
+  // envelope `{ success, data: { credits, tier, byoKeyEnabled, email?,
+  // displayName?, photoURL? } }`; we defensively also accept an un-enveloped
+  // object so test fixtures stay compact. The profile identity fields are
+  // optional so the extension keeps rendering gracefully until the backend
+  // ships them.
+  async function fetchSettingsProfile(): Promise<Record<string, unknown> | null> {
+    const session = await safeSignedIn(deps.storage);
+    if (session === null) return null;
+    try {
+      const res = await deps.fetch(deps.endpoints.settingsProfile, {
+        method: 'GET',
+        headers: { authorization: `Bearer ${session.accessToken}` },
+      });
+      if (!res.ok) return null;
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        return null;
+      }
+      if (typeof body !== 'object' || body === null) return null;
+      const obj = body as Record<string, unknown>;
+      return (obj.data as Record<string, unknown> | undefined) ?? obj;
+    } catch (err) {
+      log.warn('settings/profile fetch: network', { error: String(err) });
+      return null;
+    }
+  }
+
   const handleCreditsGet: HandlerFor<'CREDITS_GET'> = async ({ data }) => {
     const parsed = CreditsGetRequestSchema.safeParse(data ?? {});
     if (!parsed.success) {
@@ -566,38 +596,45 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       tier: 'free',
       byoKeyEnabled: false,
     };
-    const session = await safeSignedIn(deps.storage);
-    if (session === null) return fallback;
-    try {
-      const res = await deps.fetch(deps.endpoints.settingsProfile, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${session.accessToken}` },
-      });
-      if (!res.ok) return fallback;
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        return fallback;
-      }
-      if (typeof body !== 'object' || body === null) return fallback;
-      const obj = body as Record<string, unknown>;
-      const dataObj = (obj.data as Record<string, unknown> | undefined) ?? obj;
-      const credits =
-        typeof dataObj.credits === 'number' && Number.isFinite(dataObj.credits)
-          ? Math.max(0, dataObj.credits)
-          : 0;
-      const tier: 'free' | 'byo' =
-        dataObj.tier === 'byo' ? 'byo' : 'free';
-      const byoKeyEnabled =
-        typeof dataObj.byoKeyEnabled === 'boolean'
-          ? dataObj.byoKeyEnabled
-          : tier === 'byo';
-      return { credits, tier, byoKeyEnabled };
-    } catch (err) {
-      log.warn('CREDITS_GET: network', { error: String(err) });
-      return fallback;
+    const dataObj = await fetchSettingsProfile();
+    if (dataObj === null) return fallback;
+    const credits =
+      typeof dataObj.credits === 'number' && Number.isFinite(dataObj.credits)
+        ? Math.max(0, dataObj.credits)
+        : 0;
+    const tier: 'free' | 'byo' =
+      dataObj.tier === 'byo' ? 'byo' : 'free';
+    const byoKeyEnabled =
+      typeof dataObj.byoKeyEnabled === 'boolean'
+        ? dataObj.byoKeyEnabled
+        : tier === 'byo';
+    return { credits, tier, byoKeyEnabled };
+  };
+
+  // ---- PROFILE_GET ----
+  // Shares the /api/v1/settings/profile endpoint with CREDITS_GET. Any of
+  // `email` / `displayName` / `photoURL` that is not a non-empty string is
+  // surfaced as `null` so the popup can fall back to userId-derived
+  // initials without crashing.
+  const handleProfileGet: HandlerFor<'PROFILE_GET'> = async ({ data }) => {
+    const parsed = ProfileGetRequestSchema.safeParse(data ?? {});
+    if (!parsed.success) {
+      log.warn('PROFILE_GET: invalid payload');
     }
+    const fallback: ClientProfileSnapshot = {
+      email: null,
+      displayName: null,
+      photoURL: null,
+    };
+    const dataObj = await fetchSettingsProfile();
+    if (dataObj === null) return fallback;
+    const readNullableString = (raw: unknown): string | null =>
+      typeof raw === 'string' && raw.length > 0 ? raw : null;
+    return {
+      email: readNullableString(dataObj.email),
+      displayName: readNullableString(dataObj.displayName),
+      photoURL: readNullableString(dataObj.photoURL),
+    };
   };
 
   const agentHandlers = createAgentHandlers({
@@ -654,6 +691,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     GENERATION_COMPLETE: handleGenerationComplete,
     DETECTED_JOB_BROADCAST: handleDetectedJobBroadcast,
     CREDITS_GET: handleCreditsGet,
+    PROFILE_GET: handleProfileGet,
     MASTER_RESUME_GET: masterResumeHandlers.MASTER_RESUME_GET,
     MASTER_RESUME_PUT: masterResumeHandlers.MASTER_RESUME_PUT,
     AGENT_PREFERENCE_GET: agentHandlers.AGENT_PREFERENCE_GET,
@@ -718,7 +756,8 @@ export type _AllHandlerInputs =
   | GenerationCancelRequest
   | GenerationUpdateBroadcast
   | DetectedJobBroadcast
-  | CreditsGetRequest;
+  | CreditsGetRequest
+  | ProfileGetRequest;
 
 export type _AllHandlerOutputs =
   | AuthSignInResponse
@@ -730,4 +769,5 @@ export type _AllHandlerOutputs =
   | HighlightStatus
   | GenerationStartResponse
   | GenerationCancelResponse
-  | ClientCreditsSnapshot;
+  | ClientCreditsSnapshot
+  | ClientProfileSnapshot;

@@ -5,7 +5,7 @@
  *
  * Layout:
  *   Header (agent switcher + user)
- *   IntentBadge
+ *   StatusBadge (unified adapter + generic-JD / company-page detector)
  *   CreditsDisplay (signed in only)
  *   ActionArea (agent-aware; includes generic JD fallback for job-hunter
  *   and company-page heuristics for b2b-sales)
@@ -17,12 +17,13 @@ import React, { useEffect, useState } from 'react';
 import { useAuthState } from './useAuthState';
 import { useIntent } from './useIntent';
 import { useCredits } from './useCredits';
+import { useProfile } from './useProfile';
 import { useAgentPreference } from './useAgentPreference';
 import { useGenericIntent } from './useGenericIntent';
 import { SignInButton } from './SignInButton';
 import { ActionArea } from './ActionArea';
 import { Header } from './Header';
-import { IntentBadge } from './IntentBadge';
+import { StatusBadge } from './StatusBadge';
 import { CreditsDisplay } from './CreditsDisplay';
 import { SessionList } from './SessionList';
 import { Footer } from './Footer';
@@ -61,6 +62,7 @@ function PopupBody(): React.ReactElement {
     useAuthState();
   const { intent, tabId, loading: intentLoading } = useIntent();
   const { credits, loading: creditsLoading, error: creditsError } = useCredits();
+  const { profile } = useProfile();
   const {
     agents,
     activeAgentId,
@@ -101,23 +103,18 @@ function PopupBody(): React.ReactElement {
         }
         signOutDisabled={authLoading}
         credits={credits}
+        profile={profile}
       />
 
-      <IntentBadge
-        intent={intent}
-        loading={intentLoading && intent === null}
-        agentId={activeAgentId ?? undefined}
+      <StatusBadge
+        adapterIntent={intent}
+        genericJd={{ hasJd: genericIntent.hasJd, method: genericIntent.method }}
+        agentId={activeAgentId}
+        loading={
+          intentLoading && intent === null && !genericIntent.hasJd
+        }
       />
 
-      {signedIn && genericIntent.hasJd && (intent === null || intent.kind === 'unknown') ? (
-        <div
-          data-testid="generic-jd-badge"
-          data-method={genericIntent.method ?? ''}
-          className="mb-3 rounded-card border border-brand-500 bg-brand-50 px-3 py-2 text-xs text-brand-900 dark:border-brand-500 dark:bg-brand-900 dark:text-brand-50"
-        >
-          Job detected ({genericIntent.method ?? 'unknown'})
-        </div>
-      ) : null}
 
       {signedIn ? (
         <CreditsDisplay

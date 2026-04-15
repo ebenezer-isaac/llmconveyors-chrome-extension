@@ -53,6 +53,10 @@ import type {
   ClientCreditsSnapshotSchema,
 } from './schemas/credits.schema';
 import type {
+  ProfileGetRequestSchema,
+  ClientProfileSnapshotSchema,
+} from './schemas/profile.schema';
+import type {
   SessionListRequestSchema,
   SessionListResultSchema,
   SessionGetRequestSchema,
@@ -107,6 +111,10 @@ export type GenerationCancelResponse = z.infer<typeof GenerationCancelResponseSc
 // Credits
 export type CreditsGetRequest = z.infer<typeof CreditsGetRequestSchema>;
 export type ClientCreditsSnapshot = z.infer<typeof ClientCreditsSnapshotSchema>;
+
+// Profile
+export type ProfileGetRequest = z.infer<typeof ProfileGetRequestSchema>;
+export type ClientProfileSnapshot = z.infer<typeof ClientProfileSnapshotSchema>;
 
 // Generation (extensions)
 export type GenerationSubscribeRequest = z.infer<typeof GenerationSubscribeRequestSchema>;

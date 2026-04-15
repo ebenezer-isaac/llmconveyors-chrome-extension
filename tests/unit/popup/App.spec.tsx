@@ -66,6 +66,9 @@ function install(
       const data = (msg as { data?: { agentId?: string } }).data ?? {};
       return { ok: true, agentId: data.agentId ?? 'job-hunter', selectedAt: 2 };
     }
+    if (env.key === 'PROFILE_GET') {
+      return { email: null, displayName: null, photoURL: null };
+    }
     return sendMessage(msg);
   };
   const fake: FakeChrome = {
