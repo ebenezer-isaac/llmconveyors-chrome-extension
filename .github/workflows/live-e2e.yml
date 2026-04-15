@@ -1,0 +1,115 @@
+name: Live E2E (nightly)
+
+# Opt-in suites -- never triggered on PRs. See tests/e2e/SAFETY.md for the
+# contract. Failures here never block merges; they surface drift in live
+# ATS markup and upload Playwright artifacts for investigation.
+on:
+  schedule:
+    # 03:17 UTC nightly -- staggered off the hour to dodge GitHub rate spikes.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: live-e2e
+  cancel-in-progress: true
+
+jobs:
+  live-readonly:
+    name: Live read-only + captured autofill
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.10.0'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run live read-only suite
+        env:
+          LIVE_E2E: 'true'
+        run: pnpm test:e2e:live
+        continue-on-error: true
+
+      - name: Run captured autofill suite
+        env:
+          LIVE_E2E: 'true'
+        run: pnpm test:e2e:captured
+        continue-on-error: true
+
+      - name: Upload Playwright artifacts on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-e2e-results
+          path: tests/e2e/.test-results/
+          retention-days: 14
+
+  workday-demo:
+    name: Workday public demo fill
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.10.0'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Workday demo suite
+        env:
+          WORKDAY_DEMO_E2E: 'true'
+        run: pnpm test:e2e:workday-demo
+        continue-on-error: true
+
+      - name: Upload Playwright artifacts on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workday-demo-results
+          path: tests/e2e/.test-results/
+          retention-days: 14
