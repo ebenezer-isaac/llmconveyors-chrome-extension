@@ -1,46 +1,63 @@
 // SPDX-License-Identifier: MIT
 /**
- * Popup header: brand mark, signed-in email label, and sign-out affordance.
- * Rendered in both signed-out and signed-in states; when signed out the
- * sign-out slot collapses so the logo stays centered.
+ * Popup header: LLMC brand mark with real logo, agent switcher dropdown,
+ * signed-in user id, and sign-out affordance.
  */
 
 import React from 'react';
+import type { AgentId, AgentRegistryEntry } from '@/src/background/agents';
+import { AgentSwitcher } from './AgentSwitcher';
 
 export interface HeaderProps {
   readonly userId: string | null;
+  readonly agents: readonly AgentRegistryEntry[];
+  readonly activeAgentId: AgentId | null;
+  readonly onAgentChange: (id: AgentId) => void;
+  readonly agentsDisabled?: boolean;
   readonly onSignOut?: () => void;
   readonly signOutDisabled?: boolean;
 }
 
 export function Header({
   userId,
+  agents,
+  activeAgentId,
+  onAgentChange,
+  agentsDisabled = false,
   onSignOut,
   signOutDisabled = false,
 }: HeaderProps): React.ReactElement {
   return (
     <header
       data-testid="popup-header"
-      className="mb-3 flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-700"
+      className="mb-3 flex items-center justify-between gap-2 border-b border-zinc-200 pb-3 dark:border-zinc-700"
     >
       <div className="flex items-center gap-2">
-        <div
-          aria-hidden="true"
-          className="flex h-7 w-7 items-center justify-center rounded-card bg-brand-500 text-xs font-bold text-white"
-        >
-          LC
-        </div>
+        <img
+          src="/icon/llmc-logo.png"
+          alt="LLM Conveyors"
+          width={28}
+          height={28}
+          className="h-7 w-7 rounded-md"
+        />
         <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
           LLM Conveyors
         </h1>
       </div>
 
+      <AgentSwitcher
+        agents={agents}
+        activeAgentId={activeAgentId}
+        onChange={onAgentChange}
+        disabled={agentsDisabled}
+      />
+
       {userId !== null && onSignOut !== undefined ? (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <span
             data-testid="popup-user-id"
             title={userId}
-            className="max-w-[140px] truncate text-xs text-zinc-500 dark:text-zinc-400"
+            className="hidden max-w-[100px] truncate text-xs text-zinc-500 dark:text-zinc-400 sm:inline"
           >
             {userId}
           </span>

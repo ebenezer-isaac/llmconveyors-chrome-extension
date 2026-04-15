@@ -1,75 +1,154 @@
 // SPDX-License-Identifier: MIT
 /**
- * Sidepanel App: composes the header, JD summary, keyword list, and
- * autofill history into a single column layout that lives alongside
- * the browser tab. The side panel is the "always-on" view; it reacts
- * to tab switches so the user sees state for whatever ATS page is
- * currently active.
+ * Sidepanel root (post-101.5 pivot).
  *
- * Contrast with the popup (360x480, transient) which surfaces the
- * single Fill + Highlight affordances. The side panel is a passive
- * dashboard: no buttons that hit the backend, only reads of
- * per-tab state already captured by A8 and A9.
+ * Renders a single iframe pointing at the current agent's subdomain on
+ * llmconveyors.com with `?embed=extension` so the web app hides its global
+ * chrome and the panel shows the dashboard directly. The iframe reloads
+ * when the active agent changes.
+ *
+ * Contextual tab URL is passed as `tabUrl` so the web app can detect pages
+ * the user is currently viewing (e.g. a Greenhouse job posting) and adjust
+ * its prompts.
  */
 
-import React from 'react';
-import { useAuthState } from '../popup/useAuthState';
-import { Header } from '../popup/Header';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../popup/ErrorBoundary';
-import { JdSummary } from './JdSummary';
-import { KeywordList } from './KeywordList';
-import { AutofillHistory } from './AutofillHistory';
+import { useAgentPreference } from '../popup/useAgentPreference';
 import { useTargetTabId } from './useTargetTabId';
-import { useSidepanelIntent } from './useSidepanelIntent';
-import { useKeywords } from './useKeywords';
-import { useAutofillHistory } from './useAutofillHistory';
+import type { AgentRegistryEntry } from '@/src/background/agents';
+
+const ROOT_DOMAIN = 'llmconveyors.com';
+
+function buildIframeUrl(
+  agent: AgentRegistryEntry,
+  tabUrl: string | null,
+  reloadKey: number,
+): string {
+  const origin = `https://${agent.subdomain}.${ROOT_DOMAIN}`;
+  const params = new URLSearchParams();
+  params.set('embed', 'extension');
+  if (tabUrl) params.set('tabUrl', tabUrl);
+  params.set('cb', String(reloadKey));
+  return `${origin}?${params.toString()}`;
+}
+
+function useActiveTabUrl(): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  const { tabId } = useTargetTabId();
+  useEffect(() => {
+    const g = globalThis as unknown as {
+      chrome?: {
+        tabs?: {
+          get: (id: number, cb: (tab: { url?: string } | undefined) => void) => void;
+        };
+      };
+    };
+    const tabs = g.chrome?.tabs;
+    if (!tabs || typeof tabId !== 'number') {
+      setUrl(null);
+      return;
+    }
+    try {
+      tabs.get(tabId, (tab) => setUrl(tab?.url ?? null));
+    } catch {
+      setUrl(null);
+    }
+  }, [tabId]);
+  return url;
+}
 
 function SidepanelBody(): React.ReactElement {
-  const { state: authState, loading: authLoading, signOut } = useAuthState();
-  const { tabId, loading: tabLoading } = useTargetTabId();
-  const { intent, loading: intentLoading } = useSidepanelIntent(tabId);
-  const { keywords, loading: keywordsLoading } = useKeywords(tabId);
-  const { history, loading: historyLoading } = useAutofillHistory(tabId);
+  const { agents, activeAgentId, loading, error } = useAgentPreference();
+  const tabUrl = useActiveTabUrl();
+  const [reloadKey, setReloadKey] = useState(0);
+  const [iframeError, setIframeError] = useState<string | null>(null);
 
-  const signedIn = authState.signedIn;
-  const userId = signedIn ? authState.userId : null;
+  const agent = useMemo(
+    () => agents.find((a) => a.id === activeAgentId) ?? agents[0] ?? null,
+    [agents, activeAgentId],
+  );
+
+  useEffect(() => {
+    setIframeError(null);
+  }, [agent?.id, tabUrl]);
+
+  if (loading) {
+    return (
+      <div
+        data-testid="sidepanel-root"
+        className="flex h-screen w-full items-center justify-center bg-white text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400"
+      >
+        Loading LLM Conveyors...
+      </div>
+    );
+  }
+
+  if (!agent || error) {
+    return (
+      <div
+        data-testid="sidepanel-root"
+        className="flex h-screen w-full items-center justify-center bg-white p-6 text-center dark:bg-zinc-900"
+      >
+        <div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            Unable to load the extension dashboard.
+          </p>
+          {error ? (
+            <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const src = buildIframeUrl(agent, tabUrl, reloadKey);
 
   return (
     <div
       data-testid="sidepanel-root"
-      data-tab-id={tabId ?? ''}
-      className="flex min-h-screen w-full flex-col bg-white px-4 py-4 text-zinc-900 font-display dark:bg-zinc-900 dark:text-zinc-50"
+      data-active-agent={agent.id}
+      className="flex h-screen w-full flex-col bg-white dark:bg-zinc-900"
     >
-      <Header
-        userId={userId}
-        onSignOut={
-          signedIn
-            ? () => {
-                void signOut();
-              }
-            : undefined
-        }
-        signOutDisabled={authLoading}
-      />
-
-      {!signedIn ? (
-        <section
-          data-testid="sidepanel-signed-out"
-          className="mb-4 rounded-card border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+      {iframeError ? (
+        <div
+          data-testid="sidepanel-iframe-error"
+          className="flex flex-1 items-center justify-center p-6 text-center"
         >
-          Sign in from the popup to load keyword matches and autofill history.
-        </section>
-      ) : null}
-
-      <JdSummary intent={intent} loading={intentLoading || tabLoading} />
-
-      <KeywordList keywords={keywords} loading={keywordsLoading} />
-
-      <AutofillHistory history={history} loading={historyLoading} />
-
-      <footer className="mt-auto border-t border-zinc-200 pt-3 text-[10px] text-zinc-400 dark:border-zinc-700 dark:text-zinc-500">
-        LLM Conveyors Job Assistant
-      </footer>
+          <div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">{iframeError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setIframeError(null);
+                setReloadKey((k) => k + 1);
+              }}
+              className="mt-4 rounded-md border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : (
+        <iframe
+          key={`${agent.id}:${reloadKey}`}
+          data-testid="sidepanel-iframe"
+          title={`LLM Conveyors ${agent.label}`}
+          src={src}
+          className="h-full w-full border-0"
+          sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-downloads"
+          onError={() =>
+            setIframeError('Cannot reach llmconveyors.com. Check your connection and retry.')
+          }
+        />
+      )}
     </div>
   );
 }

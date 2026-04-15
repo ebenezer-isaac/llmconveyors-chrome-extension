@@ -44,7 +44,7 @@ function makeStore(): {
 describe('master-resume cache', () => {
   it('round-trips a fresh response', async () => {
     const { storage, data } = makeStore();
-    let t = 1_000;
+    const t = 1_000;
     const cache = createMasterResumeCache({ storage, logger: makeLogger(), now: () => t });
     await cache.write(RESPONSE);
     expect(data[MASTER_RESUME_CACHE_KEY]).toBeDefined();

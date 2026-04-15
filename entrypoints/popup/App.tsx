@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: MIT
 // entrypoints/popup/App.tsx
 /**
- * Popup root. Composes the header, intent badge, credits display, action
- * area (fill + highlight), and footer into the 360x480 popup surface. All
- * data comes from hooks (useAuthState, useIntent, useCredits); the App
- * component is responsible only for layout and for translating auth/intent
- * state into enable/disable props for the action buttons.
+ * Popup root. Post 101.5 pivot.
  *
- * A root ErrorBoundary wraps the tree so a render-time crash in any hook or
- * component collapses to a single inline banner rather than a blank popup.
+ * Composes: LLMC branded header + agent switcher, intent badge, credits
+ * widget, agent-aware action area (fill + highlight), footer with links
+ * into the side panel / settings. All data comes from hooks; the App is
+ * responsible only for layout and wiring.
  */
 
 import React from 'react';
 import { useAuthState } from './useAuthState';
 import { useIntent } from './useIntent';
 import { useCredits } from './useCredits';
+import { useAgentPreference } from './useAgentPreference';
 import { SignInButton } from './SignInButton';
 import { ActionArea } from './ActionArea';
 import { Header } from './Header';
@@ -28,6 +27,12 @@ function PopupBody(): React.ReactElement {
     useAuthState();
   const { intent, tabId, loading: intentLoading } = useIntent();
   const { credits, loading: creditsLoading, error: creditsError } = useCredits();
+  const {
+    agents,
+    activeAgentId,
+    setActiveAgent,
+    loading: agentsLoading,
+  } = useAgentPreference();
 
   const signedIn = authState.signedIn;
   const userId = authState.signedIn ? authState.userId : null;
@@ -39,6 +44,12 @@ function PopupBody(): React.ReactElement {
     >
       <Header
         userId={userId}
+        agents={agents}
+        activeAgentId={activeAgentId}
+        onAgentChange={(id) => {
+          void setActiveAgent(id);
+        }}
+        agentsDisabled={agentsLoading}
         onSignOut={
           signedIn
             ? () => {
@@ -67,7 +78,7 @@ function PopupBody(): React.ReactElement {
           className="rounded-card border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
         >
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Sign in to auto-fill job applications on Greenhouse, Lever, and Workday.
+            Sign in to auto-fill applications and run agents from llmconveyors.com.
           </p>
           <SignInButton
             onClick={() => {

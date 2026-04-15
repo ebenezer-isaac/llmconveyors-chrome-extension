@@ -34,9 +34,42 @@ function install(
 ): FakeChrome {
   const listeners: Listener[] = [];
   const tabListeners: TabsListener[] = [];
+  // Wrap sendMessage so the popup's new AGENT_* messages always get a typed
+  // default response, keeping individual test cases focused on their own
+  // concerns instead of enumerating every new envelope.
+  const wrapped = async (msg: unknown): Promise<unknown> => {
+    const env = msg as { key?: string };
+    if (env.key === 'AGENT_REGISTRY_LIST') {
+      return {
+        agents: [
+          {
+            id: 'job-hunter',
+            routePath: '/job-hunt',
+            subdomain: 'job-hunt',
+            apiEndpoint: '/api/agents/job-hunter/generate',
+            hasSettings: true,
+            isPublic: true,
+            accentColor: 'emerald',
+            iconSvg: '',
+            label: 'Job Hunter',
+            shortDescription: 'Tailor CVs',
+          },
+        ],
+        defaultAgentId: 'job-hunter',
+      };
+    }
+    if (env.key === 'AGENT_PREFERENCE_GET') {
+      return { agentId: 'job-hunter', selectedAt: 1 };
+    }
+    if (env.key === 'AGENT_PREFERENCE_SET') {
+      const data = (msg as { data?: { agentId?: string } }).data ?? {};
+      return { ok: true, agentId: data.agentId ?? 'job-hunter', selectedAt: 2 };
+    }
+    return sendMessage(msg);
+  };
   const fake: FakeChrome = {
     runtime: {
-      sendMessage,
+      sendMessage: wrapped,
       onMessage: {
         addListener: (fn) => listeners.push(fn),
         removeListener: (fn) => {
@@ -106,6 +139,8 @@ describe('Popup App integration', () => {
       if (env.key === 'AUTH_STATUS') return { signedIn: false };
       if (env.key === 'INTENT_GET') return null;
       if (env.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (env.key === 'AGENT_REGISTRY_LIST') return { agents: [], defaultAgentId: 'job-hunter' };
+      if (env.key === 'AGENT_PREFERENCE_GET') return { agentId: 'job-hunter', selectedAt: 1 };
       return undefined;
     }, [{ id: 1, url: 'about:blank' }]);
     await mount();
