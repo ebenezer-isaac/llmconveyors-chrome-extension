@@ -98,13 +98,18 @@ export function classifyLaunchError(err: unknown): AuthError {
 }
 
 /**
- * Launch the interactive web auth flow. Returns the redirect URL captured
- * by Chrome after the bridge page sets window.location to the
- * chromiumapp.org target.
+ * Launch the web auth flow. Returns the redirect URL captured by Chrome
+ * after the bridge page sets window.location to the chromiumapp.org target.
+ *
+ * `interactive` defaults to true (popup Sign In click). Pass `false` for a
+ * silent refresh attempted by the popup on mount; Chrome rejects silent
+ * flows when user interaction is required, which we classify as a
+ * cancellation so the caller can quietly stay signed-out.
  */
 export async function launchWebAuthFlow(
   bridgeUrl: string,
   deps: WebAuthFlowDeps = defaultWebAuthFlowDeps,
+  interactive: boolean = true,
 ): Promise<string> {
   const redirectUri = deps.getRedirectURL();
   if (typeof redirectUri !== 'string' || redirectUri.length === 0) {
@@ -118,14 +123,22 @@ export async function launchWebAuthFlow(
   try {
     responseUrl = await deps.launchWebAuthFlow({
       url: signInUrl,
-      interactive: true,
+      interactive,
     });
   } catch (err) {
     throw classifyLaunchError(err);
   }
   if (typeof responseUrl !== 'string' || responseUrl.length === 0) {
-    // launchWebAuthFlow only returns undefined on silent-refresh paths,
-    // and we always pass interactive: true. Treat empty as a network fault.
+    // In interactive mode launchWebAuthFlow should always resolve with a
+    // redirect URL; an empty value means Chrome dropped the flow (network
+    // fault). In silent mode Chrome returns undefined when it would need
+    // to prompt the user, which we surface as a cancellation so the popup
+    // stays in the signed-out panel without error.
+    if (interactive === false) {
+      throw new AuthCancelledError(
+        'silent auth flow requires user interaction',
+      );
+    }
     throw new AuthNetworkError(
       'launchWebAuthFlow returned an empty response URL',
     );

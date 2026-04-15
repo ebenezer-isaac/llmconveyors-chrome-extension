@@ -100,6 +100,7 @@ function PopupBody(): React.ReactElement {
             : undefined
         }
         signOutDisabled={authLoading}
+        credits={credits}
       />
 
       <IntentBadge

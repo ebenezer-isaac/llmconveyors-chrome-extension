@@ -49,8 +49,12 @@ export {
 } from './sign-in-orchestrator';
 export type {
   AuthBroadcast,
+  SignInAttemptOptions,
   SignInOrchestratorDeps,
   StorageFacade,
 } from './sign-in-orchestrator';
 
 export { AUTH_MODULE_BLUEPRINT, blueprint } from './blueprint';
+
+export { registerCookieWatcher } from './cookie-watcher';
+export type { CookieWatcherDeps } from './cookie-watcher';

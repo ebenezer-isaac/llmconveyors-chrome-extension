@@ -17,9 +17,8 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
 
   manifest: {
-    name: 'LLM Conveyors Job Assistant',
-    description:
-      'Intelligent form autofill and keyword highlighting for Greenhouse, Lever, and Workday job applications.',
+    name: '__MSG_appName__',
+    description: '__MSG_appDescription__',
     version: '0.1.0',
     default_locale: 'en',
     minimum_chrome_version: '114',
@@ -32,12 +31,14 @@ export default defineConfig({
       'scripting',
       'sidePanel',
       'notifications',
+      'cookies',
     ],
     host_permissions: [
       'https://*.greenhouse.io/*',
       'https://jobs.lever.co/*',
       'https://*.myworkdayjobs.com/*',
       'https://api.llmconveyors.com/*',
+      'https://*.llmconveyors.com/*',
       'https://llmconveyors.com/*',
       ...DEV_HOST_PERMISSIONS,
     ],
@@ -48,7 +49,7 @@ export default defineConfig({
       extension_pages: "script-src 'self'; object-src 'self'; base-uri 'self'",
     },
     action: {
-      default_title: 'LLM Conveyors Job Assistant',
+      default_title: '__MSG_appName__',
       default_icon: {
         '16': '/icon/16.png',
         '32': '/icon/32.png',

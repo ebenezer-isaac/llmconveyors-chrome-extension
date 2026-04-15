@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT
 /**
  * Popup header: LLMC brand mark with real logo, agent switcher dropdown,
- * signed-in user id, and sign-out affordance.
+ * and (when signed in) a UserMenu avatar that hosts account actions +
+ * sign-out.
  */
 
 import React from 'react';
 import type { AgentId, AgentRegistryEntry } from '@/src/background/agents';
+import type { CreditsState } from '@/src/background/messaging/protocol';
 import { AgentSwitcher } from './AgentSwitcher';
+import { UserMenu } from './UserMenu';
 
 export interface HeaderProps {
   readonly userId: string | null;
@@ -16,6 +19,7 @@ export interface HeaderProps {
   readonly agentsDisabled?: boolean;
   readonly onSignOut?: () => void;
   readonly signOutDisabled?: boolean;
+  readonly credits?: CreditsState | null;
 }
 
 export function Header({
@@ -26,7 +30,11 @@ export function Header({
   agentsDisabled = false,
   onSignOut,
   signOutDisabled = false,
+  credits = null,
 }: HeaderProps): React.ReactElement {
+  const activeAgent =
+    agents.find((entry) => entry.id === activeAgentId) ?? null;
+
   return (
     <header
       data-testid="popup-header"
@@ -57,20 +65,19 @@ export function Header({
           <span
             data-testid="popup-user-id"
             title={userId}
-            className="hidden max-w-[100px] truncate text-xs text-zinc-500 dark:text-zinc-400 sm:inline"
+            className="sr-only"
           >
             {userId}
           </span>
-          <button
-            type="button"
-            data-testid="sign-out-button"
-            aria-label="Sign out"
-            onClick={onSignOut}
-            disabled={signOutDisabled}
-            className="rounded-card border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
-          >
-            Sign out
-          </button>
+          <UserMenu
+            userId={userId}
+            displayName={null}
+            email={userId.includes('@') ? userId : null}
+            credits={credits}
+            activeAgent={activeAgent}
+            onSignOut={onSignOut}
+            signOutDisabled={signOutDisabled}
+          />
         </div>
       ) : null}
     </header>

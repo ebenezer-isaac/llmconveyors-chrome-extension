@@ -2,15 +2,15 @@
 /**
  * React hook that subscribes the popup to the current auth state.
  *
- * On mount, sends an AUTH_STATUS message and stores the response. Also
- * registers a chrome.runtime.onMessage listener that reacts to
- * AUTH_STATE_CHANGED broadcasts fired by the background service worker
- * after sign-in or sign-out.
+ * On mount, sends an AUTH_STATUS message and stores the response. If the
+ * response is unauthed, the hook immediately attempts a silent web-auth
+ * flow (`interactive: false`) so users whose web session is still live get
+ * signed in automatically without clicking Sign In. Silent failures are
+ * swallowed -- the user can still click Sign In explicitly.
  *
- * The hook returns the current state plus imperative `signIn` / `signOut`
- * actions that the popup buttons can invoke. Both actions optimistically
- * update local state when the background resolves; failures are surfaced
- * as a human-readable error string.
+ * Also registers a chrome.runtime.onMessage listener that reacts to
+ * AUTH_STATE_CHANGED broadcasts fired by the background service worker
+ * after sign-in, sign-out, or cookie-watcher detected changes.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -80,6 +80,7 @@ export interface UseAuthStateResult {
   readonly loading: boolean;
   readonly error: string | null;
   readonly signIn: () => Promise<void>;
+  readonly silentSignIn: () => Promise<void>;
   readonly signOut: () => Promise<void>;
 }
 
@@ -88,6 +89,49 @@ export function useAuthState(): UseAuthStateResult {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef<boolean>(true);
+
+  const runSignIn = useCallback(
+    async (interactive: boolean): Promise<void> => {
+      const runtime = getRuntime();
+      if (runtime === null) {
+        if (interactive) setError('Extension runtime unavailable');
+        return;
+      }
+      if (interactive) setError(null);
+      setLoading(true);
+      try {
+        // The E2E harness seeds `llmc.e2e.test-cookie-jar` so Playwright can
+        // drive sign-in without launching the real identity popup. Only
+        // honour it for the interactive click path; silent mount should
+        // still go through the real launchWebAuthFlow so the code exercises
+        // the same cookie refresh path the production popup takes.
+        const testJar = interactive ? await readTestCookieJar() : null;
+        const payload: { cookieJar?: string; interactive?: boolean } = testJar
+          ? { cookieJar: testJar }
+          : { interactive };
+        const response = (await runtime.sendMessage({
+          key: 'AUTH_SIGN_IN',
+          data: payload,
+        })) as AuthSignInResponse | undefined;
+        if (!mountedRef.current) return;
+        if (!response) {
+          if (interactive) setError('Sign-in returned no response');
+          return;
+        }
+        if (response.ok) {
+          setState({ signedIn: true, userId: response.userId });
+          return;
+        }
+        if (interactive) setError(response.reason);
+      } catch (err) {
+        if (!mountedRef.current) return;
+        if (interactive) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (mountedRef.current) setLoading(false);
+      }
+    },
+    [],
+  );
 
   // Initial status fetch + subscribe to broadcasts.
   useEffect(() => {
@@ -99,18 +143,28 @@ export function useAuthState(): UseAuthStateResult {
         if (mountedRef.current) setLoading(false);
         return;
       }
+      let currentState: AuthState = UNAUTHED;
       try {
         const response = await runtime.sendMessage({
           key: 'AUTH_STATUS',
           data: {},
         });
         if (!mountedRef.current) return;
-        if (isAuthState(response)) setState(response);
+        if (isAuthState(response)) {
+          currentState = response;
+          setState(response);
+        }
       } catch {
         // Service worker may be spinning up; the broadcast listener will
         // still catch a subsequent sign-in.
-      } finally {
-        if (mountedRef.current) setLoading(false);
+      }
+      // Attempt a silent sign-in only when we already know the user is
+      // unauthed. Keep `loading: true` so the popup does not flash the
+      // signed-out panel before the silent flow resolves.
+      if (currentState.signedIn === false) {
+        await runSignIn(false);
+      } else if (mountedRef.current) {
+        setLoading(false);
       }
     }
 
@@ -130,43 +184,15 @@ export function useAuthState(): UseAuthStateResult {
       mountedRef.current = false;
       runtime?.onMessage.removeListener(onMessage);
     };
-  }, []);
+  }, [runSignIn]);
 
   const signIn = useCallback(async (): Promise<void> => {
-    const runtime = getRuntime();
-    if (runtime === null) {
-      setError('Extension runtime unavailable');
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      // Read an optional test-mode cookie jar from chrome.storage.local.
-      // Production builds never have this key set; the E2E harness seeds
-      // it so Playwright can exercise the sign-in flow without driving
-      // the real chrome.identity.launchWebAuthFlow popup window, which
-      // is unreliable under headless Chromium.
-      const testJar = await readTestCookieJar();
-      const payload: { cookieJar?: string } = testJar ? { cookieJar: testJar } : {};
-      const response = (await runtime.sendMessage({
-        key: 'AUTH_SIGN_IN',
-        data: payload,
-      })) as AuthSignInResponse | undefined;
-      if (!response) {
-        setError('Sign-in returned no response');
-        return;
-      }
-      if (response.ok) {
-        setState({ signedIn: true, userId: response.userId });
-      } else {
-        setError(response.reason);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
+    await runSignIn(true);
+  }, [runSignIn]);
+
+  const silentSignIn = useCallback(async (): Promise<void> => {
+    await runSignIn(false);
+  }, [runSignIn]);
 
   const signOut = useCallback(async (): Promise<void> => {
     const runtime = getRuntime();
@@ -193,5 +219,5 @@ export function useAuthState(): UseAuthStateResult {
     }
   }, []);
 
-  return { state, loading, error, signIn, signOut };
+  return { state, loading, error, signIn, silentSignIn, signOut };
 }

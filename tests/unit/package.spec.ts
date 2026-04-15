@@ -47,9 +47,28 @@ describe('A1 scaffold invariants', () => {
     expect(licenseText.toLowerCase()).not.toContain('zovo');
   });
 
-  test('wxt.config.ts manifest name is LLM Conveyors Job Assistant', () => {
+  test('wxt.config.ts manifest uses locale indirection for name and description', () => {
     const cfg = readFileSync(resolve(ROOT, 'wxt.config.ts'), 'utf-8');
-    expect(cfg).toContain("name: 'LLM Conveyors Job Assistant'");
+    expect(cfg).toContain("name: '__MSG_appName__'");
+    expect(cfg).toContain("description: '__MSG_appDescription__'");
+  });
+
+  test('_locales/en/messages.json ships the post-pivot LLM Conveyors brand', () => {
+    const raw = readFileSync(
+      resolve(ROOT, 'public/_locales/en/messages.json'),
+      'utf-8',
+    );
+    const parsed = JSON.parse(raw) as {
+      readonly appName: { readonly message: string };
+      readonly appDescription: { readonly message: string };
+    };
+    expect(parsed.appName.message).toBe('LLM Conveyors');
+    // The post-pivot copy is agent-agnostic and must not reference the
+    // old Greenhouse/Lever/Workday-only wording.
+    expect(parsed.appDescription.message).toMatch(/AI-powered/i);
+    expect(parsed.appDescription.message.toLowerCase()).not.toContain(
+      'greenhouse, lever, and workday job applications',
+    );
   });
 
   test('src/background/log.ts exports createLogger and Logger type', () => {

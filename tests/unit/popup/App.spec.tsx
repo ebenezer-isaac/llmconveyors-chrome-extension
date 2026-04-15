@@ -138,9 +138,10 @@ describe('Popup App integration', () => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: false };
       if (env.key === 'INTENT_GET') return null;
-      if (env.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (env.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       if (env.key === 'AGENT_REGISTRY_LIST') return { agents: [], defaultAgentId: 'job-hunter' };
       if (env.key === 'AGENT_PREFERENCE_GET') return { agentId: 'job-hunter', selectedAt: 1 };
+      if (env.key === 'AUTH_SIGN_IN') return { ok: false, reason: 'silent sign-in not available' };
       return undefined;
     }, [{ id: 1, url: 'about:blank' }]);
     await mount();
@@ -156,8 +157,8 @@ describe('Popup App integration', () => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'u_1' };
       if (env.key === 'INTENT_GET') return null;
-      if (env.key === 'CREDITS_GET') return { balance: 33, plan: 'pro', resetAt: null };
-      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'CREDITS_GET') return { credits: 33, tier: 'byo', byoKeyEnabled: true };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], hasMore: false, nextCursor: null, fetchedAt: 0, fromCache: false };
       if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 2, url: 'about:blank' }]);
@@ -166,7 +167,7 @@ describe('Popup App integration', () => {
     expect(query('signed-out-panel')).toBeNull();
     expect(query('action-area')).not.toBeNull();
     const credits = query('credits-remaining');
-    expect(credits?.textContent).toMatch(/33 credits remaining/);
+    expect(credits?.textContent).toMatch(/33 credits/);
     const fill = query('fill-button') as HTMLButtonElement | null;
     const highlight = query('highlight-button') as HTMLButtonElement | null;
     expect(fill?.disabled).toBe(true);
@@ -185,8 +186,8 @@ describe('Popup App integration', () => {
           url: 'https://boards.greenhouse.io/acme/jobs/1',
           detectedAt: 1,
         };
-      if (env.key === 'CREDITS_GET') return { balance: 5, plan: 'free', resetAt: null };
-      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'CREDITS_GET') return { credits: 5, tier: 'free', byoKeyEnabled: false };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], hasMore: false, nextCursor: null, fetchedAt: 0, fromCache: false };
       if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 3, url: 'https://boards.greenhouse.io/acme/jobs/1' }]);
@@ -212,8 +213,8 @@ describe('Popup App integration', () => {
           url: 'https://jobs.lever.co/acme/1/apply',
           detectedAt: 2,
         };
-      if (env.key === 'CREDITS_GET') return { balance: 10, plan: 'free', resetAt: null };
-      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'CREDITS_GET') return { credits: 10, tier: 'free', byoKeyEnabled: false };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], hasMore: false, nextCursor: null, fetchedAt: 0, fromCache: false };
       if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 4, url: 'https://jobs.lever.co/acme/1/apply' }]);
@@ -230,7 +231,7 @@ describe('Popup App integration', () => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: false };
       if (env.key === 'INTENT_GET') return null;
-      if (env.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (env.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     }, [{ id: 5, url: 'about:blank' }]);
     await mount();
@@ -239,23 +240,25 @@ describe('Popup App integration', () => {
     expect(query('popup-footer')).not.toBeNull();
     expect(query('intent-badge')).not.toBeNull();
     expect(query('popup-version')?.textContent).toMatch(/v0\.1\.0/);
-    expect(query('dashboard-link')).not.toBeNull();
-    expect(query('settings-link')).not.toBeNull();
+    // Dashboard and Settings moved from the footer into the user menu
+    // dropdown (post-104). The footer now only carries the version number.
+    expect(query('dashboard-link')).toBeNull();
+    expect(query('settings-link')).toBeNull();
   });
 
-  it('renders the user id in the header when signed in', async () => {
+  it('renders the user-menu avatar when signed in', async () => {
     install(async (msg) => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'alice@example.com' };
       if (env.key === 'INTENT_GET') return null;
-      if (env.key === 'CREDITS_GET') return { balance: 1, plan: 'free', resetAt: null };
-      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'CREDITS_GET') return { credits: 1, tier: 'free', byoKeyEnabled: false };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], hasMore: false, nextCursor: null, fetchedAt: 0, fromCache: false };
       if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 6, url: 'about:blank' }]);
     await mount();
     await flush();
     expect(query('popup-user-id')?.textContent).toBe('alice@example.com');
-    expect(query('sign-out-button')).not.toBeNull();
+    expect(query('user-menu-trigger')).not.toBeNull();
   });
 });

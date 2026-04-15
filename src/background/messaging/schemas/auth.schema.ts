@@ -13,6 +13,14 @@ import { defineDiscriminatedUnion } from './define-discriminated-union';
 export const AuthSignInRequestSchema = z
   .object({
     cookieJar: z.string().max(16_384).optional(),
+    /**
+     * When `false`, drive `chrome.identity.launchWebAuthFlow` with
+     * `interactive: false` for a silent token refresh. The popup uses this
+     * on mount to sign in automatically when the web cookie is still valid,
+     * falling back to the signed-out panel + explicit Sign In button when
+     * silent exchange fails. Defaults to `true`.
+     */
+    interactive: z.boolean().optional(),
   })
   .strict();
 

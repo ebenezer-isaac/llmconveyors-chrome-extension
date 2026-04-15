@@ -81,11 +81,23 @@ export interface SignInOrchestratorDeps {
   /**
    * Swappable launch entrypoint. Defaults to our wrapper that calls
    * `webAuthFlow.launchWebAuthFlow`. Tests can replace the whole function.
+   * The third argument is the `interactive` flag forwarded to Chrome.
    */
   readonly launch: (
     bridgeUrl: string,
     webAuthFlow: WebAuthFlowDeps,
+    interactive: boolean,
   ) => Promise<string>;
+}
+
+/** Options for a single sign-in attempt. */
+export interface SignInAttemptOptions {
+  /**
+   * Controls `chrome.identity.launchWebAuthFlow`'s `interactive` flag.
+   * Defaults to true; the popup passes false on mount for silent token
+   * refresh.
+   */
+  readonly interactive?: boolean;
 }
 
 // Module-level single-flight mutex. Two concurrent callers share the same
@@ -122,10 +134,13 @@ export function buildStoredSession(
  * Run the full sign-in transaction under the mutex. Always re-throws
  * AuthError subtypes unchanged; wraps unexpected throws in AuthProviderError.
  */
-async function runSignIn(deps: SignInOrchestratorDeps): Promise<AuthState> {
-  deps.logger.info('sign-in: start');
+async function runSignIn(
+  deps: SignInOrchestratorDeps,
+  interactive: boolean,
+): Promise<AuthState> {
+  deps.logger.info('sign-in: start', { interactive });
 
-  const responseUrl = await deps.launch(deps.bridgeUrl, deps.webAuthFlow);
+  const responseUrl = await deps.launch(deps.bridgeUrl, deps.webAuthFlow, interactive);
 
   let parsed: ParsedAuthFragment;
   try {
@@ -193,18 +208,22 @@ async function runSignIn(deps: SignInOrchestratorDeps): Promise<AuthState> {
 }
 
 /**
- * Factory. Returns a zero-arg function bound to `deps`. Used by tests to
- * create a controlled orchestrator with fakes.
+ * Factory. Returns a function bound to `deps` that accepts optional attempt
+ * options (currently just the interactive flag). Used by tests to create a
+ * controlled orchestrator with fakes.
  */
 export function createSignInOrchestrator(
   deps: SignInOrchestratorDeps,
-): () => Promise<AuthState> {
-  return async function boundSignIn(): Promise<AuthState> {
+): (opts?: SignInAttemptOptions) => Promise<AuthState> {
+  return async function boundSignIn(
+    opts?: SignInAttemptOptions,
+  ): Promise<AuthState> {
     if (inflight !== null) {
       deps.logger.debug('sign-in: mutex hit, awaiting existing flight');
       return inflight;
     }
-    const promise = runSignIn(deps).finally(() => {
+    const interactive = opts?.interactive !== false;
+    const promise = runSignIn(deps, interactive).finally(() => {
       inflight = null;
     });
     inflight = promise;

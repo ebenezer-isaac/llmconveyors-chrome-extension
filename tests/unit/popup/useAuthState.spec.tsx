@@ -143,13 +143,13 @@ describe('popup App + useAuthState', () => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
       if (typed.key === 'INTENT_GET') return null;
-      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
     await mountApp();
     await flushMicrotasks();
     expect(query('sign-in-button')).not.toBeNull();
-    expect(query('sign-out-button')).toBeNull();
+    expect(query('user-menu-trigger')).toBeNull();
     expect(query('action-area')).toBeNull();
   });
 
@@ -158,7 +158,7 @@ describe('popup App + useAuthState', () => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: true, userId: 'user_abc' };
       if (typed.key === 'INTENT_GET') return null;
-      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
     await mountApp();
@@ -167,19 +167,28 @@ describe('popup App + useAuthState', () => {
     expect(userId).not.toBeNull();
     expect(userId?.textContent).toBe('user_abc');
     expect(query('sign-in-button')).toBeNull();
-    expect(query('sign-out-button')).not.toBeNull();
+    expect(query('user-menu-trigger')).not.toBeNull();
   });
 
   it('transitions to signed-in after clicking sign-in-button (cookieJar mode)', async () => {
     const sendMessage = vi.fn(async (msg: unknown) => {
-      const typed = msg as { key?: string; data?: { cookieJar?: string } };
+      const typed = msg as {
+        key?: string;
+        data?: { cookieJar?: string; interactive?: boolean };
+      };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
       if (typed.key === 'AUTH_SIGN_IN') {
+        // The on-mount silent attempt sends `{ interactive: false }` and
+        // should quietly fail so the popup shows the Sign In button; the
+        // explicit click sends the test cookie jar and succeeds.
+        if (typed.data?.interactive === false) {
+          return { ok: false, reason: 'silent sign-in not available' };
+        }
         expect(typed.data?.cookieJar).toBe('test-jar');
         return { ok: true, userId: 'user_signed_in' };
       }
       if (typed.key === 'INTENT_GET') return null;
-      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
     installFakeChrome(sendMessage, 'test-jar');
@@ -187,6 +196,8 @@ describe('popup App + useAuthState', () => {
     await flushMicrotasks();
     const btn = query('sign-in-button');
     expect(btn).not.toBeNull();
+    // Silent attempt should not render an error banner.
+    expect(query('auth-error')).toBeNull();
     await click(btn!);
     await flushMicrotasks();
     const userId = query('popup-user-id');
@@ -199,16 +210,23 @@ describe('popup App + useAuthState', () => {
 
   it('surfaces sign-in failure as a visible error', async () => {
     const sendMessage = vi.fn(async (msg: unknown) => {
-      const typed = msg as { key?: string };
+      const typed = msg as { key?: string; data?: { interactive?: boolean } };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
-      if (typed.key === 'AUTH_SIGN_IN') return { ok: false, reason: 'network error' };
+      if (typed.key === 'AUTH_SIGN_IN') {
+        if (typed.data?.interactive === false) {
+          return { ok: false, reason: 'silent sign-in not available' };
+        }
+        return { ok: false, reason: 'network error' };
+      }
       if (typed.key === 'INTENT_GET') return null;
-      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
     installFakeChrome(sendMessage);
     await mountApp();
     await flushMicrotasks();
+    // Silent mount failure must NOT raise an error banner.
+    expect(query('auth-error')).toBeNull();
     await click(query('sign-in-button')!);
     await flushMicrotasks();
     const errEl = query('auth-error');
@@ -216,20 +234,25 @@ describe('popup App + useAuthState', () => {
     expect(errEl?.textContent).toContain('network error');
   });
 
-  it('signs out on sign-out-button click', async () => {
+  it('signs out via the user-menu Logout item', async () => {
     const sendMessage = vi.fn(async (msg: unknown) => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: true, userId: 'user_abc' };
       if (typed.key === 'AUTH_SIGN_OUT') return { ok: true };
       if (typed.key === 'INTENT_GET') return null;
-      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
+      if (typed.key === 'SESSION_LIST')
+        return { ok: true, items: [], hasMore: false, nextCursor: null, fetchedAt: 0, fromCache: false };
+      if (typed.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     });
     installFakeChrome(sendMessage);
     await mountApp();
     await flushMicrotasks();
     expect(query('popup-user-id')).not.toBeNull();
-    await click(query('sign-out-button')!);
+    await click(query('user-menu-trigger')!);
+    await flushMicrotasks();
+    await click(query('user-menu-logout')!);
     await flushMicrotasks();
     expect(query('sign-in-button')).not.toBeNull();
     expect(query('popup-user-id')).toBeNull();
@@ -241,7 +264,7 @@ describe('popup App + useAuthState', () => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
       if (typed.key === 'INTENT_GET') return null;
-      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
+      if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
     const origAdd = fake.runtime.onMessage.addListener;
