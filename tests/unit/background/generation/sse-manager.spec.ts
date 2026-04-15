@@ -45,7 +45,10 @@ function logger() {
 
 describe('createSseManager', () => {
   it('broadcasts a well-formed update frame', async () => {
-    const broadcast = vi.fn(async () => undefined);
+    const seen: Array<{ key: string; data: unknown }> = [];
+    const broadcast = async (msg: { key: string; data: unknown }): Promise<void> => {
+      seen.push(msg);
+    };
     const body = makeSseResponseBody([
       'data: {"generationId":"g1","sessionId":"s1","phase":"extract","status":"running","progress":0.5}\n\n',
     ]);
@@ -63,13 +66,15 @@ describe('createSseManager', () => {
     expect(r).toEqual({ ok: true });
     // Drain microtasks so the stream pump runs.
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(broadcast).toHaveBeenCalled();
-    const call = broadcast.mock.calls[0]?.[0];
-    expect(call?.key).toBe('GENERATION_UPDATE');
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen[0]?.key).toBe('GENERATION_UPDATE');
   });
 
   it('emits GENERATION_COMPLETE on terminal status', async () => {
-    const broadcast = vi.fn(async () => undefined);
+    const seen: Array<{ key: string; data: unknown }> = [];
+    const broadcast = async (msg: { key: string; data: unknown }): Promise<void> => {
+      seen.push(msg);
+    };
     const body = makeSseResponseBody([
       'data: {"generationId":"g2","sessionId":"s2","phase":"final","status":"completed"}\n\n',
     ]);
@@ -85,7 +90,7 @@ describe('createSseManager', () => {
     });
     await m.subscribe({ generationId: 'g2' });
     await new Promise((resolve) => setTimeout(resolve, 20));
-    const keys = broadcast.mock.calls.map((c) => c[0]?.key);
+    const keys = seen.map((c) => c.key);
     expect(keys).toContain('GENERATION_UPDATE');
     expect(keys).toContain('GENERATION_COMPLETE');
   });
