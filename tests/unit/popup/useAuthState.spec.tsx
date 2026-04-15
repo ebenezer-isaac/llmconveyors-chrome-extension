@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import App from '@/entrypoints/popup/App';
 
 type MessageListener = (msg: unknown) => void;
+type TabsListener = (info: { tabId: number }) => void;
 
 interface FakeRuntime {
   sendMessage: (msg: unknown) => Promise<unknown>;
@@ -19,10 +20,20 @@ interface FakeRuntime {
     removeListener: (fn: MessageListener) => void;
     listeners: MessageListener[];
   };
+  openOptionsPage?: () => void;
+}
+
+interface FakeTabs {
+  query: (info: unknown) => Promise<Array<{ id?: number; url?: string }>>;
+  onActivated: {
+    addListener: (fn: TabsListener) => void;
+    removeListener: (fn: TabsListener) => void;
+  };
 }
 
 interface FakeChrome {
   runtime: FakeRuntime;
+  tabs: FakeTabs;
   storage: {
     local: {
       get: (key: string) => Promise<Record<string, unknown>>;
@@ -36,6 +47,7 @@ function installFakeChrome(
   testJar?: string,
 ): FakeChrome {
   const listeners: MessageListener[] = [];
+  const tabListeners: TabsListener[] = [];
   const storeMap = new Map<string, unknown>();
   if (testJar) storeMap.set('llmc.e2e.test-cookie-jar', testJar);
   const fake: FakeChrome = {
@@ -50,6 +62,17 @@ function installFakeChrome(
           if (idx !== -1) listeners.splice(idx, 1);
         },
         listeners,
+      },
+      openOptionsPage: vi.fn(),
+    },
+    tabs: {
+      query: async () => [{ id: 1, url: 'about:blank' }],
+      onActivated: {
+        addListener: (fn) => tabListeners.push(fn),
+        removeListener: (fn) => {
+          const i = tabListeners.indexOf(fn);
+          if (i !== -1) tabListeners.splice(i, 1);
+        },
       },
     },
     storage: {
@@ -102,6 +125,7 @@ async function flushMicrotasks(): Promise<void> {
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
   });
 }
 
@@ -118,26 +142,32 @@ describe('popup App + useAuthState', () => {
     installFakeChrome(async (msg) => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
+      if (typed.key === 'INTENT_GET') return null;
+      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
       return undefined;
     });
     await mountApp();
     await flushMicrotasks();
     expect(query('sign-in-button')).not.toBeNull();
-    expect(query('signed-in-indicator')).toBeNull();
+    expect(query('sign-out-button')).toBeNull();
+    expect(query('action-area')).toBeNull();
   });
 
-  it('renders the signed-in indicator when AUTH_STATUS returns authenticated', async () => {
+  it('renders the user id in the header when AUTH_STATUS returns authenticated', async () => {
     installFakeChrome(async (msg) => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: true, userId: 'user_abc' };
+      if (typed.key === 'INTENT_GET') return null;
+      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
       return undefined;
     });
     await mountApp();
     await flushMicrotasks();
-    const indicator = query('signed-in-indicator');
-    expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain('user_abc');
+    const userId = query('popup-user-id');
+    expect(userId).not.toBeNull();
+    expect(userId?.textContent).toBe('user_abc');
     expect(query('sign-in-button')).toBeNull();
+    expect(query('sign-out-button')).not.toBeNull();
   });
 
   it('transitions to signed-in after clicking sign-in-button (cookieJar mode)', async () => {
@@ -148,6 +178,8 @@ describe('popup App + useAuthState', () => {
         expect(typed.data?.cookieJar).toBe('test-jar');
         return { ok: true, userId: 'user_signed_in' };
       }
+      if (typed.key === 'INTENT_GET') return null;
+      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
       return undefined;
     });
     installFakeChrome(sendMessage, 'test-jar');
@@ -157,9 +189,9 @@ describe('popup App + useAuthState', () => {
     expect(btn).not.toBeNull();
     await click(btn!);
     await flushMicrotasks();
-    const indicator = query('signed-in-indicator');
-    expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain('user_signed_in');
+    const userId = query('popup-user-id');
+    expect(userId).not.toBeNull();
+    expect(userId?.textContent).toBe('user_signed_in');
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'AUTH_SIGN_IN' }),
     );
@@ -170,6 +202,8 @@ describe('popup App + useAuthState', () => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
       if (typed.key === 'AUTH_SIGN_IN') return { ok: false, reason: 'network error' };
+      if (typed.key === 'INTENT_GET') return null;
+      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
       return undefined;
     });
     installFakeChrome(sendMessage);
@@ -187,16 +221,18 @@ describe('popup App + useAuthState', () => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: true, userId: 'user_abc' };
       if (typed.key === 'AUTH_SIGN_OUT') return { ok: true };
+      if (typed.key === 'INTENT_GET') return null;
+      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
       return undefined;
     });
     installFakeChrome(sendMessage);
     await mountApp();
     await flushMicrotasks();
-    expect(query('signed-in-indicator')).not.toBeNull();
+    expect(query('popup-user-id')).not.toBeNull();
     await click(query('sign-out-button')!);
     await flushMicrotasks();
     expect(query('sign-in-button')).not.toBeNull();
-    expect(query('signed-in-indicator')).toBeNull();
+    expect(query('popup-user-id')).toBeNull();
   });
 
   it('updates UI when AUTH_STATE_CHANGED is broadcast after mount', async () => {
@@ -204,11 +240,14 @@ describe('popup App + useAuthState', () => {
     const fake = installFakeChrome(async (msg) => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
+      if (typed.key === 'INTENT_GET') return null;
+      if (typed.key === 'CREDITS_GET') return { balance: 0, plan: 'free', resetAt: null };
       return undefined;
     });
     const origAdd = fake.runtime.onMessage.addListener;
-    fake.runtime.onMessage.addListener = (fn) => {
-      broadcastListener = fn;
+    fake.runtime.onMessage.addListener = (fn: MessageListener) => {
+      // Capture only the useAuthState listener (the one looking at AUTH_STATE_CHANGED).
+      if (broadcastListener === null) broadcastListener = fn;
       origAdd(fn);
     };
     await mountApp();
@@ -221,8 +260,8 @@ describe('popup App + useAuthState', () => {
       });
       await Promise.resolve();
     });
-    const indicator = query('signed-in-indicator');
-    expect(indicator).not.toBeNull();
-    expect(indicator?.textContent).toContain('user_broadcast');
+    const userId = query('popup-user-id');
+    expect(userId).not.toBeNull();
+    expect(userId?.textContent).toBe('user_broadcast');
   });
 });

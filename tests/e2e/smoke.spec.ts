@@ -73,8 +73,8 @@ test('sign-in happy path stores session and shows signed-in popup state', async 
     await seedE2ETestCookieJar(context, extId);
     const popup = await openPopup(context, extId);
     await popup.click('[data-testid="sign-in-button"]');
-    await popup.waitForSelector('[data-testid="signed-in-indicator"]', { timeout: 10_000 });
-    await expect(popup.locator('[data-testid="signed-in-indicator"]')).toContainText(/user_e2e_001/);
+    await popup.waitForSelector('[data-testid="popup-user-id"]', { timeout: 10_000 });
+    await expect(popup.locator('[data-testid="popup-user-id"]')).toContainText(/user_e2e_001/);
     await popup.close();
   } finally {
     await context.close();

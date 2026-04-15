@@ -18,13 +18,26 @@ type FillOutcome =
     }
   | { readonly kind: 'error'; readonly message: string };
 
+export interface FillButtonProps {
+  readonly disabled?: boolean;
+  readonly disabledReason?: string;
+}
+
 /**
- * FillButton - visible when the user is signed in. Click triggers a
- * FILL_REQUEST to the background, which forwards to the active tab's
- * content script.
+ * FillButton - primary autofill CTA. Dispatches FILL_REQUEST to the
+ * background, which forwards to the active tab's content script and returns
+ * the projected result envelope. The button accepts an explicit `disabled`
+ * prop so the parent (ActionArea) can gate it on auth and intent; the
+ * `disabledReason` surfaces as a tooltip.
  */
-export function FillButton(): React.ReactElement {
+export function FillButton({
+  disabled = false,
+  disabledReason,
+}: FillButtonProps): React.ReactElement {
   const [outcome, setOutcome] = React.useState<FillOutcome>({ kind: 'idle' });
+
+  const isBusy = outcome.kind === 'pending';
+  const isDisabled = disabled || isBusy;
 
   async function handleClick(): Promise<void> {
     setOutcome({ kind: 'pending' });
@@ -58,18 +71,22 @@ export function FillButton(): React.ReactElement {
     }
   }
 
+  const tooltip = disabled ? disabledReason : undefined;
+
   return (
-    <div className="mt-3">
+    <div className="w-full">
       <button
         type="button"
         data-testid="fill-button"
+        aria-label="Fill application"
+        title={tooltip}
         onClick={() => {
           void handleClick();
         }}
-        disabled={outcome.kind === 'pending'}
-        className="w-full rounded-card bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+        disabled={isDisabled}
+        className="w-full rounded-card bg-brand-500 px-3 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {outcome.kind === 'pending' ? 'Filling...' : 'Fill application'}
+        {isBusy ? 'Filling...' : 'Fill application'}
       </button>
 
       {outcome.kind === 'success' ? (
