@@ -11,13 +11,13 @@
  */
 
 import React from 'react';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 import { GenerateButton } from './GenerateButton';
 import { GetCreditsLink } from './GetCreditsLink';
 
 export interface B2bSalesActionsProps {
   readonly tabUrl: string | null;
-  readonly credits: CreditsState | null;
+  readonly credits: ClientCreditsSnapshot | null;
 }
 
 function isLinkedInProfileUrl(url: string | null): boolean {

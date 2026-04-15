@@ -7,7 +7,8 @@
  * Contents:
  *   - avatar circle with initials fallback
  *   - usage section (credits + tier) with a mailto top-up link for free tier
- *   - Resume & CV  -> new tab at the web resume editor
+ *   - Resume & CV  -> new tab at the active agent's resume editor (hidden
+ *     when the active agent declares no resume surface, e.g. b2b-sales)
  *   - Settings     -> new tab at the active agent's subdomain settings page
  *   - Dashboard    -> new tab at the active agent's subdomain root
  *   - Logout       -> existing signOut flow
@@ -16,12 +17,15 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { CreditsState } from '@/src/background/messaging/protocol';
-import type { AgentRegistryEntry } from '@/src/background/agents';
-import { getTierLabel } from './useCredits';
-
-const RESUME_EDITOR_URL = 'https://job-hunt.llmconveyors.com/en/settings/resume';
-const CONTACT_EMAIL = 'ebnezr.isaac@gmail.com';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
+import {
+  buildAgentUrl,
+  type AgentRegistryEntry,
+  type AgentUrlKind,
+} from '@/src/background/agents';
+import { clientEnv } from '@/src/shared/env';
+import { t } from '@/src/shared/i18n';
+import { formatCredits, getTierLabel } from './useCredits';
 
 function openExternal(url: string): void {
   const g = globalThis as unknown as {
@@ -47,11 +51,26 @@ function initialsFor(source: string | null): string {
   return trimmed.length > 0 ? trimmed : '?';
 }
 
+function webFallbackUrl(): string {
+  return `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}`;
+}
+
+function resolveAgentUrl(
+  agent: AgentRegistryEntry | null,
+  kind: AgentUrlKind,
+): string | null {
+  if (agent === null) return webFallbackUrl();
+  return buildAgentUrl(agent, kind, {
+    rootDomain: clientEnv.rootDomain,
+    locale: clientEnv.defaultLocale,
+  });
+}
+
 export interface UserMenuProps {
   readonly userId: string;
   readonly displayName: string | null;
   readonly email: string | null;
-  readonly credits: CreditsState | null;
+  readonly credits: ClientCreditsSnapshot | null;
   readonly activeAgent: AgentRegistryEntry | null;
   readonly onSignOut: () => void;
   readonly signOutDisabled?: boolean;
@@ -130,20 +149,24 @@ export function UserMenu({
 
   const toggleMenu = (): void => setOpen((prev) => !prev);
 
-  const agentBase = activeAgent
-    ? `https://${activeAgent.subdomain}.llmconveyors.com`
-    : 'https://llmconveyors.com';
+  const dashboardUrl = resolveAgentUrl(activeAgent, 'dashboard');
+  const settingsUrl = resolveAgentUrl(activeAgent, 'settings');
+  const resumeUrl =
+    activeAgent === null ? null : resolveAgentUrl(activeAgent, 'resume');
 
   const handleDashboard = (): void => {
-    openExternal(`${agentBase}/en`);
+    if (dashboardUrl === null) return;
+    openExternal(dashboardUrl);
     setOpen(false);
   };
   const handleSettings = (): void => {
-    openExternal(`${agentBase}/en/settings`);
+    if (settingsUrl === null) return;
+    openExternal(settingsUrl);
     setOpen(false);
   };
   const handleResume = (): void => {
-    openExternal(RESUME_EDITOR_URL);
+    if (resumeUrl === null) return;
+    openExternal(resumeUrl);
     setOpen(false);
   };
   const handleLogoutClick = (): void => {
@@ -159,11 +182,9 @@ export function UserMenu({
   );
   const creditsCount = credits?.credits ?? 0;
   const showTopUp = (credits?.tier ?? 'free') === 'free';
-  const topUpHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(
-    'Credit top-up request',
-  )}&body=${encodeURIComponent(
-    `Hi,\n\nI'd like to request additional credits for my account.\n\nUser id: ${userId}\n\nThanks`,
-  )}`;
+  const topUpHref = `mailto:${clientEnv.contactEmail}?subject=${encodeURIComponent(
+    t('userMenu_topUpSubject'),
+  )}&body=${encodeURIComponent(t('userMenu_topUpBody', [userId]))}`;
 
   return (
     <div className="relative" ref={menuRef} data-testid="user-menu">
@@ -200,33 +221,37 @@ export function UserMenu({
               data-testid="user-menu-usage"
               className="mb-2 rounded-card bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
             >
-              <p className="font-semibold text-zinc-900 dark:text-zinc-100">Usage</p>
-              <p>{creditsCount} credits</p>
+              <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                {t('userMenu_usage')}
+              </p>
+              <p>{t('userMenu_creditsLabel', [formatCredits(creditsCount)])}</p>
               <p className="text-[11px]">{tierLabel}</p>
               {showTopUp ? (
                 <p className="mt-1 text-[11px]">
-                  Need more?{' '}
+                  {t('userMenu_topUpPrompt')}{' '}
                   <a
                     data-testid="user-menu-topup-link"
                     href={topUpHref}
                     className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700 dark:text-brand-400"
                   >
-                    {CONTACT_EMAIL}
+                    {clientEnv.contactEmail}
                   </a>
                 </p>
               ) : null}
             </div>
           ) : null}
-          <button
-            ref={setMenuItemRef}
-            type="button"
-            role="menuitem"
-            data-testid="user-menu-resume"
-            onClick={handleResume}
-            className="flex w-full items-center gap-2 rounded-card px-3 py-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700"
-          >
-            Resume &amp; CV
-          </button>
+          {resumeUrl !== null ? (
+            <button
+              ref={setMenuItemRef}
+              type="button"
+              role="menuitem"
+              data-testid="user-menu-resume"
+              onClick={handleResume}
+              className="flex w-full items-center gap-2 rounded-card px-3 py-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700"
+            >
+              {t('userMenu_resumeCv')}
+            </button>
+          ) : null}
           <button
             ref={setMenuItemRef}
             type="button"
@@ -235,7 +260,7 @@ export function UserMenu({
             onClick={handleSettings}
             className="flex w-full items-center gap-2 rounded-card px-3 py-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700"
           >
-            Settings
+            {t('userMenu_settings')}
           </button>
           <button
             ref={setMenuItemRef}
@@ -245,7 +270,7 @@ export function UserMenu({
             onClick={handleDashboard}
             className="flex w-full items-center gap-2 rounded-card px-3 py-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700"
           >
-            Dashboard
+            {t('userMenu_dashboard')}
           </button>
           <button
             ref={setMenuItemRef}
@@ -256,7 +281,7 @@ export function UserMenu({
             disabled={signOutDisabled}
             className="flex w-full items-center gap-2 rounded-card px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-900/30"
           >
-            Log out
+            {t('userMenu_logout')}
           </button>
         </div>
       ) : null}

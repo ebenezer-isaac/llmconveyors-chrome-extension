@@ -6,6 +6,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import App from '@/entrypoints/popup/App';
+import { installI18n } from './_i18n-test-helper';
 
 type Listener = (msg: unknown) => void;
 type TabsListener = (info: { tabId: number }) => void;
@@ -91,6 +92,7 @@ function install(
     },
   };
   (globalThis as unknown as { chrome: FakeChrome }).chrome = fake;
+  installI18n();
   return fake;
 }
 

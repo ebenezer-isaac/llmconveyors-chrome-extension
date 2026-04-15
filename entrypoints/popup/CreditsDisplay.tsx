@@ -14,11 +14,12 @@
  */
 
 import React from 'react';
-import type { CreditsState } from '@/src/background/messaging/protocol';
-import { getTierLabel } from './useCredits';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
+import { t } from '@/src/shared/i18n';
+import { getTierLabel, formatCredits } from './useCredits';
 
 export interface CreditsDisplayProps {
-  readonly credits: CreditsState | null;
+  readonly credits: ClientCreditsSnapshot | null;
   readonly loading: boolean;
   readonly error: string | null;
 }
@@ -34,7 +35,7 @@ export function CreditsDisplay({
         data-testid="credits-remaining"
         data-state="loading"
         aria-busy="true"
-        aria-label="Loading credit balance"
+        aria-label={t('credits_loading')}
         className="llmc-shimmer mb-3 h-8 w-32 rounded-card bg-zinc-100 dark:bg-zinc-800"
       />
     );
@@ -48,15 +49,15 @@ export function CreditsDisplay({
         role="status"
         className="mb-3 rounded-card bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-100"
       >
-        Credits unavailable
+        {t('credits_unavailable')}
       </div>
     );
   }
 
   const rawCredits = credits?.credits ?? 0;
-  const displayCredits = Number.isFinite(rawCredits)
-    ? Math.max(0, Math.floor(rawCredits))
-    : 0;
+  const safeCredits =
+    Number.isFinite(rawCredits) && rawCredits > 0 ? Math.floor(rawCredits) : 0;
+  const displayCredits = formatCredits(safeCredits);
   const tier = credits?.tier ?? 'free';
   const byoKeyEnabled = credits?.byoKeyEnabled ?? false;
   const tierLabel = getTierLabel(tier, byoKeyEnabled);
@@ -65,7 +66,7 @@ export function CreditsDisplay({
     <div
       data-testid="credits-remaining"
       data-state="ready"
-      data-balance={String(displayCredits)}
+      data-balance={String(safeCredits)}
       data-tier={tier}
       className="mb-3 inline-flex items-center gap-2 rounded-pill bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
     >
@@ -73,7 +74,7 @@ export function CreditsDisplay({
         aria-hidden="true"
         className="inline-block h-2 w-2 rounded-pill bg-brand-500"
       />
-      <span>{displayCredits} credits</span>
+      <span>{t('credits_remaining', [displayCredits])}</span>
       <span className="text-[10px] font-normal text-zinc-500 dark:text-zinc-400">
         {tierLabel}
       </span>

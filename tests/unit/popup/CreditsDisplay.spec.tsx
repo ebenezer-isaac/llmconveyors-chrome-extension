@@ -6,12 +6,15 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { CreditsDisplay } from '@/entrypoints/popup/CreditsDisplay';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
+import { installI18n, uninstallI18n } from './_i18n-test-helper';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeEach(() => {
+  delete (globalThis as unknown as { chrome?: unknown }).chrome;
+  installI18n();
   container = document.createElement('div');
   document.body.appendChild(container);
 });
@@ -23,10 +26,12 @@ afterEach(() => {
   container?.remove();
   container = null;
   root = null;
+  uninstallI18n();
+  delete (globalThis as unknown as { chrome?: unknown }).chrome;
 });
 
 async function render(
-  credits: CreditsState | null,
+  credits: ClientCreditsSnapshot | null,
   loading: boolean,
   error: string | null,
 ): Promise<void> {
@@ -59,7 +64,11 @@ describe('CreditsDisplay', () => {
   });
 
   it('renders "N credits" + tier label on free tier', async () => {
-    const credits: CreditsState = { credits: 42, tier: 'free', byoKeyEnabled: false };
+    const credits: ClientCreditsSnapshot = {
+      credits: 42,
+      tier: 'free',
+      byoKeyEnabled: false,
+    };
     await render(credits, false, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-state')).toBe('ready');
@@ -70,7 +79,11 @@ describe('CreditsDisplay', () => {
   });
 
   it('floors fractional balances and clamps negatives to zero', async () => {
-    const credits: CreditsState = { credits: -5, tier: 'free', byoKeyEnabled: false };
+    const credits: ClientCreditsSnapshot = {
+      credits: -5,
+      tier: 'free',
+      byoKeyEnabled: false,
+    };
     await render(credits, false, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-balance')).toBe('0');
@@ -78,7 +91,11 @@ describe('CreditsDisplay', () => {
   });
 
   it('keeps rendering ready state when loading resolves with cached credits', async () => {
-    const credits: CreditsState = { credits: 10, tier: 'free', byoKeyEnabled: false };
+    const credits: ClientCreditsSnapshot = {
+      credits: 10,
+      tier: 'free',
+      byoKeyEnabled: false,
+    };
     // loading=true + credits present should still show the ready state so
     // the UI never flashes back to a shimmer after the first fetch.
     await render(credits, true, null);
@@ -88,12 +105,16 @@ describe('CreditsDisplay', () => {
   });
 
   it('renders "BYO Key tier" label when tier is byo', async () => {
-    const credits: CreditsState = { credits: 25, tier: 'byo', byoKeyEnabled: true };
+    const credits: ClientCreditsSnapshot = {
+      credits: 25,
+      tier: 'byo',
+      byoKeyEnabled: true,
+    };
     await render(credits, false, null);
     const el = query('credits-remaining');
     expect(el?.getAttribute('data-balance')).toBe('25');
     expect(el?.getAttribute('data-tier')).toBe('byo');
     expect(el?.textContent).toContain('25');
-    expect(el?.textContent).toMatch(/BYO Key tier/);
+    expect(el?.textContent).toMatch(/BYO Key/);
   });
 });

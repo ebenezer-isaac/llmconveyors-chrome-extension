@@ -50,7 +50,7 @@ import type {
 } from './schemas/generation.schema';
 import type {
   CreditsGetRequestSchema,
-  CreditsStateSchema,
+  ClientCreditsSnapshotSchema,
 } from './schemas/credits.schema';
 import type {
   SessionListRequestSchema,
@@ -106,7 +106,7 @@ export type GenerationCancelResponse = z.infer<typeof GenerationCancelResponseSc
 
 // Credits
 export type CreditsGetRequest = z.infer<typeof CreditsGetRequestSchema>;
-export type CreditsState = z.infer<typeof CreditsStateSchema>;
+export type ClientCreditsSnapshot = z.infer<typeof ClientCreditsSnapshotSchema>;
 
 // Generation (extensions)
 export type GenerationSubscribeRequest = z.infer<typeof GenerationSubscribeRequestSchema>;

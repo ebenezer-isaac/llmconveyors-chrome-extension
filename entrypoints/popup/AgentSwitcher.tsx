@@ -7,6 +7,7 @@
 
 import React from 'react';
 import type { AgentId, AgentRegistryEntry } from '@/src/background/agents';
+import { t } from '@/src/shared/i18n';
 
 export interface AgentSwitcherProps {
   readonly agents: readonly AgentRegistryEntry[];
@@ -24,7 +25,7 @@ export function AgentSwitcher({
   if (agents.length === 0) return null;
   return (
     <label className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-      <span className="sr-only">Active agent</span>
+      <span className="sr-only">{t('agentSwitcher_label')}</span>
       <select
         data-testid="agent-switcher"
         value={activeAgentId ?? agents[0]?.id ?? ''}

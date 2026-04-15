@@ -6,6 +6,7 @@
  */
 
 import React from 'react';
+import { t } from '@/src/shared/i18n';
 
 export interface FooterProps {
   readonly version?: string;
@@ -17,7 +18,7 @@ export function Footer({ version = '0.1.0' }: FooterProps): React.ReactElement {
       data-testid="popup-footer"
       className="mt-3 flex items-center justify-center border-t border-zinc-200 pt-2 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400"
     >
-      <span data-testid="popup-version">v{version}</span>
+      <span data-testid="popup-version">{t('footer_version', [version])}</span>
     </footer>
   );
 }

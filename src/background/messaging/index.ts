@@ -23,7 +23,7 @@ export type {
   GenerationStartResponse,
   GenerationUpdateBroadcast,
   GenerationArtifact,
-  CreditsState,
+  ClientCreditsSnapshot,
 } from './protocol';
 export {
   BG_HANDLED_KEYS,

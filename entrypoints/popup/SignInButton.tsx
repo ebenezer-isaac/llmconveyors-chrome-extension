@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import React from 'react';
+import { t } from '@/src/shared/i18n';
 
 export interface SignInButtonProps {
   readonly onClick: () => void;
@@ -15,7 +16,7 @@ export function SignInButton({ onClick, disabled = false }: SignInButtonProps): 
       disabled={disabled}
       className="mt-3 w-full rounded-card bg-brand-500 py-2 text-sm font-medium text-white hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      Sign in
+      {t('signIn_buttonLabel')}
     </button>
   );
 }

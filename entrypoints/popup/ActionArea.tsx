@@ -9,7 +9,7 @@
 
 import React from 'react';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 import type { AgentId } from '@/src/background/agents';
 import { JobHunterActions } from './JobHunterActions';
 import { B2bSalesActions } from './B2bSalesActions';
@@ -22,7 +22,7 @@ export interface ActionAreaProps {
   readonly activeAgentId: AgentId | null;
   readonly hasGenericJd: boolean;
   readonly genericJdText: string | null;
-  readonly credits: CreditsState | null;
+  readonly credits: ClientCreditsSnapshot | null;
 }
 
 export function ActionArea({

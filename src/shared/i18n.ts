@@ -42,6 +42,7 @@ export type MessageKey =
   | 'userMenu_topUpBody'
   | 'credits_remaining'
   | 'credits_loading'
+  | 'credits_unavailable'
   | 'footer_version'
   | 'sessionList_title'
   | 'sessionList_viewAll'

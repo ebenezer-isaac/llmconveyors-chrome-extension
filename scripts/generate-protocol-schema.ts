@@ -237,7 +237,7 @@ async function loadModules(): Promise<{
     {
       key: 'CREDITS_GET',
       requestSchema: credits.CreditsGetRequestSchema,
-      responseSchema: credits.CreditsStateSchema,
+      responseSchema: credits.ClientCreditsSnapshotSchema,
       handlerLocation: 'background',
       broadcastOnly: false,
     },

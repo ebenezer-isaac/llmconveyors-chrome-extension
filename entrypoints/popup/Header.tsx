@@ -7,7 +7,7 @@
 
 import React from 'react';
 import type { AgentId, AgentRegistryEntry } from '@/src/background/agents';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 import { AgentSwitcher } from './AgentSwitcher';
 import { UserMenu } from './UserMenu';
 
@@ -19,7 +19,7 @@ export interface HeaderProps {
   readonly agentsDisabled?: boolean;
   readonly onSignOut?: () => void;
   readonly signOutDisabled?: boolean;
-  readonly credits?: CreditsState | null;
+  readonly credits?: ClientCreditsSnapshot | null;
 }
 
 export function Header({

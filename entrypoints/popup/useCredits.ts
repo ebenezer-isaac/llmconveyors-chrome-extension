@@ -15,7 +15,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
+import { t } from '@/src/shared/i18n';
 
 type MessageListener = (msg: unknown) => void;
 
@@ -35,7 +36,7 @@ function getRuntime(): RuntimeMessenger | null {
   return g.chrome?.runtime ?? g.browser?.runtime ?? null;
 }
 
-function isCreditsState(value: unknown): value is CreditsState {
+function isClientCreditsSnapshot(value: unknown): value is ClientCreditsSnapshot {
   if (value === null || typeof value !== 'object') return false;
   const v = value as {
     credits?: unknown;
@@ -49,14 +50,14 @@ function isCreditsState(value: unknown): value is CreditsState {
 }
 
 export interface UseCreditsResult {
-  readonly credits: CreditsState | null;
+  readonly credits: ClientCreditsSnapshot | null;
   readonly loading: boolean;
   readonly error: string | null;
   readonly refresh: () => Promise<void>;
 }
 
 export function useCredits(): UseCreditsResult {
-  const [credits, setCredits] = useState<CreditsState | null>(null);
+  const [credits, setCredits] = useState<ClientCreditsSnapshot | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef<boolean>(true);
@@ -76,7 +77,7 @@ export function useCredits(): UseCreditsResult {
         data: {},
       });
       if (!mountedRef.current) return;
-      if (isCreditsState(response)) {
+      if (isClientCreditsSnapshot(response)) {
         setCredits(response);
         setError(null);
       } else {
@@ -99,7 +100,7 @@ export function useCredits(): UseCreditsResult {
       if (msg === null || typeof msg !== 'object') return;
       const env = msg as { key?: string; data?: unknown };
       if (env.key !== 'CREDITS_UPDATED' && env.key !== 'CREDITS_STATE') return;
-      if (isCreditsState(env.data)) {
+      if (isClientCreditsSnapshot(env.data)) {
         if (mountedRef.current) setCredits(env.data);
       }
     };
@@ -120,11 +121,29 @@ export function useCredits(): UseCreditsResult {
   return { credits, loading, error, refresh: fetchCredits };
 }
 
-/** Stable display label for the tier badge shown in the popup. */
+/**
+ * Localised display label for the tier badge shown in the popup.
+ *
+ * Mirrors the web app helper in `src/hooks/useCredits.tsx` but returns an
+ * i18n-backed string so the extension surface respects the user's UI locale.
+ */
 export function getTierLabel(
-  tier: CreditsState['tier'],
+  tier: ClientCreditsSnapshot['tier'],
   byoKeyEnabled: boolean,
 ): string {
-  if (tier === 'byo' || byoKeyEnabled) return 'BYO Key tier';
-  return 'Free tier';
+  if (tier === 'byo' && byoKeyEnabled) return t('userMenu_tierByoEnabled');
+  if (tier === 'byo') return t('userMenu_tierByo');
+  return t('userMenu_tierFree');
+}
+
+/**
+ * Format a credit balance for display. Defensive against NaN / Infinity /
+ * negative / fractional inputs; always returns a thousands-separated integer
+ * string via the en-US locale so the rendered value matches the web app's
+ * `formatCredits` helper byte-for-byte.
+ */
+export function formatCredits(credits: number): string {
+  const safe =
+    Number.isFinite(credits) && credits > 0 ? Math.floor(credits) : 0;
+  return safe.toLocaleString('en-US');
 }

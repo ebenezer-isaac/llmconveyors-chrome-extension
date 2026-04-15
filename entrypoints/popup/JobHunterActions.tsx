@@ -14,7 +14,7 @@
 
 import React from 'react';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 import { FillButton } from './FillButton';
 import { HighlightToggle } from './HighlightToggle';
 import { GenerateButton } from './GenerateButton';
@@ -25,7 +25,7 @@ export interface JobHunterActionsProps {
   readonly tabId: number | null;
   readonly hasGenericJd: boolean;
   readonly genericJdText: string | null;
-  readonly credits: CreditsState | null;
+  readonly credits: ClientCreditsSnapshot | null;
 }
 
 export function JobHunterActions({

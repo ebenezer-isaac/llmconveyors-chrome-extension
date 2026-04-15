@@ -89,6 +89,10 @@
     "message": "Loading credits...",
     "description": "Shown while credit balance is being fetched."
   },
+  "credits_unavailable": {
+    "message": "Credits unavailable",
+    "description": "Shown when the credit balance cannot be fetched."
+  },
   "footer_version": {
     "message": "v$version$",
     "description": "Extension version number shown in the popup footer.",

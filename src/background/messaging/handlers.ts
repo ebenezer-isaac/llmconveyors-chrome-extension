@@ -21,7 +21,7 @@ import type {
   HighlightStatus,
   GenerationStartResponse,
   GenerationCancelResponse,
-  CreditsState,
+  ClientCreditsSnapshot,
   DetectedIntentPayload,
   KeywordsExtractRequest,
   GenerationStartRequest,
@@ -561,7 +561,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (!parsed.success) {
       log.warn('CREDITS_GET: invalid payload');
     }
-    const fallback: CreditsState = {
+    const fallback: ClientCreditsSnapshot = {
       credits: 0,
       tier: 'free',
       byoKeyEnabled: false,
@@ -730,4 +730,4 @@ export type _AllHandlerOutputs =
   | HighlightStatus
   | GenerationStartResponse
   | GenerationCancelResponse
-  | CreditsState;
+  | ClientCreditsSnapshot;

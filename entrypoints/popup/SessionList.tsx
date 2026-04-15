@@ -8,8 +8,12 @@
 import React, { useMemo, useState } from 'react';
 import { useSessionList } from './useSessionList';
 import type { SessionListItem } from '@/src/background/messaging/schemas/session-list.schema';
+import { clientEnv } from '@/src/shared/env';
+import { t } from '@/src/shared/i18n';
 
-const DASHBOARD_URL = 'https://llmconveyors.com/dashboard';
+function dashboardUrl(): string {
+  return `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}/dashboard`;
+}
 
 function statusLabel(status: SessionListItem['status']): string {
   switch (status) {
@@ -101,13 +105,14 @@ function openSessionInSidePanel(sessionId: string): void {
 }
 
 function openDashboard(): void {
+  const url = dashboardUrl();
   const g = globalThis as unknown as {
     chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
   };
   if (g.chrome?.tabs?.create) {
-    g.chrome.tabs.create({ url: DASHBOARD_URL });
+    g.chrome.tabs.create({ url });
   } else {
-    window.open(DASHBOARD_URL, '_blank', 'noopener');
+    window.open(url, '_blank', 'noopener');
   }
 }
 
@@ -131,7 +136,7 @@ export function SessionList({ enabled }: SessionListProps): React.ReactElement |
           aria-expanded={expanded}
           className="text-xs font-semibold uppercase tracking-wide text-zinc-700 dark:text-zinc-200"
         >
-          Recent sessions {expanded ? '-' : '+'}
+          {t('sessionList_title')} {expanded ? '-' : '+'}
         </button>
         <button
           type="button"
@@ -139,14 +144,14 @@ export function SessionList({ enabled }: SessionListProps): React.ReactElement |
           onClick={openDashboard}
           className="text-xs font-medium text-brand-600 underline hover:text-brand-700 dark:text-brand-400"
         >
-          View all -&gt;
+          {t('sessionList_viewAll')}
         </button>
       </div>
       {expanded ? (
         <div className="mt-2">
           {loading && visible.length === 0 ? (
             <p data-testid="session-list-loading" className="text-xs text-zinc-500">
-              Loading...
+              {t('sessionList_loading')}
             </p>
           ) : null}
           {error !== null ? (
@@ -159,7 +164,7 @@ export function SessionList({ enabled }: SessionListProps): React.ReactElement |
           ) : null}
           {visible.length === 0 && !loading && error === null ? (
             <p data-testid="session-list-empty" className="text-xs text-zinc-500">
-              No sessions yet.
+              {t('sessionList_empty')}
             </p>
           ) : null}
           <ul className="flex flex-col gap-1">

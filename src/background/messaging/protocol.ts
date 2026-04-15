@@ -39,7 +39,7 @@ import type {
   GenerationInteractRequest,
   GenerationInteractResponse,
   CreditsGetRequest,
-  CreditsState,
+  ClientCreditsSnapshot,
   SessionListRequest,
   SessionListResult,
   SessionGetRequest,
@@ -99,7 +99,7 @@ export interface ProtocolMap {
   DETECTED_JOB_BROADCAST: (data: DetectedJobBroadcast) => void;
 
   // --- Credits (1) ---
-  CREDITS_GET: (data: CreditsGetRequest) => CreditsState;
+  CREDITS_GET: (data: CreditsGetRequest) => ClientCreditsSnapshot;
 
   // --- Master Resume (2) ---
   MASTER_RESUME_GET: (data: MasterResumeGetRequest) => MasterResumeGetResponse;
@@ -188,6 +188,6 @@ export type {
   GenerationStartRequest,
   GenerationStartResponse,
   GenerationUpdateBroadcast,
-  CreditsState,
+  ClientCreditsSnapshot,
 } from './protocol-types';
 export type { GenerationArtifact } from './schemas/generation.schema';

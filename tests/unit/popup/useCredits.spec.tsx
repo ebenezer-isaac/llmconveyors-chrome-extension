@@ -7,7 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useCredits } from '@/entrypoints/popup/useCredits';
-import type { CreditsState } from '@/src/background/messaging/protocol';
+import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 
 type Listener = (msg: unknown) => void;
 
@@ -84,7 +84,7 @@ async function flush(): Promise<void> {
 
 describe('useCredits', () => {
   it('fetches credits on mount and exposes the response', async () => {
-    const credits: CreditsState = { credits: 100, tier: 'free', byoKeyEnabled: false };
+    const credits: ClientCreditsSnapshot = { credits: 100, tier: 'free', byoKeyEnabled: false };
     const sendMessage = vi.fn(async (msg: unknown) => {
       const env = msg as { key?: string };
       if (env.key === 'CREDITS_GET') return credits;
@@ -135,7 +135,7 @@ describe('useCredits', () => {
 
   it('refreshes credits on window focus events', async () => {
     let n = 0;
-    const sendMessage = vi.fn(async (): Promise<CreditsState> => {
+    const sendMessage = vi.fn(async (): Promise<ClientCreditsSnapshot> => {
       n++;
       return { credits: n * 10, tier: 'free', byoKeyEnabled: false };
     });
@@ -165,7 +165,7 @@ describe('useCredits', () => {
       for (const fn of listeners) {
         fn({
           key: 'CREDITS_UPDATED',
-          data: { credits: 17, tier: 'byo', byoKeyEnabled: true } as CreditsState,
+          data: { credits: 17, tier: 'byo', byoKeyEnabled: true } as ClientCreditsSnapshot,
         });
       }
       await Promise.resolve();

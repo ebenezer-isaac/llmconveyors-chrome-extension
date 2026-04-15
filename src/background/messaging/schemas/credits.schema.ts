@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 export const CreditsGetRequestSchema = z.object({}).strict();
 
-export const CreditsStateSchema = z
+export const ClientCreditsSnapshotSchema = z
   .object({
     credits: z.number().min(0).max(1_000_000_000),
     tier: z.enum(['free', 'byo']),
@@ -21,4 +21,4 @@ export const CreditsStateSchema = z
   })
   .strict();
 
-export type CreditsState = z.infer<typeof CreditsStateSchema>;
+export type ClientCreditsSnapshot = z.infer<typeof ClientCreditsSnapshotSchema>;
