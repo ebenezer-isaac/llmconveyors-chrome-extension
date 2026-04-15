@@ -133,7 +133,7 @@ async function probeIntent(
   const liveTabUrl = livePage.url();
   const driver = await context.newPage();
   try {
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
     const deadline = Date.now() + 10_000;
     let bootstrapped = false;
     let intentKind: string | null = null;

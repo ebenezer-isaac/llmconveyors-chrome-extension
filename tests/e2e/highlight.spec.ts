@@ -22,7 +22,7 @@ const FIXTURE_URL =
  *      state with { kind: 'greenhouse', pageKind: 'job-posting' }.
  *
  * Extension-origin sendMessage is dispatched from a helper page loaded at
- * chrome-extension://<id>/__e2e__/seed.html so runtime.sendMessage sees the
+ * chrome-extension://<id>/e2e/seed.html so runtime.sendMessage sees the
  * message as originating from an extension context; chrome.tabs.sendMessage
  * is used when the target is the content script in the fixture tab.
  */
@@ -58,7 +58,7 @@ test('highlight apply on greenhouse fixture marks expected keyword ranges', asyn
     await page.waitForTimeout(1_000);
 
     const driver = await context.newPage();
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
 
     const applyResponse = await driver.evaluate(
       async ({ url }) => {
@@ -130,7 +130,7 @@ test('highlight clear removes all mark elements', async () => {
     await page.waitForTimeout(1_000);
 
     const driver = await context.newPage();
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
 
     const applyResponse = await driver.evaluate(
       async ({ url }) => {
@@ -215,7 +215,7 @@ test('intent detection dispatches INTENT_DETECTED on JSON-LD JobPosting page', a
     await page.waitForTimeout(2_000);
 
     const driver = await context.newPage();
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
 
     const intent = await driver.evaluate(
       async ({ url }) => {

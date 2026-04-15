@@ -102,7 +102,7 @@ test('greenhouse autofill happy path fills all standard fields', async () => {
     // exercises the content script's real onMessage('FILL_REQUEST')
     // handler registered by A8.
     const driver = await context.newPage();
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
 
     const fillResponse = await driver.evaluate(
       async ({ url }) => {

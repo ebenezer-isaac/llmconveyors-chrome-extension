@@ -138,7 +138,7 @@ if (fixtures.length === 0) {
         await page.waitForTimeout(750);
 
         const driver = await context.newPage();
-        await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+        await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
         const fillResponse: unknown = await driver.evaluate(
           async ({ url }) => {
             const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {

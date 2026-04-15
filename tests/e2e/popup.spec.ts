@@ -105,7 +105,7 @@ async function seedIntentForTab(
   },
 ): Promise<void> {
   const driver = await context.newPage();
-  await driver.goto(`chrome-extension://${extensionId}/__e2e__/seed.html`);
+  await driver.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
   await driver.evaluate(
     async ({ payload }) => {
       await new Promise<void>((resolve) => {
@@ -172,7 +172,7 @@ test('popup state updates when intent changes on active tab', async () => {
 
     // Resolve the fixture tab id through the service worker.
     const driver = await context.newPage();
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
     const tabIdResult = await driver.evaluate(async ({ url }) => {
       const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
         chrome.tabs.query({ url: `${url}*` }, (t) => resolve(t));

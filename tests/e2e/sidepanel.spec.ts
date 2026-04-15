@@ -53,7 +53,7 @@ async function resolveTabId(
   fixtureUrl: string,
 ): Promise<number> {
   const driver = await context.newPage();
-  await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+  await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
   const id = await driver.evaluate(async ({ url }) => {
     const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
       chrome.tabs.query({ url: `${url}*` }, (t) => resolve(t));
@@ -80,7 +80,7 @@ async function seedIntentForTab(
   },
 ): Promise<void> {
   const driver = await context.newPage();
-  await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+  await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
   await driver.evaluate(
     async ({ payload }) => {
       await new Promise<void>((resolve) => {
@@ -122,7 +122,7 @@ async function seedKeywordsForTab(
   }>,
 ): Promise<void> {
   const driver = await context.newPage();
-  await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+  await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
   await driver.evaluate(
     async ({ key, value }) => {
       await new Promise<void>((resolve, reject) => {

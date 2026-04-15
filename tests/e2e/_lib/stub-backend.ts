@@ -135,7 +135,7 @@ export async function seedE2ETestCookieJar(
   extensionId: string,
 ): Promise<void> {
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/__e2e__/seed.html`);
+  await page.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
   await page.evaluate(
     ({ key, jar }) =>
       new Promise<void>((resolve, reject) => {

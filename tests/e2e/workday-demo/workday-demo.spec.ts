@@ -71,7 +71,7 @@ async function dispatchFill(
 ): Promise<unknown> {
   const driver = await context.newPage();
   try {
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
     const resp = await driver.evaluate(
       async ({ id, u }) => {
         return await new Promise<unknown>((resolve) => {
@@ -105,7 +105,7 @@ async function resolveTabId(
 ): Promise<number | null> {
   const driver = await context.newPage();
   try {
-    await driver.goto(`chrome-extension://${extId}/__e2e__/seed.html`);
+    await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
     const id = await driver.evaluate(async ({ u }) => {
       const tabs = await new Promise<chrome.tabs.Tab[]>((resolve) => {
         chrome.tabs.query({ url: `${u}*` }, (t) => resolve(t));

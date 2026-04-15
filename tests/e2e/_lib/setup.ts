@@ -83,14 +83,14 @@ export async function getExtensionId(context: BrowserContext): Promise<string> {
 
 /**
  * Seed the canonical profile into chrome.storage.local via an extension-page
- * helper. The helper page is shipped under public/__e2e__/seed.html by A1.
+ * helper. The helper page is shipped under public/e2e/seed.html by A1.
  */
 export async function seedProfile(
   context: BrowserContext,
   extensionId: string,
 ): Promise<void> {
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/__e2e__/seed.html`);
+  await page.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
   await page.evaluate(
     ({ key, profile }) =>
       new Promise<void>((resolve, reject) => {
@@ -116,7 +116,7 @@ export async function seedAuthSession(
   extensionId: string,
 ): Promise<void> {
   const page = await context.newPage();
-  await page.goto(`chrome-extension://${extensionId}/__e2e__/seed.html`);
+  await page.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
   await page.evaluate(
     ({ session }) =>
       new Promise<void>((resolve, reject) => {
