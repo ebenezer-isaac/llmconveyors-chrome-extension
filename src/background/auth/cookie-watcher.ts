@@ -79,10 +79,25 @@ export function registerCookieWatcher(deps: CookieWatcherDeps): () => void {
 
   const handler = (info: CookieChangeInfo): void => {
     if (!isRelevantCookie(info)) return;
-    if (info.removed) {
-      // 'explicit' happens on manual sign-out in the web app; 'expired' /
-      // 'evicted' happen on TTL or storage pressure. Any of them means the
-      // current cookie is no longer valid.
+
+    // SuperTokens rotates sAccessToken on every request. Each rotation fires
+    // two events: (removed: true, cause: 'overwrite') then (removed: false,
+    // cause: 'explicit'). Treating the first as a sign-out races the popup
+    // into a re-exchange loop with the A4 bridge that reloads the active
+    // tab; treating the second as a new identity is equally wrong because
+    // it is almost always just a token refresh, not an account switch.
+    //
+    // Scope this watcher to genuine sign-out signals only:
+    //   - cause 'explicit' WITHOUT an immediate overwrite counterpart means
+    //     the user actively logged out of the web app
+    //   - cause 'expired' means the SuperTokens TTL ran out with no refresh
+    //     (effectively a timed sign-out)
+    //   - cause 'evicted' means storage pressure ate the cookie; safest to
+    //     treat as a sign-out so the user is forced to re-auth
+    //
+    // Account-switch detection is deferred to the API 401 retry path; a
+    // fresh sign-in there picks up the new identity via the bridge.
+    if (info.removed && info.cause !== 'overwrite') {
       deps.logger.info('cookie-watcher: session cookie removed', {
         cause: info.cause,
       });
@@ -105,18 +120,9 @@ export function registerCookieWatcher(deps: CookieWatcherDeps): () => void {
           });
         }
       })();
-      return;
     }
-
-    // Cookie set or refreshed. Trigger a silent re-exchange so the
-    // extension picks up the new identity without requiring an interactive
-    // click. Failures are swallowed: the user can always click Sign In.
-    deps.logger.debug('cookie-watcher: session cookie set, triggering silent refresh');
-    void deps.attemptSilentSignIn().catch((err: unknown) => {
-      deps.logger.debug('cookie-watcher: silent refresh rejected', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
+    // All other events (removed with cause 'overwrite', or set events) are
+    // ignored to prevent the refresh-loop.
   };
 
   cookies.onChanged.addListener(handler);
