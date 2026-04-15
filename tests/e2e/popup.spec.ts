@@ -60,7 +60,7 @@ async function installCreditsBackendStub(
   await context.route('https://api.llmconveyors.com/**', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
-    if (url.pathname.endsWith('/api/v1/settings/usage-summary')) {
+    if (url.pathname.endsWith('/api/v1/settings/usage/summary')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -75,7 +75,7 @@ async function installCreditsBackendStub(
   await context.route('https://api.llmconveyors.local/**', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
-    if (url.pathname.endsWith('/api/v1/settings/usage-summary')) {
+    if (url.pathname.endsWith('/api/v1/settings/usage/summary')) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

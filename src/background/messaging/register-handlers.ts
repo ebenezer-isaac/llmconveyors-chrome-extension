@@ -150,11 +150,40 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
   const handlers = createHandlers(deps);
   handlersSingleton = handlers;
 
+  // Dual-mode listener. Chrome MV3 native runtime requires the classic
+  // `return true` + `sendResponse(...)` pattern because a Promise return
+  // is not reliably awaited across the service-worker / content-script
+  // boundary in Manifest V3. The fake-browser harness used by integration
+  // tests, however, consumes the listener return value directly via
+  // Promise.all and does not pass a sendResponse callback. We branch on
+  // the presence of the callback argument: when Chrome is real it arrives
+  // as a function; under fake-browser it is undefined and we return the
+  // dispatch Promise directly instead.
   browser.runtime.onMessage.addListener(
-    (message: unknown, sender: chrome.runtime.MessageSender) => {
-      // The runtime expects either a Promise response or `true` to keep the
-      // channel open. Returning the dispatch promise is idiomatic.
-      return dispatch(handlers, message, sender);
+    (
+      message: unknown,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: ((resp: unknown) => void) | undefined,
+    ) => {
+      const promise = dispatch(handlers, message, sender).catch(
+        (err: unknown) => {
+          logger.warn('dispatch rejected', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return undefined;
+        },
+      );
+      if (typeof sendResponse === 'function') {
+        promise.then((result) => {
+          try {
+            sendResponse(result);
+          } catch {
+            // Channel already closed.
+          }
+        });
+        return true;
+      }
+      return promise;
     },
   );
 

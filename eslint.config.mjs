@@ -65,6 +65,8 @@ export default tseslint.config(
       'dist/**',
       'public/**',
       'src/_blueprints/**',
+      'tests/e2e/.test-results/**',
+      'tests/e2e/.dist/**',
     ],
   },
 );

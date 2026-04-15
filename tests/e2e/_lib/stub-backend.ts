@@ -40,12 +40,35 @@ async function backendHandler(route: Route): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        taxonomyVersion: '2026.04.1',
-        keywords: [
-          { term: 'TypeScript', weight: 1.0, category: 'language' },
-          { term: 'React', weight: 0.9, category: 'framework' },
-          { term: 'distributed systems', weight: 0.8, category: 'concept' },
-        ],
+        success: true,
+        data: {
+          keywords: [
+            {
+              term: 'TypeScript',
+              category: 'tool',
+              score: 1.0,
+              occurrences: 1,
+              canonicalForm: 'typescript',
+            },
+            {
+              term: 'React',
+              category: 'tool',
+              score: 0.9,
+              occurrences: 1,
+              canonicalForm: 'react',
+            },
+            {
+              term: 'distributed systems',
+              category: 'domain',
+              score: 0.8,
+              occurrences: 1,
+              canonicalForm: 'distributed-systems',
+            },
+          ],
+          tookMs: 12,
+        },
+        requestId: 'e2e-extract-skills',
+        timestamp: new Date().toISOString(),
       }),
     });
     return;
