@@ -33,7 +33,11 @@ export default defineConfig({
         resolve: { alias: sharedAliases },
         test: {
           name: 'unit',
-          include: ['tests/unit/**/*.spec.ts', 'src/**/*.spec.ts'],
+          include: [
+            'tests/unit/**/*.spec.ts',
+            'tests/unit/**/*.spec.tsx',
+            'src/**/*.spec.ts',
+          ],
           exclude: ['node_modules', '.wxt', '.output', 'dist', 'tests/harness/**'],
           environment: 'happy-dom',
           server: {

@@ -1,0 +1,10 @@
+{
+  "appName": {
+    "message": "LLM Conveyors Job Assistant",
+    "description": "Extension display name shown in chrome://extensions and the Chrome Web Store."
+  },
+  "appDescription": {
+    "message": "Intelligent form autofill and keyword highlighting for Greenhouse, Lever, and Workday job applications.",
+    "description": "Short description shown in chrome://extensions and the Chrome Web Store."
+  }
+}

@@ -82,6 +82,14 @@ import {
   newSessionId,
 } from '../types/brands';
 import { jsonResumeToProfile } from './json-resume-converter';
+import {
+  AuthError,
+  createSignInOrchestrator,
+  DEFAULT_BRIDGE_URL,
+  defaultParseAuthFragmentDeps,
+  defaultWebAuthFlowDeps,
+  launchWebAuthFlow as defaultLaunchWebAuthFlow,
+} from '../auth';
 
 /**
  * Storage facade: tests pass an in-memory stub, production wires
@@ -159,19 +167,35 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   const log = deps.logger;
 
   // ---- AUTH_SIGN_IN ----
+  // Two execution paths:
+  //   1. Legacy cookie-jar exchange (integration tests + server-assisted
+  //      path): when `data.cookieJar` is a non-empty string, POST to
+  //      endpoints.authExchange and persist the response.
+  //   2. launchWebAuthFlow orchestrator (interactive popup sign-in): when
+  //      no cookieJar is provided, drive the Chrome identity flow against
+  //      the A4 bridge page, parse the chromiumapp.org fragment, extract
+  //      userId from the JWT, and persist.
   const handleAuthSignIn: HandlerFor<'AUTH_SIGN_IN'> = async ({ data }) => {
     const parsed = AuthSignInRequestSchema.safeParse(data ?? {});
     if (!parsed.success) {
       return { ok: false, reason: 'invalid sign-in payload' };
     }
+    const jar = parsed.data.cookieJar;
+    if (typeof jar === 'string' && jar.length > 0) {
+      return cookieJarExchange(jar);
+    }
+    return webAuthFlowSignIn();
+  };
+
+  async function cookieJarExchange(cookieJar: string): Promise<AuthSignInResponse> {
     try {
       const res = await deps.fetch(deps.endpoints.authExchange, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          ...(parsed.data.cookieJar ? { 'x-llmc-ext-cookie-jar': parsed.data.cookieJar } : {}),
+          'x-llmc-ext-cookie-jar': cookieJar,
         },
-        body: JSON.stringify({ cookieJar: parsed.data.cookieJar ?? '' }),
+        body: JSON.stringify({ cookieJar }),
       });
       if (!res.ok) {
         return { ok: false, reason: `exchange failed: ${res.status}` };
@@ -203,10 +227,45 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       await deps.broadcast.sendRuntime({ key: 'AUTH_STATE_CHANGED', data: nextState });
       return { ok: true, userId: validated.data.userId };
     } catch (err) {
-      log.error('AUTH_SIGN_IN: unexpected', err);
+      log.error('AUTH_SIGN_IN: cookie-jar exchange failed', err);
       return { ok: false, reason: 'network error' };
     }
-  };
+  }
+
+  async function webAuthFlowSignIn(): Promise<AuthSignInResponse> {
+    const orchestrator = createSignInOrchestrator({
+      webAuthFlow: defaultWebAuthFlowDeps,
+      storage: {
+        writeSession: deps.storage.writeSession,
+        readSession: deps.storage.readSession,
+      },
+      broadcast: {
+        sendRuntime: deps.broadcast.sendRuntime,
+      },
+      parseDeps: defaultParseAuthFragmentDeps,
+      logger: log,
+      now: deps.now,
+      bridgeUrl: DEFAULT_BRIDGE_URL,
+      launch: defaultLaunchWebAuthFlow,
+    });
+    try {
+      const state = await orchestrator();
+      if (!state.signedIn) {
+        return { ok: false, reason: 'sign-in returned unauthenticated state' };
+      }
+      return { ok: true, userId: state.userId };
+    } catch (err) {
+      if (err instanceof AuthError) {
+        log.warn('AUTH_SIGN_IN: web-auth-flow failed', {
+          errName: err.name,
+          errMessage: err.message,
+        });
+        return { ok: false, reason: `${err.name}: ${err.message}` };
+      }
+      log.error('AUTH_SIGN_IN: web-auth-flow unexpected', err);
+      return { ok: false, reason: 'unexpected error during sign-in' };
+    }
+  }
 
   // ---- AUTH_SIGN_OUT ----
   const handleAuthSignOut: HandlerFor<'AUTH_SIGN_OUT'> = async ({ data }) => {

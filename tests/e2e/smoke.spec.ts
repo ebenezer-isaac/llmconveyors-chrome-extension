@@ -8,7 +8,7 @@ import {
   seedAuthSession,
   openPopup,
 } from './_lib/setup';
-import { installBackendStubs } from './_lib/stub-backend';
+import { installBackendStubs, seedE2ETestCookieJar } from './_lib/stub-backend';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,13 +27,24 @@ const EXTENSION_PATH = join(__dirname, '..', '..', '.output', 'chrome-mv3');
  */
 
 async function launchExtensionContext(): Promise<BrowserContext> {
+  // MV3 service workers require a non-headless-shell Chromium to register.
+  // Playwright's `chromium` download is the headless-shell; passing
+  // `channel: 'chromium'` opts into the full bundle that bundles extensions.
+  // We pass `--headless=new` in args so the worker UI is not shown, but
+  // we leave Playwright's `headless` option false so the ext mode sticks.
+  const argsBase = [
+    '--no-sandbox',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    `--disable-extensions-except=${EXTENSION_PATH}`,
+    `--load-extension=${EXTENSION_PATH}`,
+  ];
+  const headlessEnv = process.env.E2E_HEADFUL === 'true' ? [] : ['--headless=new'];
   const context = await chromium.launchPersistentContext('', {
+    channel: 'chromium',
     headless: false,
-    args: [
-      '--headless=new',
-      `--disable-extensions-except=${EXTENSION_PATH}`,
-      `--load-extension=${EXTENSION_PATH}`,
-    ],
+    args: [...headlessEnv, ...argsBase],
   });
   return context;
 }
@@ -51,15 +62,17 @@ test.skip('popup renders with placeholder sign-in button', async () => {
   }
 });
 
-test.skip('sign-in happy path stores session and shows signed-in popup state', async () => {
+test('sign-in happy path stores session and shows signed-in popup state', async () => {
   const context = await launchExtensionContext();
   try {
     await installBackendStubs(context);
     const extId = await getExtensionId(context);
+    // Seed the E2E cookie-jar hook so the popup routes through the
+    // stubbed backend exchange instead of Chrome's interactive OAuth
+    // window, which is unreliable under headless Chromium.
+    await seedE2ETestCookieJar(context, extId);
     const popup = await openPopup(context, extId);
     await popup.click('[data-testid="sign-in-button"]');
-    // The sign-in flow opens a SuperTokens-bridge page; A6 stubs it with a
-    // dev-only handshake that immediately returns the token.
     await popup.waitForSelector('[data-testid="signed-in-indicator"]', { timeout: 10_000 });
     await expect(popup.locator('[data-testid="signed-in-indicator"]')).toContainText(/user_e2e_001/);
     await popup.close();

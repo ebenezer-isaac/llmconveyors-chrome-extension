@@ -8,21 +8,77 @@ import {
 /**
  * Retrieve the extension id from the background service-worker URL. Playwright
  * does not expose this directly so we use the service-worker registration.
+ *
+ * Under `--headless=new` with a persistent context, the MV3 service worker
+ * sometimes does not register until something forces the extension to be
+ * queried. We try several progressive nudges before giving up.
  */
 export async function getExtensionId(context: BrowserContext): Promise<string> {
-  const workers = context.serviceWorkers();
-  const firstWorker = workers[0];
-  if (firstWorker) {
-    const url = firstWorker.url();
-    const match = url.match(/chrome-extension:\/\/([a-z]+)\//);
-    if (match && match[1]) return match[1];
+  function match(url: string): string | null {
+    const m = url.match(/chrome-extension:\/\/([a-z]+)\//);
+    return m && m[1] ? m[1] : null;
   }
-  // Fallback: wait for the service worker to register.
-  const worker = await context.waitForEvent('serviceworker');
-  const url = worker.url();
-  const match = url.match(/chrome-extension:\/\/([a-z]+)\//);
-  if (!match || !match[1]) throw new Error('could not determine extension id');
-  return match[1];
+
+  const existing = context.serviceWorkers();
+  if (existing[0]) {
+    const id = match(existing[0].url());
+    if (id) return id;
+  }
+
+  // Nudge 1: open chrome://extensions.
+  {
+    const page = await context.newPage();
+    try {
+      await page
+        .goto('chrome://extensions/', { timeout: 5_000 })
+        .catch(() => undefined);
+    } finally {
+      await page.close().catch(() => undefined);
+    }
+  }
+
+  // Poll for the service worker.
+  for (let i = 0; i < 20; i++) {
+    const list = context.serviceWorkers();
+    if (list.length > 0) {
+      const id = match(list[0]!.url());
+      if (id) return id;
+    }
+    // Also scan background pages (MV2-ish fallback some builds expose).
+    const pages = context.backgroundPages();
+    for (const p of pages) {
+      const id = match(p.url());
+      if (id) return id;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  // Nudge 2: await the serviceworker event with a generous timeout.
+  try {
+    const worker = await context.waitForEvent('serviceworker', {
+      timeout: 15_000,
+    });
+    const id = match(worker.url());
+    if (id) return id;
+  } catch {
+    // fallthrough
+  }
+
+  // Final attempt: some builds expose the extension id via a background
+  // page event instead of service worker.
+  try {
+    const bg = await context.waitForEvent('backgroundpage', {
+      timeout: 5_000,
+    });
+    const id = match(bg.url());
+    if (id) return id;
+  } catch {
+    // fallthrough
+  }
+
+  throw new Error(
+    'could not determine extension id: no service-worker or background page registered',
+  );
 }
 
 /**
