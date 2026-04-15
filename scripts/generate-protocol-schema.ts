@@ -74,6 +74,12 @@ async function loadModules(): Promise<{
   const creditsUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/credits.schema.ts'),
   ).href;
+  const sessionListUrl = pathToFileURL(
+    resolve(REPO_ROOT, 'src/background/messaging/schemas/session-list.schema.ts'),
+  ).href;
+  const genericIntentUrl = pathToFileURL(
+    resolve(REPO_ROOT, 'src/background/messaging/schemas/generic-intent.schema.ts'),
+  ).href;
 
   type SchemaModule = Record<string, z.ZodTypeAny>;
   const auth = (await import(authUrl)) as SchemaModule;
@@ -83,6 +89,8 @@ async function loadModules(): Promise<{
   const highlight = (await import(highlightUrl)) as SchemaModule;
   const generation = (await import(generationUrl)) as SchemaModule;
   const credits = (await import(creditsUrl)) as SchemaModule;
+  const sessionList = (await import(sessionListUrl)) as SchemaModule;
+  const genericIntent = (await import(genericIntentUrl)) as SchemaModule;
 
   const pairs: SchemaPair[] = [
     // Auth
@@ -189,6 +197,34 @@ async function loadModules(): Promise<{
       handlerLocation: 'background',
       broadcastOnly: false,
     },
+    {
+      key: 'GENERATION_SUBSCRIBE',
+      requestSchema: generation.GenerationSubscribeRequestSchema,
+      responseSchema: generation.GenerationSubscribeResponseSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    {
+      key: 'GENERATION_INTERACT',
+      requestSchema: generation.GenerationInteractRequestSchema,
+      responseSchema: generation.GenerationInteractResponseSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    {
+      key: 'GENERATION_STARTED',
+      requestSchema: null,
+      responseSchema: null,
+      handlerLocation: 'background',
+      broadcastOnly: true,
+    },
+    {
+      key: 'GENERATION_COMPLETE',
+      requestSchema: null,
+      responseSchema: null,
+      handlerLocation: 'background',
+      broadcastOnly: true,
+    },
     // Broadcast
     {
       key: 'DETECTED_JOB_BROADCAST',
@@ -202,6 +238,29 @@ async function loadModules(): Promise<{
       key: 'CREDITS_GET',
       requestSchema: credits.CreditsGetRequestSchema,
       responseSchema: credits.CreditsStateSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    // Sessions
+    {
+      key: 'SESSION_LIST',
+      requestSchema: sessionList.SessionListRequestSchema,
+      responseSchema: sessionList.SessionListResultSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    {
+      key: 'SESSION_GET',
+      requestSchema: sessionList.SessionGetRequestSchema,
+      responseSchema: sessionList.SessionGetResultSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    // Generic Intent
+    {
+      key: 'GENERIC_INTENT_DETECT',
+      requestSchema: genericIntent.GenericIntentDetectRequestSchema,
+      responseSchema: genericIntent.GenericIntentDetectResponseSchema,
       handlerLocation: 'background',
       broadcastOnly: false,
     },

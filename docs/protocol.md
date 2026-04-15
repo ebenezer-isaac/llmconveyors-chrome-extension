@@ -3,7 +3,7 @@
 **Generated file.** Edit source schemas at `src/background/messaging/schemas/**` and run `pnpm generate:protocol-schema`.
 
 Schema version: 1.0.0
-Total keys: 16
+Total keys: 23
 
 ## Key Table
 
@@ -23,8 +23,15 @@ Total keys: 16
 | `GENERATION_START` | background | no |
 | `GENERATION_UPDATE` | background | yes |
 | `GENERATION_CANCEL` | background | no |
+| `GENERATION_SUBSCRIBE` | background | no |
+| `GENERATION_INTERACT` | background | no |
+| `GENERATION_STARTED` | background | yes |
+| `GENERATION_COMPLETE` | background | yes |
 | `DETECTED_JOB_BROADCAST` | background | yes |
 | `CREDITS_GET` | background | no |
+| `SESSION_LIST` | background | no |
+| `SESSION_GET` | background | no |
+| `GENERIC_INTENT_DETECT` | background | no |
 
 ## Request / Response Shapes
 
@@ -1134,6 +1141,194 @@ Response schema:
 }
 ```
 
+### GENERATION_SUBSCRIBE
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "generationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "generationId"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "signed-out",
+            "network-error",
+            "already-subscribed"
+          ]
+        }
+      },
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### GENERATION_INTERACT
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "agentType": {
+      "type": "string",
+      "enum": [
+        "job-hunter",
+        "b2b-sales"
+      ]
+    },
+    "generationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "interactionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "interactionType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "interactionData": {}
+  },
+  "required": [
+    "agentType",
+    "generationId",
+    "interactionId",
+    "interactionType"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "signed-out",
+            "not-found",
+            "network-error",
+            "api-error",
+            "invalid-payload"
+          ]
+        },
+        "status": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### GENERATION_STARTED
+
+Handler: background. Broadcast-only: true.
+
+Request schema:
+```json
+null
+```
+
+Response schema:
+```json
+null
+```
+
+### GENERATION_COMPLETE
+
+Handler: background. Broadcast-only: true.
+
+Request schema:
+```json
+null
+```
+
+Response schema:
+```json
+null
+```
+
 ### DETECTED_JOB_BROADCAST
 
 Handler: background. Broadcast-only: true.
@@ -1253,6 +1448,517 @@ Response schema:
     "resetAt"
   ],
   "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### SESSION_LIST
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50
+    },
+    "offset": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "failed",
+        "awaiting_input",
+        "cancelled"
+      ]
+    },
+    "forceRefresh": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "agentType": {
+                "type": "string",
+                "enum": [
+                  "job-hunter",
+                  "b2b-sales"
+                ]
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "completed",
+                  "failed",
+                  "awaiting_input",
+                  "cancelled"
+                ]
+              },
+              "companyName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "jobTitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "updatedAt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completedAt": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "sessionId",
+              "agentType",
+              "status",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fetchedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fromCache": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok",
+        "items",
+        "total",
+        "fetchedAt",
+        "fromCache"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "signed-out",
+            "network-error",
+            "api-error",
+            "shape-mismatch"
+          ]
+        },
+        "status": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### SESSION_GET
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "sessionId"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "session": {
+          "type": "object",
+          "properties": {
+            "sessionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "agentType": {
+              "type": "string",
+              "enum": [
+                "job-hunter",
+                "b2b-sales"
+              ]
+            },
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "completed",
+                "failed",
+                "awaiting_input",
+                "cancelled"
+              ]
+            },
+            "companyName": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "jobTitle": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "createdAt": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "updatedAt": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "completedAt": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "sessionId",
+            "agentType",
+            "status",
+            "createdAt",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "ok",
+        "session"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "signed-out",
+            "not-found",
+            "network-error",
+            "api-error",
+            "shape-mismatch"
+          ]
+        },
+        "status": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### GENERIC_INTENT_DETECT
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "tabId": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "agent": {
+      "type": "string",
+      "enum": [
+        "job-hunter",
+        "b2b-sales"
+      ]
+    }
+  },
+  "required": [
+    "tabId",
+    "agent"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "job-description"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100000
+                },
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "jsonld",
+                    "readability"
+                  ]
+                },
+                "jobTitle": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "company": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "maxLength": 2048
+                }
+              },
+              "required": [
+                "kind",
+                "text",
+                "method",
+                "url"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "company-page"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "maxLength": 2048
+                },
+                "signals": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "jsonld-organization",
+                      "about-link",
+                      "contact-link",
+                      "corp-host"
+                    ]
+                  },
+                  "maxItems": 8
+                },
+                "companyName": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "kind",
+                "url",
+                "signals"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "ok",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "no-match",
+            "no-tab",
+            "script-inject-failed",
+            "invalid-payload",
+            "permission-denied"
+          ]
+        }
+      },
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ],
   "$schema": "http://json-schema.org/draft-07/schema#"
 }
 ```

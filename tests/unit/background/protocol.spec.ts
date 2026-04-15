@@ -11,12 +11,12 @@ import {
  * BG_HANDLED_KEYS has 14 entries and ALL_PROTOCOL_KEYS has 16.
  */
 describe('ProtocolMap key registry', () => {
-  it('BG_HANDLED_KEYS has exactly 20 entries post-101.4', () => {
-    expect(BG_HANDLED_KEYS).toHaveLength(20);
+  it('BG_HANDLED_KEYS has exactly 27 entries post-102/103', () => {
+    expect(BG_HANDLED_KEYS).toHaveLength(27);
   });
 
-  it('ALL_PROTOCOL_KEYS has exactly 22 entries post-101.4', () => {
-    expect(ALL_PROTOCOL_KEYS).toHaveLength(22);
+  it('ALL_PROTOCOL_KEYS has exactly 29 entries post-102/103', () => {
+    expect(ALL_PROTOCOL_KEYS).toHaveLength(29);
   });
 
   it('ALL_PROTOCOL_KEYS is a superset of BG_HANDLED_KEYS', () => {
@@ -26,7 +26,7 @@ describe('ProtocolMap key registry', () => {
     }
   });
 
-  it('ALL_PROTOCOL_KEYS contains the required 22 post-101.4 keys', () => {
+  it('ALL_PROTOCOL_KEYS contains the required 29 post-102/103 keys', () => {
     const required = [
       'AUTH_SIGN_IN',
       'AUTH_SIGN_OUT',
@@ -42,6 +42,10 @@ describe('ProtocolMap key registry', () => {
       'GENERATION_START',
       'GENERATION_UPDATE',
       'GENERATION_CANCEL',
+      'GENERATION_SUBSCRIBE',
+      'GENERATION_INTERACT',
+      'GENERATION_STARTED',
+      'GENERATION_COMPLETE',
       'DETECTED_JOB_BROADCAST',
       'CREDITS_GET',
       'MASTER_RESUME_GET',
@@ -50,6 +54,9 @@ describe('ProtocolMap key registry', () => {
       'AGENT_PREFERENCE_SET',
       'AGENT_REGISTRY_LIST',
       'AGENT_MANIFEST_GET',
+      'SESSION_LIST',
+      'SESSION_GET',
+      'GENERIC_INTENT_DETECT',
     ].sort();
     const actual = [...ALL_PROTOCOL_KEYS].sort();
     expect(actual).toEqual(required);

@@ -15,3 +15,5 @@ export * from './keywords.schema';
 export * from './highlight.schema';
 export * from './generation.schema';
 export * from './credits.schema';
+export * from './session-list.schema';
+export * from './generic-intent.schema';

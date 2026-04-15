@@ -71,8 +71,73 @@ export const GenerationCancelResponseSchema = z
   })
   .strict();
 
+/**
+ * GENERATION_SUBSCRIBE - popup / sidepanel asks the background to open a live
+ * SSE stream for the given generationId. Background manages the single active
+ * connection and fans out GENERATION_UPDATE broadcasts.
+ */
+export const GenerationSubscribeRequestSchema = z
+  .object({
+    generationId: z.string().min(1).max(128),
+  })
+  .strict();
+
+export const GenerationSubscribeResponseSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }).strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      reason: z.enum(['signed-out', 'network-error', 'already-subscribed']),
+    })
+    .strict(),
+]);
+
+/**
+ * GENERATION_INTERACT - user response to an interaction-request event raised
+ * by a running generation. Mirrors the backend POST /agents/:type/interact
+ * shape, but carries agentType so the bg can route to the right endpoint.
+ */
+export const GenerationInteractRequestSchema = z
+  .object({
+    agentType: z.enum(['job-hunter', 'b2b-sales']),
+    generationId: z.string().min(1).max(128),
+    interactionId: z.string().min(1).max(128),
+    interactionType: z.string().min(1).max(100),
+    interactionData: z.unknown(),
+  })
+  .strict();
+
+export const GenerationInteractResponseSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }).strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      reason: z.enum([
+        'signed-out',
+        'not-found',
+        'network-error',
+        'api-error',
+        'invalid-payload',
+      ]),
+      status: z.number().int().optional(),
+    })
+    .strict(),
+]);
+
 export type GenerationStartResponse = z.infer<typeof GenerationStartResponseSchema>;
 export type GenerationArtifact = z.infer<typeof GenerationArtifactSchema>;
 export type GenerationUpdateBroadcast = z.infer<
   typeof GenerationUpdateBroadcastSchema
+>;
+export type GenerationSubscribeRequest = z.infer<
+  typeof GenerationSubscribeRequestSchema
+>;
+export type GenerationSubscribeResponse = z.infer<
+  typeof GenerationSubscribeResponseSchema
+>;
+export type GenerationInteractRequest = z.infer<
+  typeof GenerationInteractRequestSchema
+>;
+export type GenerationInteractResponse = z.infer<
+  typeof GenerationInteractResponseSchema
 >;

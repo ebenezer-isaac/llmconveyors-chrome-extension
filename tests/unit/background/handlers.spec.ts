@@ -79,6 +79,39 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
         get: vi.fn(async () => ({ kind: 'not-found' as const })),
       },
     },
+    sessions: {
+      client: {
+        list: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
+      },
+      cache: {
+        read: vi.fn(async () => null),
+        write: vi.fn(async (entry) => ({
+          items: entry.items,
+          total: entry.total,
+          fetchedAt: 1_713_000_000_000,
+        })),
+        clear: vi.fn(async () => undefined),
+        isFresh: vi.fn(() => false),
+      },
+    },
+    generation: {
+      agentClient: {
+        start: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
+        interact: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
+      },
+      sse: {
+        subscribe: vi.fn(async () => ({ ok: true as const })),
+        unsubscribe: vi.fn(),
+      },
+      cancelEndpoint: {
+        cancel: vi.fn(async () => ({ ok: true })),
+      },
+    },
+    genericIntent: {
+      scripting: {
+        executeScript: vi.fn(async () => [{ result: { ok: false, reason: 'no-match' } }]),
+      },
+    },
     ...overrides,
   };
 }
@@ -109,6 +142,13 @@ describe('HANDLERS record shape', () => {
         'AGENT_PREFERENCE_SET',
         'AGENT_REGISTRY_LIST',
         'AGENT_MANIFEST_GET',
+        'GENERATION_SUBSCRIBE',
+        'GENERATION_INTERACT',
+        'GENERATION_STARTED',
+        'GENERATION_COMPLETE',
+        'SESSION_LIST',
+        'SESSION_GET',
+        'GENERIC_INTENT_DETECT',
       ].sort(),
     );
   });

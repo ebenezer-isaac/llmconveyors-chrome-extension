@@ -26,6 +26,10 @@ type RequiredKeys =
   | 'GENERATION_START'
   | 'GENERATION_UPDATE'
   | 'GENERATION_CANCEL'
+  | 'GENERATION_SUBSCRIBE'
+  | 'GENERATION_INTERACT'
+  | 'GENERATION_STARTED'
+  | 'GENERATION_COMPLETE'
   | 'DETECTED_JOB_BROADCAST'
   | 'CREDITS_GET'
   | 'MASTER_RESUME_GET'
@@ -33,7 +37,10 @@ type RequiredKeys =
   | 'AGENT_PREFERENCE_GET'
   | 'AGENT_PREFERENCE_SET'
   | 'AGENT_REGISTRY_LIST'
-  | 'AGENT_MANIFEST_GET';
+  | 'AGENT_MANIFEST_GET'
+  | 'SESSION_LIST'
+  | 'SESSION_GET'
+  | 'GENERIC_INTENT_DETECT';
 
 type RequiredPresent = RequiredKeys extends keyof ProtocolMap ? true : false;
 type NoExtras = Exclude<keyof ProtocolMap, RequiredKeys> extends never ? true : false;

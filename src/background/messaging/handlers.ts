@@ -50,6 +50,16 @@ import type {
 } from '../agents';
 import { createAgentHandlers } from '../agents';
 import {
+  createGenerationHandlers,
+  type AgentClient,
+} from '../generation';
+import { createSessionHandlers } from '../sessions';
+import type { SessionListClientOutcome } from '../sessions';
+import type { CachedSessionList } from '../sessions';
+import type { SessionListItem } from './schemas/session-list.schema';
+import { createGenericIntentHandler } from '../generic-intent';
+import type { GenericScanAgent, GenericScanResult } from '@/src/content/generic-scan';
+import {
   AuthSignInRequestSchema,
   AuthSignOutRequestSchema,
   AuthStatusRequestSchema,
@@ -68,18 +78,10 @@ import {
   ExtractSkillsBackendResponseSchema,
 } from './schemas/keywords.schema';
 import { HighlightStatusRequestSchema } from './schemas/highlight.schema';
-import {
-  GenerationStartRequestSchema,
-  GenerationCancelRequestSchema,
-  GenerationUpdateBroadcastSchema,
-} from './schemas/generation.schema';
+import { GenerationUpdateBroadcastSchema } from './schemas/generation.schema';
 import { CreditsGetRequestSchema } from './schemas/credits.schema';
 import { SessionExpiredError } from './errors';
 import type { BgHandledKey, ProtocolMap } from './protocol';
-import {
-  newGenerationId,
-  newSessionId,
-} from '../types/brands';
 import {
   AuthError,
   createSignInOrchestrator,
@@ -143,6 +145,52 @@ export interface AgentHandlerAdapters {
   };
 }
 
+export interface SessionHandlerAdapters {
+  readonly client: {
+    list: (q: {
+      limit?: number;
+      offset?: number;
+      status?: 'active' | 'completed' | 'failed' | 'awaiting_input' | 'cancelled';
+    }) => Promise<SessionListClientOutcome>;
+  };
+  readonly cache: {
+    read: () => Promise<CachedSessionList | null>;
+    write: (entry: {
+      items: readonly SessionListItem[];
+      total: number;
+    }) => Promise<CachedSessionList>;
+    clear: () => Promise<void>;
+    isFresh: (entry: CachedSessionList) => boolean;
+  };
+}
+
+export interface GenerationHandlerAdapters {
+  readonly agentClient: AgentClient;
+  readonly sse: {
+    subscribe: (args: { generationId: string }) => Promise<
+      | { readonly ok: true }
+      | {
+          readonly ok: false;
+          readonly reason: 'signed-out' | 'network-error' | 'already-subscribed';
+        }
+    >;
+    unsubscribe: (generationId: string) => void;
+  };
+  readonly cancelEndpoint: {
+    cancel: (generationId: string) => Promise<{ ok: boolean }>;
+  };
+}
+
+export interface GenericIntentHandlerAdapters {
+  readonly scripting: {
+    executeScript: (args: {
+      target: { tabId: number };
+      func: (agent: GenericScanAgent) => GenericScanResult;
+      args: readonly [GenericScanAgent];
+    }) => Promise<ReadonlyArray<{ result?: unknown }>>;
+  };
+}
+
 export interface HandlerDeps {
   readonly logger: Logger;
   readonly fetch: typeof globalThis.fetch;
@@ -153,6 +201,9 @@ export interface HandlerDeps {
   readonly endpoints: HandlerEndpoints;
   readonly masterResume: MasterResumeHandlerAdapters;
   readonly agents: AgentHandlerAdapters;
+  readonly sessions: SessionHandlerAdapters;
+  readonly generation: GenerationHandlerAdapters;
+  readonly genericIntent: GenericIntentHandlerAdapters;
 }
 
 /**
@@ -450,41 +501,14 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     return deps.tabState.getHighlight(parsed.data.tabId);
   };
 
-  // ---- GENERATION_START (stub returns invalid-payload on shape miss; A11 impl) ----
-  const handleGenerationStart: HandlerFor<'GENERATION_START'> = async ({ data }) => {
-    const parsed = GenerationStartRequestSchema.safeParse(data);
-    if (!parsed.success) {
-      return { ok: false, reason: 'invalid payload' };
-    }
-    const session = await safeSignedIn(deps.storage);
-    if (session === null) return { ok: false, reason: 'signed-out' };
-    try {
-      const res = await deps.fetch(deps.endpoints.generationStart, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.accessToken}`,
-        },
-        body: JSON.stringify({ agent: parsed.data.agent, payload: parsed.data.payload }),
-      });
-      if (!res.ok) {
-        return { ok: false, reason: `generation start failed: ${res.status}` };
-      }
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        return { ok: false, reason: 'generation start response not JSON' };
-      }
-      const obj = (body ?? {}) as Record<string, unknown>;
-      const gid = typeof obj.generationId === 'string' ? obj.generationId : newGenerationId();
-      const sid = typeof obj.sessionId === 'string' ? obj.sessionId : newSessionId();
-      return { ok: true, generationId: gid, sessionId: sid };
-    } catch (err) {
-      log.warn('GENERATION_START: network', { error: String(err) });
-      return { ok: false, reason: 'network error' };
-    }
-  };
+  // ---- Generation handlers (delegated to generation module) ----
+  const generationHandlers = createGenerationHandlers({
+    logger: log,
+    agentClient: deps.generation.agentClient,
+    sse: deps.generation.sse,
+    broadcast: deps.broadcast.sendRuntime,
+    cancelEndpoint: deps.generation.cancelEndpoint,
+  });
 
   // ---- GENERATION_UPDATE (broadcast-only, inert) ----
   const handleGenerationUpdate: HandlerFor<'GENERATION_UPDATE'> = async ({ data }) => {
@@ -497,28 +521,18 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     return undefined;
   };
 
-  // ---- GENERATION_CANCEL ----
-  const handleGenerationCancel: HandlerFor<'GENERATION_CANCEL'> = async ({ data }) => {
-    const parsed = GenerationCancelRequestSchema.safeParse(data);
-    if (!parsed.success) {
-      return { ok: false };
-    }
-    const session = await safeSignedIn(deps.storage);
-    if (session === null) return { ok: false };
+  // ---- GENERATION_STARTED / GENERATION_COMPLETE (broadcast-only) ----
+  const handleGenerationStarted: HandlerFor<'GENERATION_STARTED'> = async () => undefined;
+  const handleGenerationComplete: HandlerFor<'GENERATION_COMPLETE'> = async () => {
+    // Invalidate the session list cache so the next popup open refetches.
     try {
-      const res = await deps.fetch(deps.endpoints.generationCancel, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.accessToken}`,
-        },
-        body: JSON.stringify({ generationId: parsed.data.generationId }),
+      await sessionHandlers.invalidateCache();
+    } catch (err: unknown) {
+      log.debug('GENERATION_COMPLETE: cache invalidate failed', {
+        error: err instanceof Error ? err.message : String(err),
       });
-      return { ok: res.ok };
-    } catch (err) {
-      log.warn('GENERATION_CANCEL: network', { error: String(err) });
-      return { ok: false };
     }
+    return undefined;
   };
 
   // ---- DETECTED_JOB_BROADCAST (inert fan-out via broadcast helper) ----
@@ -574,6 +588,18 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     logger: log,
   });
 
+  const sessionHandlers = createSessionHandlers({
+    client: deps.sessions.client,
+    cache: deps.sessions.cache,
+    now: deps.now,
+    logger: log,
+  });
+
+  const genericIntentHandler = createGenericIntentHandler({
+    logger: log,
+    scripting: deps.genericIntent.scripting,
+  });
+
   const masterResumeHandlers = createMasterResumeHandlers({
     client: deps.masterResume.client,
     cache: deps.masterResume.cache,
@@ -601,9 +627,13 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     FILL_REQUEST: handleFillRequest,
     KEYWORDS_EXTRACT: handleKeywordsExtract,
     HIGHLIGHT_STATUS: handleHighlightStatus,
-    GENERATION_START: handleGenerationStart,
+    GENERATION_START: generationHandlers.GENERATION_START as HandlerFor<'GENERATION_START'>,
     GENERATION_UPDATE: handleGenerationUpdate,
-    GENERATION_CANCEL: handleGenerationCancel,
+    GENERATION_CANCEL: generationHandlers.GENERATION_CANCEL as HandlerFor<'GENERATION_CANCEL'>,
+    GENERATION_SUBSCRIBE: generationHandlers.GENERATION_SUBSCRIBE as HandlerFor<'GENERATION_SUBSCRIBE'>,
+    GENERATION_INTERACT: generationHandlers.GENERATION_INTERACT as HandlerFor<'GENERATION_INTERACT'>,
+    GENERATION_STARTED: handleGenerationStarted,
+    GENERATION_COMPLETE: handleGenerationComplete,
     DETECTED_JOB_BROADCAST: handleDetectedJobBroadcast,
     CREDITS_GET: handleCreditsGet,
     MASTER_RESUME_GET: masterResumeHandlers.MASTER_RESUME_GET,
@@ -612,6 +642,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     AGENT_PREFERENCE_SET: agentHandlers.AGENT_PREFERENCE_SET,
     AGENT_REGISTRY_LIST: agentHandlers.AGENT_REGISTRY_LIST,
     AGENT_MANIFEST_GET: agentHandlers.AGENT_MANIFEST_GET,
+    SESSION_LIST: sessionHandlers.SESSION_LIST as HandlerFor<'SESSION_LIST'>,
+    SESSION_GET: sessionHandlers.SESSION_GET as HandlerFor<'SESSION_GET'>,
+    GENERIC_INTENT_DETECT: genericIntentHandler as HandlerFor<'GENERIC_INTENT_DETECT'>,
   });
 }
 

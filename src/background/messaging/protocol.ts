@@ -34,8 +34,18 @@ import type {
   GenerationUpdateBroadcast,
   GenerationCancelRequest,
   GenerationCancelResponse,
+  GenerationSubscribeRequest,
+  GenerationSubscribeResponse,
+  GenerationInteractRequest,
+  GenerationInteractResponse,
   CreditsGetRequest,
   CreditsState,
+  SessionListRequest,
+  SessionListResult,
+  SessionGetRequest,
+  SessionGetResult,
+  GenericIntentDetectRequest,
+  GenericIntentDetectResponse,
 } from './protocol-types';
 import type {
   MasterResumeGetRequest,
@@ -76,10 +86,14 @@ export interface ProtocolMap {
   HIGHLIGHT_CLEAR: (data: HighlightClearRequest) => HighlightClearResponse;
   HIGHLIGHT_STATUS: (data: HighlightStatusRequest) => HighlightStatus;
 
-  // --- Generation (3) ---
+  // --- Generation (7) ---
   GENERATION_START: (data: GenerationStartRequest) => GenerationStartResponse;
   GENERATION_UPDATE: (data: GenerationUpdateBroadcast) => void;
   GENERATION_CANCEL: (data: GenerationCancelRequest) => GenerationCancelResponse;
+  GENERATION_SUBSCRIBE: (data: GenerationSubscribeRequest) => GenerationSubscribeResponse;
+  GENERATION_INTERACT: (data: GenerationInteractRequest) => GenerationInteractResponse;
+  GENERATION_STARTED: (data: { readonly generationId: string; readonly sessionId: string; readonly agentType: 'job-hunter' | 'b2b-sales' }) => void;
+  GENERATION_COMPLETE: (data: { readonly generationId: string; readonly sessionId: string }) => void;
 
   // --- Broadcast (1) ---
   DETECTED_JOB_BROADCAST: (data: DetectedJobBroadcast) => void;
@@ -96,6 +110,13 @@ export interface ProtocolMap {
   AGENT_PREFERENCE_SET: (data: AgentPreferenceSetRequest) => AgentPreferenceSetResponse;
   AGENT_REGISTRY_LIST: (data: AgentRegistryListRequest) => AgentRegistryListResponse;
   AGENT_MANIFEST_GET: (data: AgentManifestGetRequest) => AgentManifestGetResponse;
+
+  // --- Sessions (2) ---
+  SESSION_LIST: (data: SessionListRequest) => SessionListResult;
+  SESSION_GET: (data: SessionGetRequest) => SessionGetResult;
+
+  // --- Generic intent (1) ---
+  GENERIC_INTENT_DETECT: (data: GenericIntentDetectRequest) => GenericIntentDetectResponse;
 }
 
 /**
@@ -116,6 +137,10 @@ export const BG_HANDLED_KEYS = [
   'GENERATION_START',
   'GENERATION_UPDATE',
   'GENERATION_CANCEL',
+  'GENERATION_SUBSCRIBE',
+  'GENERATION_INTERACT',
+  'GENERATION_STARTED',
+  'GENERATION_COMPLETE',
   'DETECTED_JOB_BROADCAST',
   'CREDITS_GET',
   'MASTER_RESUME_GET',
@@ -124,6 +149,9 @@ export const BG_HANDLED_KEYS = [
   'AGENT_PREFERENCE_SET',
   'AGENT_REGISTRY_LIST',
   'AGENT_MANIFEST_GET',
+  'SESSION_LIST',
+  'SESSION_GET',
+  'GENERIC_INTENT_DETECT',
 ] as const;
 
 export type BgHandledKey = (typeof BG_HANDLED_KEYS)[number];

@@ -43,11 +43,25 @@ import type {
   GenerationUpdateBroadcastSchema,
   GenerationCancelRequestSchema,
   GenerationCancelResponseSchema,
+  GenerationSubscribeRequestSchema,
+  GenerationSubscribeResponseSchema,
+  GenerationInteractRequestSchema,
+  GenerationInteractResponseSchema,
 } from './schemas/generation.schema';
 import type {
   CreditsGetRequestSchema,
   CreditsStateSchema,
 } from './schemas/credits.schema';
+import type {
+  SessionListRequestSchema,
+  SessionListResultSchema,
+  SessionGetRequestSchema,
+  SessionGetResultSchema,
+} from './schemas/session-list.schema';
+import type {
+  GenericIntentDetectRequestSchema,
+  GenericIntentDetectResponseSchema,
+} from './schemas/generic-intent.schema';
 
 // Auth
 export type AuthSignInRequest = z.infer<typeof AuthSignInRequestSchema>;
@@ -93,3 +107,19 @@ export type GenerationCancelResponse = z.infer<typeof GenerationCancelResponseSc
 // Credits
 export type CreditsGetRequest = z.infer<typeof CreditsGetRequestSchema>;
 export type CreditsState = z.infer<typeof CreditsStateSchema>;
+
+// Generation (extensions)
+export type GenerationSubscribeRequest = z.infer<typeof GenerationSubscribeRequestSchema>;
+export type GenerationSubscribeResponse = z.infer<typeof GenerationSubscribeResponseSchema>;
+export type GenerationInteractRequest = z.infer<typeof GenerationInteractRequestSchema>;
+export type GenerationInteractResponse = z.infer<typeof GenerationInteractResponseSchema>;
+
+// Sessions
+export type SessionListRequest = z.infer<typeof SessionListRequestSchema>;
+export type SessionListResult = z.infer<typeof SessionListResultSchema>;
+export type SessionGetRequest = z.infer<typeof SessionGetRequestSchema>;
+export type SessionGetResult = z.infer<typeof SessionGetResultSchema>;
+
+// Generic intent
+export type GenericIntentDetectRequest = z.infer<typeof GenericIntentDetectRequestSchema>;
+export type GenericIntentDetectResponse = z.infer<typeof GenericIntentDetectResponseSchema>;

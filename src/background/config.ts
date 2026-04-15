@@ -30,12 +30,32 @@ export const USAGE_SUMMARY_ENDPOINT: string = API_BASE_URL + '/api/v1/settings/u
 export const GENERATION_START_ENDPOINT: string = API_BASE_URL + '/api/v1/agents/generate';
 export const GENERATION_CANCEL_ENDPOINT: string = API_BASE_URL + '/api/v1/agents/cancel';
 export const MASTER_RESUME_ENDPOINT: string = API_BASE_URL + '/api/v1/resume/master';
+export const SESSIONS_ENDPOINT: string = API_BASE_URL + '/api/v1/sessions';
+
+/**
+ * Builds an agent-scoped URL against the canonical backend. Agent-typed
+ * endpoints (generate / interact / status) live under /api/v1/agents/:type/*
+ * per the backend manifest.
+ */
+export function buildAgentGenerateUrl(agentType: string): string {
+  return `${API_BASE_URL}/api/v1/agents/${encodeURIComponent(agentType)}/generate`;
+}
+export function buildAgentInteractUrl(agentType: string): string {
+  return `${API_BASE_URL}/api/v1/agents/${encodeURIComponent(agentType)}/interact`;
+}
+export function buildSseStreamUrl(generationId: string): string {
+  return `${API_BASE_URL}/api/v1/stream/generation/${encodeURIComponent(generationId)}`;
+}
 
 export const STORAGE_KEYS = Object.freeze({
   session: 'llmc.session.v1',
   profile: 'llmc.profile.v1',
   prefs: 'llmc.prefs.v1',
+  sessionListCache: 'llmc.session-list-cache.v1',
 } as const);
+
+/** Session list cache TTL: 30 seconds. */
+export const SESSION_LIST_CACHE_TTL_MS = 30_000;
 
 export const LOG_SCOPES = Object.freeze({
   background: 'bg',

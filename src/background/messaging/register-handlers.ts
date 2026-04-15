@@ -15,14 +15,13 @@
 
 import { browser } from 'wxt/browser';
 import { createLogger } from '../log';
-import { LOG_SCOPES } from '../config';
 import {
+  LOG_SCOPES,
   AUTH_EXCHANGE_ENDPOINT,
   AUTH_SIGN_OUT_ENDPOINT,
   EXTRACT_SKILLS_ENDPOINT,
   USAGE_SUMMARY_ENDPOINT,
   GENERATION_START_ENDPOINT,
-  GENERATION_CANCEL_ENDPOINT,
   MASTER_RESUME_ENDPOINT,
 } from '../config';
 import {
@@ -43,7 +42,23 @@ import {
   createAgentManifestClient,
   createAgentPreference,
 } from '../agents';
-import { API_BASE_URL } from '../config';
+import {
+  createSessionListClient,
+  createSessionListCache,
+} from '../sessions';
+import {
+  createAgentClient,
+  createSseManager,
+} from '../generation';
+import {
+  API_BASE_URL,
+  SESSIONS_ENDPOINT,
+  buildAgentGenerateUrl,
+  buildAgentInteractUrl,
+  buildSseStreamUrl,
+  GENERATION_CANCEL_ENDPOINT,
+} from '../config';
+import type { AgentType } from '../generation';
 import type { BgHandledKey } from './protocol';
 import { BG_HANDLED_KEYS } from './protocol';
 import { createHandlers, type Handlers, type HandlerDeps } from './handlers';
@@ -94,6 +109,79 @@ function buildProductionDeps(): HandlerDeps {
       return session?.accessToken ?? null;
     },
   });
+
+  const sessionsLogger = createLogger('bg.sessions');
+  const sessionListClient = createSessionListClient({
+    fetch: fetchFn,
+    logger: sessionsLogger,
+    baseUrl: SESSIONS_ENDPOINT,
+    accessToken: async () => {
+      const session = await readSession();
+      return session?.accessToken ?? null;
+    },
+  });
+  const sessionListCache = createSessionListCache({
+    storage: chromeStorage,
+    logger: sessionsLogger,
+    now: () => Date.now(),
+  });
+
+  const generationLogger = createLogger('bg.generation');
+  const agentClient = createAgentClient({
+    fetch: fetchFn,
+    logger: generationLogger,
+    buildGenerateUrl: (agentType: AgentType) => buildAgentGenerateUrl(agentType),
+    buildInteractUrl: (agentType: AgentType) => buildAgentInteractUrl(agentType),
+    accessToken: async () => {
+      const session = await readSession();
+      return session?.accessToken ?? null;
+    },
+  });
+  const sseManager = createSseManager({
+    fetch: fetchFn,
+    logger: generationLogger,
+    buildUrl: (generationId: string) => buildSseStreamUrl(generationId),
+    accessToken: async () => {
+      const session = await readSession();
+      return session?.accessToken ?? null;
+    },
+    broadcast: async (msg) => {
+      try {
+        await browser.runtime.sendMessage(msg);
+      } catch (err) {
+        generationLogger.debug('sse broadcast: no listener', {
+          error: String(err),
+        });
+      }
+    },
+  });
+
+  const scriptingApi = {
+    executeScript: async (args: {
+      target: { tabId: number };
+      func: (...injectArgs: readonly unknown[]) => unknown;
+      args: readonly unknown[];
+    }): Promise<ReadonlyArray<{ result?: unknown }>> => {
+      const g = globalThis as unknown as {
+        chrome?: {
+          scripting?: {
+            executeScript: (opts: unknown) => Promise<ReadonlyArray<{ result?: unknown }>>;
+          };
+        };
+      };
+      const scripting = g.chrome?.scripting;
+      if (!scripting) {
+        throw new Error('chrome.scripting not available');
+      }
+      return scripting.executeScript({
+        target: args.target,
+        func: args.func,
+        args: args.args,
+        world: 'MAIN',
+      } as unknown);
+    },
+  };
+
   return {
     logger,
     fetch: fetchFn,
@@ -138,6 +226,39 @@ function buildProductionDeps(): HandlerDeps {
     agents: {
       preference: agentPreference,
       manifestClient: agentManifestClient,
+    },
+    sessions: {
+      client: sessionListClient,
+      cache: sessionListCache,
+    },
+    generation: {
+      agentClient,
+      sse: sseManager,
+      cancelEndpoint: {
+        cancel: async (generationId: string): Promise<{ ok: boolean }> => {
+          const session = await readSession();
+          if (!session) return { ok: false };
+          try {
+            const res = await fetchFn(GENERATION_CANCEL_ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                authorization: `Bearer ${session.accessToken}`,
+              },
+              body: JSON.stringify({ generationId }),
+            });
+            return { ok: res.ok };
+          } catch (err: unknown) {
+            generationLogger.warn('cancel endpoint failed', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+            return { ok: false };
+          }
+        },
+      },
+    },
+    genericIntent: {
+      scripting: scriptingApi as never,
     },
   };
 }
@@ -198,6 +319,9 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
         endpoints: { ...baseDeps.endpoints, ...(customDeps.endpoints ?? {}) },
         masterResume: customDeps.masterResume ?? baseDeps.masterResume,
         agents: customDeps.agents ?? baseDeps.agents,
+        sessions: customDeps.sessions ?? baseDeps.sessions,
+        generation: customDeps.generation ?? baseDeps.generation,
+        genericIntent: customDeps.genericIntent ?? baseDeps.genericIntent,
       }
     : baseDeps;
   const handlers = createHandlers(deps);

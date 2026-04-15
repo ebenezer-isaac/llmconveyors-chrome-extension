@@ -29,7 +29,6 @@ export const blueprint: ModuleBlueprint = {
     'productionDynamicImport',
     'readProfile',
     'isEmptyProfile',
-    'PROFILE_STORAGE_KEY',
     'registerFillListener',
     'blueprint',
   ],
