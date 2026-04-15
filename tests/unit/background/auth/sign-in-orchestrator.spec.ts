@@ -48,7 +48,14 @@ function buildRedirect(overrides: {
   return `https://${VALID_HOST}.chromiumapp.org/cb#at=${encodeURIComponent(at)}&rt=${encodeURIComponent(rt)}&ft=${encodeURIComponent(ft)}&exp=${exp}`;
 }
 
-function makeStorage(): StorageFacade & { readonly reads: StoredSession[]; readonly writes: StoredSession[] } {
+interface TrackedStorage {
+  reads: StoredSession[];
+  writes: StoredSession[];
+  writeSession: StorageFacade['writeSession'];
+  readSession: StorageFacade['readSession'];
+}
+
+function makeStorage(): TrackedStorage {
   const writes: StoredSession[] = [];
   const reads: StoredSession[] = [];
   return {
