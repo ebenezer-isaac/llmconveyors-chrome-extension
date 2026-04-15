@@ -30,6 +30,7 @@ export default defineConfig({
       'https://*.myworkdayjobs.com/*',
       'https://api.llmconveyors.com/*',
       'https://llmconveyors.com/*',
+      'http://localhost:5174/*',
     ],
     action: {
       default_title: 'LLM Conveyors Job Assistant',

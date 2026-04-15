@@ -30,9 +30,9 @@ describe('A1 scaffold invariants', () => {
     expect(PKG.description.toLowerCase()).not.toContain('zovo');
   });
 
-  test('ats-autofill-engine is NOT a dependency in A1 (A5 adds it)', () => {
-    const deps = { ...(PKG.dependencies ?? {}), ...(PKG.devDependencies ?? {}) };
-    expect(deps).not.toHaveProperty('ats-autofill-engine');
+  test('ats-autofill-engine is a dependency after A8 adds it', () => {
+    const deps = { ...(PKG.dependencies ?? {}) };
+    expect(deps).toHaveProperty('ats-autofill-engine');
   });
 
   test('llmconveyors SDK is NOT a dependency in A1 (A5 adds it)', () => {

@@ -4,6 +4,7 @@ import React from 'react';
 import { useAuthState } from './useAuthState';
 import { SignInButton } from './SignInButton';
 import { SignedInIndicator } from './SignedInIndicator';
+import { FillButton } from './FillButton';
 
 export default function App(): React.ReactElement {
   const { state, loading, error, signIn, signOut } = useAuthState();
@@ -30,6 +31,7 @@ export default function App(): React.ReactElement {
               }}
               signOutDisabled={loading}
             />
+            <FillButton />
           </>
         ) : (
           <>
