@@ -11,10 +11,22 @@
 
 import React from 'react';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
+import type { AgentId } from '@/src/background/agents';
 
 export interface IntentBadgeProps {
   readonly intent: DetectedIntent | null;
   readonly loading?: boolean;
+  readonly agentId?: AgentId;
+}
+
+function emptyLabel(agentId: AgentId | undefined): string {
+  switch (agentId) {
+    case 'b2b-sales':
+      return 'No company page detected';
+    case 'job-hunter':
+    default:
+      return 'No JD detected';
+  }
 }
 
 function vendorLabel(kind: DetectedIntent['kind']): string {
@@ -43,7 +55,7 @@ function pageKindLabel(pageKind: DetectedIntent['pageKind']): string {
   }
 }
 
-export function IntentBadge({ intent, loading = false }: IntentBadgeProps): React.ReactElement {
+export function IntentBadge({ intent, loading = false, agentId }: IntentBadgeProps): React.ReactElement {
   if (loading) {
     return (
       <div
@@ -64,7 +76,7 @@ export function IntentBadge({ intent, loading = false }: IntentBadgeProps): Reac
         role="status"
         className="mb-3 rounded-card border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
       >
-        No JD detected
+        {emptyLabel(agentId)}
       </div>
     );
   }

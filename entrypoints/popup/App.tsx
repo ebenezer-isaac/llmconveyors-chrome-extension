@@ -60,7 +60,7 @@ function PopupBody(): React.ReactElement {
         signOutDisabled={authLoading}
       />
 
-      <IntentBadge intent={intent} loading={intentLoading && intent === null} />
+      <IntentBadge intent={intent} loading={intentLoading && intent === null} agentId={activeAgentId ?? undefined} />
 
       {signedIn ? (
         <CreditsDisplay
@@ -78,7 +78,9 @@ function PopupBody(): React.ReactElement {
           className="rounded-card border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
         >
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            Sign in to auto-fill applications and run agents from llmconveyors.com.
+            {activeAgentId === 'b2b-sales'
+              ? 'Sign in to research companies and run B2B sales outreach from llmconveyors.com.'
+              : 'Sign in to auto-fill job applications and run agents from llmconveyors.com.'}
           </p>
           <SignInButton
             onClick={() => {
