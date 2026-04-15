@@ -27,7 +27,9 @@ type RequiredKeys =
   | 'GENERATION_UPDATE'
   | 'GENERATION_CANCEL'
   | 'DETECTED_JOB_BROADCAST'
-  | 'CREDITS_GET';
+  | 'CREDITS_GET'
+  | 'MASTER_RESUME_GET'
+  | 'MASTER_RESUME_PUT';
 
 type RequiredPresent = RequiredKeys extends keyof ProtocolMap ? true : false;
 type NoExtras = Exclude<keyof ProtocolMap, RequiredKeys> extends never ? true : false;

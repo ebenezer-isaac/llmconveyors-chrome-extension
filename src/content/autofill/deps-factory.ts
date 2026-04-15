@@ -7,10 +7,9 @@
  * factory so tests never accidentally inherit production impls.
  */
 
-import { browser } from 'wxt/browser';
 import type { AutofillControllerDeps } from './autofill-controller';
 import { loadAdapter } from './adapter-loader';
-import { readProfile } from './profile-reader';
+import { readProfile, defaultRequestMasterResume } from './profile-reader';
 import { sendMessage } from '@/src/background/messaging/protocol';
 import { createLogger } from '@/src/background/log';
 import type { AtsAdapter } from 'ats-autofill-engine';
@@ -45,12 +44,6 @@ export function createProductionDeps(): AutofillControllerDeps {
   const controllerLogger = createLogger('autofill-controller');
   const broadcastLogger = createLogger('autofill-broadcast');
 
-  const storageGet = async (
-    key: string,
-  ): Promise<Record<string, unknown>> => {
-    return (await browser.storage.local.get(key)) as Record<string, unknown>;
-  };
-
   return {
     loadAdapter: (url) =>
       loadAdapter(url, {
@@ -60,7 +53,8 @@ export function createProductionDeps(): AutofillControllerDeps {
     readProfile: () =>
       readProfile({
         logger: profileReaderLogger,
-        storageGet,
+        now: () => Date.now(),
+        requestMasterResume: defaultRequestMasterResume,
       }),
     // Resume file attach is out of scope for A8 single-pass happy path;
     // the plan-builder routes file fields to plan.skipped so this is

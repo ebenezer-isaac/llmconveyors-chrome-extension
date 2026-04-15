@@ -29,6 +29,7 @@ export const EXTRACT_SKILLS_ENDPOINT: string = API_BASE_URL + '/api/v1/ats/extra
 export const USAGE_SUMMARY_ENDPOINT: string = API_BASE_URL + '/api/v1/settings/usage/summary';
 export const GENERATION_START_ENDPOINT: string = API_BASE_URL + '/api/v1/agents/generate';
 export const GENERATION_CANCEL_ENDPOINT: string = API_BASE_URL + '/api/v1/agents/cancel';
+export const MASTER_RESUME_ENDPOINT: string = API_BASE_URL + '/api/v1/resume/master';
 
 export const STORAGE_KEYS = Object.freeze({
   session: 'llmc.session.v1',

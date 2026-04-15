@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: MIT
 /**
- * Unit tests for profile-reader.ts.
+ * Unit tests for profile-reader.ts (post-101 backend master-resume variant).
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import type { Mock } from 'vitest';
 import {
   readProfile,
   isEmptyProfile,
-  PROFILE_STORAGE_KEY,
   type ProfileReaderDeps,
 } from '@/src/content/autofill/profile-reader';
 import type { Profile } from 'ats-autofill-engine/profile';
 import type { Logger } from '@/src/background/log';
+import type { MasterResumeGetResponse } from '@/src/background/master-resume';
 
 function makeFakeLogger(): Logger {
   return {
@@ -23,90 +22,129 @@ function makeFakeLogger(): Logger {
   };
 }
 
-function makeRealisticProfile(): Profile {
+function depsWithResponse(
+  response: MasterResumeGetResponse,
+  logger: Logger = makeFakeLogger(),
+): ProfileReaderDeps {
   return {
-    profileVersion: '1.0',
-    updatedAtMs: 1_713_000_000_000,
-    basics: {
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      email: 'ada@example.com',
-      phone: '+441234567890',
-    },
-    work: [],
-    education: [],
-    skills: [],
-  } as Profile;
+    logger,
+    now: () => 1_713_000_000_000,
+    requestMasterResume: vi.fn(async () => response),
+  };
 }
 
 describe('readProfile - happy path', () => {
-  it('returns a Profile when storage has a valid record', async () => {
-    const profile = makeRealisticProfile();
-    const storageGet: Mock = vi.fn(async () => ({
-      [PROFILE_STORAGE_KEY]: profile,
-    }));
-    const deps: ProfileReaderDeps = { logger: makeFakeLogger(), storageGet };
+  it('maps JSON Resume-shaped structuredData to a Profile', async () => {
+    const deps = depsWithResponse({
+      ok: true,
+      resume: {
+        userId: 'u',
+        label: 'Master',
+        rawText: 'Ada Lovelace\nada@example.com',
+        structuredData: {
+          basics: {
+            name: 'Ada Lovelace',
+            email: 'ada@example.com',
+            phone: '+441234567890',
+          },
+          work: [],
+          education: [],
+          skills: [],
+        },
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    });
     const result = await readProfile(deps);
     expect(result).not.toBeNull();
-    expect(result?.basics.firstName).toBe('Ada');
     expect(result?.basics.email).toBe('ada@example.com');
-    expect(result?.profileVersion).toBe('1.0');
+  });
+
+  it('normalises Rx Resume-shaped structuredData (sections wrapper)', async () => {
+    const deps = depsWithResponse({
+      ok: true,
+      resume: {
+        userId: 'u',
+        label: 'Master',
+        rawText: 'text',
+        structuredData: {
+          sections: {
+            basics: {
+              items: [
+                {
+                  name: 'Grace Hopper',
+                  email: 'grace@example.com',
+                },
+              ],
+            },
+          },
+        },
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    });
+    const result = await readProfile(deps);
+    expect(result).not.toBeNull();
+    expect(result?.basics.email).toBe('grace@example.com');
   });
 });
 
 describe('readProfile - failure paths', () => {
-  it('returns null when storage has no key', async () => {
-    const storageGet: Mock = vi.fn(async () => ({}));
-    const deps: ProfileReaderDeps = { logger: makeFakeLogger(), storageGet };
+  it('returns null when backend reports not-found (resume null)', async () => {
+    const deps = depsWithResponse({ ok: true, resume: null });
     expect(await readProfile(deps)).toBeNull();
   });
 
-  it('returns null when storage returns undefined for the key', async () => {
-    const storageGet: Mock = vi.fn(async () => ({
-      [PROFILE_STORAGE_KEY]: undefined,
-    }));
-    const deps: ProfileReaderDeps = { logger: makeFakeLogger(), storageGet };
+  it('returns null when backend reports unauthenticated', async () => {
+    const deps = depsWithResponse({ ok: false, reason: 'unauthenticated' });
     expect(await readProfile(deps)).toBeNull();
   });
 
-  it('returns null when stored record is null', async () => {
-    const storageGet: Mock = vi.fn(async () => ({
-      [PROFILE_STORAGE_KEY]: null,
-    }));
-    const deps: ProfileReaderDeps = { logger: makeFakeLogger(), storageGet };
+  it('returns null when backend reports network-error', async () => {
+    const deps = depsWithResponse({ ok: false, reason: 'network-error' });
     expect(await readProfile(deps)).toBeNull();
   });
 
-  it('returns null when stored record fails ProfileSchema validation', async () => {
-    const storageGet: Mock = vi.fn(async () => ({
-      [PROFILE_STORAGE_KEY]: { profileVersion: 'not-a-version', basics: {} },
-    }));
-    const logger = makeFakeLogger();
-    const deps: ProfileReaderDeps = { logger, storageGet };
-    expect(await readProfile(deps)).toBeNull();
-    expect(logger.warn).toHaveBeenCalled();
-  });
-
-  it('returns null when storage.get rejects', async () => {
-    const storageGet: Mock = vi.fn(async () => {
-      throw new Error('quota exceeded');
+  it('returns null when structuredData is missing', async () => {
+    const deps = depsWithResponse({
+      ok: true,
+      resume: {
+        userId: 'u',
+        label: 'Master',
+        rawText: 'text',
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
     });
+    expect(await readProfile(deps)).toBeNull();
+  });
+
+  it('returns null when structuredData has neither JSON Resume nor Rx shape', async () => {
+    const deps = depsWithResponse({
+      ok: true,
+      resume: {
+        userId: 'u',
+        label: 'Master',
+        rawText: 'text',
+        structuredData: { something: 'else' },
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    });
+    expect(await readProfile(deps)).toBeNull();
+  });
+
+  it('returns null when requestMasterResume throws', async () => {
     const logger = makeFakeLogger();
-    const deps: ProfileReaderDeps = { logger, storageGet };
+    const deps: ProfileReaderDeps = {
+      logger,
+      now: () => 0,
+      requestMasterResume: vi.fn(async () => {
+        throw new Error('runtime closed');
+      }),
+    };
     expect(await readProfile(deps)).toBeNull();
     expect(logger.error).toHaveBeenCalled();
-  });
-
-  it('returns null for v1-shape legacy record (no profileVersion)', async () => {
-    const storageGet: Mock = vi.fn(async () => ({
-      [PROFILE_STORAGE_KEY]: {
-        firstName: 'Ada',
-        lastName: 'Lovelace',
-        email: 'ada@example.com',
-      },
-    }));
-    const deps: ProfileReaderDeps = { logger: makeFakeLogger(), storageGet };
-    expect(await readProfile(deps)).toBeNull();
   });
 });
 
@@ -116,7 +154,14 @@ describe('isEmptyProfile', () => {
   });
 
   it('returns false for profile with firstName', () => {
-    const p = makeRealisticProfile();
+    const p = {
+      profileVersion: '1.0',
+      updatedAtMs: 0,
+      basics: { firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
+      work: [],
+      education: [],
+      skills: [],
+    } as unknown as Profile;
     expect(isEmptyProfile(p)).toBe(false);
   });
 

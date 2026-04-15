@@ -18,8 +18,9 @@ export type { AdapterLoaderDeps } from './adapter-loader';
 export {
   readProfile,
   isEmptyProfile,
-  PROFILE_STORAGE_KEY,
+  defaultRequestMasterResume,
 } from './profile-reader';
 export type { ProfileReaderDeps } from './profile-reader';
+export { structuredDataToProfile } from './rx-resume-to-profile';
 export { registerFillListener } from './messaging';
 export { blueprint, AUTOFILL_MODULE_BLUEPRINT } from './blueprint';

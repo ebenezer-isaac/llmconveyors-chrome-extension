@@ -33,6 +33,27 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
     sendRuntime: vi.fn(async () => undefined),
     sendToTab: vi.fn(async () => ({ ok: false })),
   };
+  const masterResume = {
+    client: {
+      get: vi.fn(async () => ({ kind: 'not-found' as const })),
+      put: vi.fn(async () => ({
+        kind: 'ok' as const,
+        resume: {
+          userId: 'u',
+          label: 'CV',
+          rawText: 'text',
+          createdAt: 't',
+          updatedAt: 't',
+        },
+      })),
+    },
+    cache: {
+      read: vi.fn(async () => null),
+      readStale: vi.fn(async () => null),
+      write: vi.fn(async () => undefined),
+      clear: vi.fn(async () => undefined),
+    },
+  };
   return {
     logger,
     fetch: vi.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch,
@@ -48,6 +69,7 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
       generationStart: 'https://api.test/start',
       generationCancel: 'https://api.test/cancel',
     },
+    masterResume,
     ...overrides,
   };
 }
@@ -72,6 +94,8 @@ describe('HANDLERS record shape', () => {
         'GENERATION_CANCEL',
         'DETECTED_JOB_BROADCAST',
         'CREDITS_GET',
+        'MASTER_RESUME_GET',
+        'MASTER_RESUME_PUT',
       ].sort(),
     );
   });

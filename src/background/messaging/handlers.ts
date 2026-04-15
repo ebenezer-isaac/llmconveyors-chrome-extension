@@ -36,6 +36,13 @@ import type {
   DetectedJobBroadcast,
   HighlightStatusRequest,
 } from './protocol-types';
+import type {
+  MasterResumeGetOutcome,
+  MasterResumePutOutcome,
+  MasterResumeResponse,
+  MasterResumeUpsert,
+} from '../master-resume';
+import { createMasterResumeHandlers } from '../master-resume';
 import {
   AuthSignInRequestSchema,
   AuthSignOutRequestSchema,
@@ -107,6 +114,19 @@ export interface HandlerEndpoints {
   readonly generationCancel: string;
 }
 
+export interface MasterResumeHandlerAdapters {
+  readonly client: {
+    get: () => Promise<MasterResumeGetOutcome>;
+    put: (payload: MasterResumeUpsert) => Promise<MasterResumePutOutcome>;
+  };
+  readonly cache: {
+    read: () => Promise<{ response: MasterResumeResponse; fetchedAt: number } | null>;
+    readStale: () => Promise<{ response: MasterResumeResponse; fetchedAt: number } | null>;
+    write: (r: MasterResumeResponse) => Promise<void>;
+    clear: () => Promise<void>;
+  };
+}
+
 export interface HandlerDeps {
   readonly logger: Logger;
   readonly fetch: typeof globalThis.fetch;
@@ -115,6 +135,7 @@ export interface HandlerDeps {
   readonly tabState: HandlerTabState;
   readonly broadcast: HandlerBroadcast;
   readonly endpoints: HandlerEndpoints;
+  readonly masterResume: MasterResumeHandlerAdapters;
 }
 
 /**
@@ -530,6 +551,23 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
   };
 
+  const masterResumeHandlers = createMasterResumeHandlers({
+    client: deps.masterResume.client,
+    cache: deps.masterResume.cache,
+    logger: log,
+    broadcastUnauthenticated: async () => {
+      try {
+        await deps.storage.clearSession();
+      } catch (err) {
+        log.warn('master-resume: clearSession failed', { error: String(err) });
+      }
+      await deps.broadcast.sendRuntime({
+        key: 'AUTH_STATE_CHANGED',
+        data: { signedIn: false },
+      });
+    },
+  });
+
   return Object.freeze({
     AUTH_SIGN_IN: handleAuthSignIn,
     AUTH_SIGN_OUT: handleAuthSignOut,
@@ -545,6 +583,8 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     GENERATION_CANCEL: handleGenerationCancel,
     DETECTED_JOB_BROADCAST: handleDetectedJobBroadcast,
     CREDITS_GET: handleCreditsGet,
+    MASTER_RESUME_GET: masterResumeHandlers.MASTER_RESUME_GET,
+    MASTER_RESUME_PUT: masterResumeHandlers.MASTER_RESUME_PUT,
   });
 }
 

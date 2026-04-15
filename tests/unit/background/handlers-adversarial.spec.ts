@@ -69,6 +69,27 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
       generationStart: 'https://api.test/start',
       generationCancel: 'https://api.test/cancel',
     },
+    masterResume: {
+      client: {
+        get: vi.fn(async () => ({ kind: 'not-found' as const })),
+        put: vi.fn(async () => ({
+          kind: 'ok' as const,
+          resume: {
+            userId: 'u',
+            label: 'CV',
+            rawText: 'text',
+            createdAt: 't',
+            updatedAt: 't',
+          },
+        })),
+      },
+      cache: {
+        read: vi.fn(async () => null),
+        readStale: vi.fn(async () => null),
+        write: vi.fn(async () => undefined),
+        clear: vi.fn(async () => undefined),
+      },
+    },
     ...over,
   };
 }

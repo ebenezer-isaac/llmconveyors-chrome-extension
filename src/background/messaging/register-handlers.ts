@@ -23,6 +23,7 @@ import {
   USAGE_SUMMARY_ENDPOINT,
   GENERATION_START_ENDPOINT,
   GENERATION_CANCEL_ENDPOINT,
+  MASTER_RESUME_ENDPOINT,
 } from '../config';
 import {
   readSession,
@@ -34,6 +35,10 @@ import {
   getTabState,
   setIntent,
 } from '../storage/tab-state';
+import {
+  createMasterResumeCache,
+  createMasterResumeClient,
+} from '../master-resume';
 import type { BgHandledKey } from './protocol';
 import { BG_HANDLED_KEYS } from './protocol';
 import { createHandlers, type Handlers, type HandlerDeps } from './handlers';
@@ -43,9 +48,36 @@ import type { HighlightStatus } from './schemas/highlight.schema';
 const logger = createLogger(LOG_SCOPES.handlers);
 
 function buildProductionDeps(): HandlerDeps {
+  const fetchFn = globalThis.fetch.bind(globalThis);
+  const chromeStorage = {
+    get: async (key: string) => {
+      const raw = await chrome.storage.local.get(key);
+      return raw as Record<string, unknown>;
+    },
+    set: async (items: Record<string, unknown>) => {
+      await chrome.storage.local.set(items);
+    },
+    remove: async (key: string) => {
+      await chrome.storage.local.remove(key);
+    },
+  };
+  const masterResumeCache = createMasterResumeCache({
+    storage: chromeStorage,
+    logger,
+    now: () => Date.now(),
+  });
+  const masterResumeClient = createMasterResumeClient({
+    fetch: fetchFn,
+    logger,
+    endpoint: MASTER_RESUME_ENDPOINT,
+    accessToken: async () => {
+      const session = await readSession();
+      return session?.accessToken ?? null;
+    },
+  });
   return {
     logger,
-    fetch: globalThis.fetch.bind(globalThis),
+    fetch: fetchFn,
     now: () => Date.now(),
     storage: {
       readSession,
@@ -79,6 +111,10 @@ function buildProductionDeps(): HandlerDeps {
       usageSummary: USAGE_SUMMARY_ENDPOINT,
       generationStart: GENERATION_START_ENDPOINT,
       generationCancel: GENERATION_CANCEL_ENDPOINT,
+    },
+    masterResume: {
+      client: masterResumeClient,
+      cache: masterResumeCache,
     },
   };
 }
@@ -137,6 +173,7 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
         tabState: { ...baseDeps.tabState, ...(customDeps.tabState ?? {}) },
         broadcast: { ...baseDeps.broadcast, ...(customDeps.broadcast ?? {}) },
         endpoints: { ...baseDeps.endpoints, ...(customDeps.endpoints ?? {}) },
+        masterResume: customDeps.masterResume ?? baseDeps.masterResume,
       }
     : baseDeps;
   const handlers = createHandlers(deps);

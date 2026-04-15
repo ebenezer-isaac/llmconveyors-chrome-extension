@@ -37,6 +37,12 @@ import type {
   CreditsGetRequest,
   CreditsState,
 } from './protocol-types';
+import type {
+  MasterResumeGetRequest,
+  MasterResumeGetResponse,
+  MasterResumePutRequest,
+  MasterResumePutResponse,
+} from '../master-resume';
 
 export interface ProtocolMap {
   // --- Auth (4) ---
@@ -70,6 +76,10 @@ export interface ProtocolMap {
 
   // --- Credits (1) ---
   CREDITS_GET: (data: CreditsGetRequest) => CreditsState;
+
+  // --- Master Resume (2) ---
+  MASTER_RESUME_GET: (data: MasterResumeGetRequest) => MasterResumeGetResponse;
+  MASTER_RESUME_PUT: (data: MasterResumePutRequest) => MasterResumePutResponse;
 }
 
 /**
@@ -92,6 +102,8 @@ export const BG_HANDLED_KEYS = [
   'GENERATION_CANCEL',
   'DETECTED_JOB_BROADCAST',
   'CREDITS_GET',
+  'MASTER_RESUME_GET',
+  'MASTER_RESUME_PUT',
 ] as const;
 
 export type BgHandledKey = (typeof BG_HANDLED_KEYS)[number];

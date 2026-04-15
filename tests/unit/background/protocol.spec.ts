@@ -11,12 +11,12 @@ import {
  * BG_HANDLED_KEYS has 14 entries and ALL_PROTOCOL_KEYS has 16.
  */
 describe('ProtocolMap key registry', () => {
-  it('BG_HANDLED_KEYS has exactly 14 entries (post-101, no PROFILE_*)', () => {
-    expect(BG_HANDLED_KEYS).toHaveLength(14);
+  it('BG_HANDLED_KEYS has exactly 16 entries (post-101: no PROFILE_*, + MASTER_RESUME_*)', () => {
+    expect(BG_HANDLED_KEYS).toHaveLength(16);
   });
 
-  it('ALL_PROTOCOL_KEYS has exactly 16 entries (post-101, no PROFILE_*)', () => {
-    expect(ALL_PROTOCOL_KEYS).toHaveLength(16);
+  it('ALL_PROTOCOL_KEYS has exactly 18 entries (post-101)', () => {
+    expect(ALL_PROTOCOL_KEYS).toHaveLength(18);
   });
 
   it('ALL_PROTOCOL_KEYS is a superset of BG_HANDLED_KEYS', () => {
@@ -26,7 +26,7 @@ describe('ProtocolMap key registry', () => {
     }
   });
 
-  it('ALL_PROTOCOL_KEYS contains the required 16 post-101 keys', () => {
+  it('ALL_PROTOCOL_KEYS contains the required 18 post-101 keys', () => {
     const required = [
       'AUTH_SIGN_IN',
       'AUTH_SIGN_OUT',
@@ -44,6 +44,8 @@ describe('ProtocolMap key registry', () => {
       'GENERATION_CANCEL',
       'DETECTED_JOB_BROADCAST',
       'CREDITS_GET',
+      'MASTER_RESUME_GET',
+      'MASTER_RESUME_PUT',
     ].sort();
     const actual = [...ALL_PROTOCOL_KEYS].sort();
     expect(actual).toEqual(required);
