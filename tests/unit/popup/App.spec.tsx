@@ -157,6 +157,8 @@ describe('Popup App integration', () => {
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'u_1' };
       if (env.key === 'INTENT_GET') return null;
       if (env.key === 'CREDITS_GET') return { balance: 33, plan: 'pro', resetAt: null };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 2, url: 'about:blank' }]);
     await mount();
@@ -172,7 +174,7 @@ describe('Popup App integration', () => {
     expect(query('intent-badge')?.getAttribute('data-state')).toBe('none');
   });
 
-  it('enables fill and highlight on a job-posting page when signed in', async () => {
+  it('enables generate + highlight on a job-posting page; fill stays disabled (no form yet)', async () => {
     install(async (msg) => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'u_1' };
@@ -184,13 +186,17 @@ describe('Popup App integration', () => {
           detectedAt: 1,
         };
       if (env.key === 'CREDITS_GET') return { balance: 5, plan: 'free', resetAt: null };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 3, url: 'https://boards.greenhouse.io/acme/jobs/1' }]);
     await mount();
     await flush();
     const fill = query('fill-button') as HTMLButtonElement;
     const highlight = query('highlight-button') as HTMLButtonElement;
-    expect(fill.disabled).toBe(false);
+    const generate = query('generate-button') as HTMLButtonElement;
+    expect(generate?.disabled).toBe(false);
+    expect(fill.disabled).toBe(true);
     expect(highlight.disabled).toBe(false);
     expect(query('intent-badge')?.getAttribute('data-vendor')).toBe('greenhouse');
   });
@@ -207,6 +213,8 @@ describe('Popup App integration', () => {
           detectedAt: 2,
         };
       if (env.key === 'CREDITS_GET') return { balance: 10, plan: 'free', resetAt: null };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 4, url: 'https://jobs.lever.co/acme/1/apply' }]);
     await mount();
@@ -241,6 +249,8 @@ describe('Popup App integration', () => {
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'alice@example.com' };
       if (env.key === 'INTENT_GET') return null;
       if (env.key === 'CREDITS_GET') return { balance: 1, plan: 'free', resetAt: null };
+      if (env.key === 'SESSION_LIST') return { ok: true, items: [], total: 0, fetchedAt: 0, fromCache: false };
+      if (env.key === 'GENERIC_INTENT_DETECT') return { ok: false, reason: 'no-match' };
       return undefined;
     }, [{ id: 6, url: 'about:blank' }]);
     await mount();

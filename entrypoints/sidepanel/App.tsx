@@ -1,24 +1,22 @@
 // SPDX-License-Identifier: MIT
 /**
- * Sidepanel root (post-101.5 pivot).
+ * Sidepanel root (post commits 1-4).
  *
- * Renders a single iframe pointing at the current agent's subdomain on
- * llmconveyors.com with `?embed=extension` so the web app hides its global
- * chrome and the panel shows the dashboard directly. The iframe reloads
- * when the active agent changes.
- *
- * Contextual tab URL is passed as `tabUrl` so the web app can detect pages
- * the user is currently viewing (e.g. a Greenhouse job posting) and adjust
- * its prompts.
+ * Adds a Generation tab (native live view) beside the existing Dashboard
+ * iframe. The tab defaults to Generation when a GENERATION_STARTED broadcast
+ * arrives so the user sees live progress without manual switching.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../popup/ErrorBoundary';
 import { useAgentPreference } from '../popup/useAgentPreference';
 import { useTargetTabId } from './useTargetTabId';
+import { GenerationView } from './GenerationView';
 import type { AgentRegistryEntry } from '@/src/background/agents';
 
 const ROOT_DOMAIN = 'llmconveyors.com';
+
+type PanelTab = 'generation' | 'dashboard';
 
 function buildIframeUrl(
   agent: AgentRegistryEntry,
@@ -58,11 +56,26 @@ function useActiveTabUrl(): string | null {
   return url;
 }
 
+type RuntimeMessenger = {
+  onMessage: {
+    addListener: (fn: (msg: unknown) => void) => void;
+    removeListener: (fn: (msg: unknown) => void) => void;
+  };
+};
+function getRuntime(): RuntimeMessenger | null {
+  const g = globalThis as unknown as {
+    chrome?: { runtime?: RuntimeMessenger };
+    browser?: { runtime?: RuntimeMessenger };
+  };
+  return g.chrome?.runtime ?? g.browser?.runtime ?? null;
+}
+
 function SidepanelBody(): React.ReactElement {
   const { agents, activeAgentId, loading, error } = useAgentPreference();
   const tabUrl = useActiveTabUrl();
   const [reloadKey, setReloadKey] = useState(0);
   const [iframeError, setIframeError] = useState<string | null>(null);
+  const [tab, setTab] = useState<PanelTab>('dashboard');
 
   const agent = useMemo(
     () => agents.find((a) => a.id === activeAgentId) ?? agents[0] ?? null,
@@ -72,6 +85,21 @@ function SidepanelBody(): React.ReactElement {
   useEffect(() => {
     setIframeError(null);
   }, [agent?.id, tabUrl]);
+
+  // Switch to the Generation tab automatically when a new generation kicks off.
+  useEffect(() => {
+    const runtime = getRuntime();
+    if (runtime === null) return;
+    const listener = (msg: unknown): void => {
+      if (!msg || typeof msg !== 'object') return;
+      const env = msg as { key?: string };
+      if (env.key === 'GENERATION_STARTED') {
+        setTab('generation');
+      }
+    };
+    runtime.onMessage.addListener(listener);
+    return () => runtime.onMessage.removeListener(listener);
+  }, []);
 
   if (loading) {
     return (
@@ -111,6 +139,8 @@ function SidepanelBody(): React.ReactElement {
 
   const src = buildIframeUrl(agent, tabUrl, reloadKey);
   const dashboardUrl = `https://${agent.subdomain}.${ROOT_DOMAIN}`;
+  const agentType: 'job-hunter' | 'b2b-sales' =
+    agent.id === 'b2b-sales' ? 'b2b-sales' : 'job-hunter';
 
   function openInTab(): void {
     const g = globalThis as unknown as {
@@ -127,12 +157,30 @@ function SidepanelBody(): React.ReactElement {
     <div
       data-testid="sidepanel-root"
       data-active-agent={agent.id}
+      data-active-tab={tab}
       className="flex h-screen w-full flex-col bg-white dark:bg-zinc-900"
     >
       <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          If the dashboard does not load, third-party cookies may be blocked.
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="sidepanel-tab-generation"
+            aria-pressed={tab === 'generation'}
+            onClick={() => setTab('generation')}
+            className={`rounded-md px-2 py-1 text-xs font-medium ${tab === 'generation' ? 'bg-brand-500 text-white' : 'border border-zinc-300 bg-white text-zinc-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200'}`}
+          >
+            Generation
+          </button>
+          <button
+            type="button"
+            data-testid="sidepanel-tab-dashboard"
+            aria-pressed={tab === 'dashboard'}
+            onClick={() => setTab('dashboard')}
+            className={`rounded-md px-2 py-1 text-xs font-medium ${tab === 'dashboard' ? 'bg-brand-500 text-white' : 'border border-zinc-300 bg-white text-zinc-700 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200'}`}
+          >
+            Dashboard
+          </button>
+        </div>
         <button
           type="button"
           onClick={openInTab}
@@ -142,7 +190,9 @@ function SidepanelBody(): React.ReactElement {
           Open in tab
         </button>
       </div>
-      {iframeError ? (
+      {tab === 'generation' ? (
+        <GenerationView activeAgentType={agentType} />
+      ) : iframeError ? (
         <div
           data-testid="sidepanel-iframe-error"
           className="flex flex-1 items-center justify-center p-6 text-center"

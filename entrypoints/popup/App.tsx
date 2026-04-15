@@ -1,26 +1,60 @@
 // SPDX-License-Identifier: MIT
 // entrypoints/popup/App.tsx
 /**
- * Popup root. Post 101.5 pivot.
+ * Popup root. Post commits 1-4.
  *
- * Composes: LLMC branded header + agent switcher, intent badge, credits
- * widget, agent-aware action area (fill + highlight), footer with links
- * into the side panel / settings. All data comes from hooks; the App is
- * responsible only for layout and wiring.
+ * Layout:
+ *   Header (agent switcher + user)
+ *   IntentBadge
+ *   CreditsDisplay (signed in only)
+ *   ActionArea (agent-aware; includes generic JD fallback for job-hunter
+ *   and company-page heuristics for b2b-sales)
+ *   SessionList (signed in only)
+ *   Footer
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuthState } from './useAuthState';
 import { useIntent } from './useIntent';
 import { useCredits } from './useCredits';
 import { useAgentPreference } from './useAgentPreference';
+import { useGenericIntent } from './useGenericIntent';
 import { SignInButton } from './SignInButton';
 import { ActionArea } from './ActionArea';
 import { Header } from './Header';
 import { IntentBadge } from './IntentBadge';
 import { CreditsDisplay } from './CreditsDisplay';
+import { SessionList } from './SessionList';
 import { Footer } from './Footer';
 import { ErrorBoundary } from './ErrorBoundary';
+
+function useActiveTabUrl(tabId: number | null): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (tabId === null) {
+      setUrl(null);
+      return;
+    }
+    const g = globalThis as unknown as {
+      chrome?: {
+        tabs?: {
+          get: (id: number, cb: (tab: { url?: string } | undefined) => void) => void;
+        };
+      };
+    };
+    const tabs = g.chrome?.tabs;
+    if (!tabs || typeof tabs.get !== 'function') {
+      setUrl(null);
+      return;
+    }
+    try {
+      tabs.get(tabId, (tab) => setUrl(tab?.url ?? null));
+    } catch {
+      setUrl(null);
+    }
+  }, [tabId]);
+  return url;
+}
 
 function PopupBody(): React.ReactElement {
   const { state: authState, loading: authLoading, error: authError, signIn, signOut } =
@@ -36,6 +70,14 @@ function PopupBody(): React.ReactElement {
 
   const signedIn = authState.signedIn;
   const userId = authState.signedIn ? authState.userId : null;
+  const tabUrl = useActiveTabUrl(tabId);
+
+  const genericIntent = useGenericIntent({
+    enabled: signedIn && activeAgentId !== null,
+    tabId,
+    adapterIntent: intent,
+    agentId: activeAgentId,
+  });
 
   return (
     <div
@@ -60,7 +102,21 @@ function PopupBody(): React.ReactElement {
         signOutDisabled={authLoading}
       />
 
-      <IntentBadge intent={intent} loading={intentLoading && intent === null} agentId={activeAgentId ?? undefined} />
+      <IntentBadge
+        intent={intent}
+        loading={intentLoading && intent === null}
+        agentId={activeAgentId ?? undefined}
+      />
+
+      {signedIn && genericIntent.hasJd && (intent === null || intent.kind === 'unknown') ? (
+        <div
+          data-testid="generic-jd-badge"
+          data-method={genericIntent.method ?? ''}
+          className="mb-3 rounded-card border border-brand-500 bg-brand-50 px-3 py-2 text-xs text-brand-900 dark:border-brand-500 dark:bg-brand-900 dark:text-brand-50"
+        >
+          Job detected ({genericIntent.method ?? 'unknown'})
+        </div>
+      ) : null}
 
       {signedIn ? (
         <CreditsDisplay
@@ -71,7 +127,16 @@ function PopupBody(): React.ReactElement {
       ) : null}
 
       {signedIn ? (
-        <ActionArea signedIn={signedIn} intent={intent} tabId={tabId} />
+        <ActionArea
+          signedIn={signedIn}
+          intent={intent}
+          tabId={tabId}
+          tabUrl={tabUrl}
+          activeAgentId={activeAgentId}
+          hasGenericJd={genericIntent.hasJd}
+          genericJdText={genericIntent.jdText}
+          credits={credits}
+        />
       ) : (
         <section
           data-testid="signed-out-panel"
@@ -90,6 +155,8 @@ function PopupBody(): React.ReactElement {
           />
         </section>
       )}
+
+      {signedIn ? <SessionList enabled={signedIn} /> : null}
 
       {authError !== null ? (
         <p
