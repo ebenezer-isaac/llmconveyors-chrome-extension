@@ -211,8 +211,10 @@ describe('HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR forwarders adversarial', () => {
         sender: {} as any,
       });
       expect(sendToTab).toHaveBeenCalledTimes(1);
-      const args = sendToTab.mock.calls[0]!;
-      expect(args[0]).toBe(99);
+      const calls = sendToTab.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      const first = calls[0] as unknown as [number, unknown];
+      expect(first[0]).toBe(99);
     });
   });
 });

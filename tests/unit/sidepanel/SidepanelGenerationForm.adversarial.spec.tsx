@@ -6,7 +6,7 @@
  * max-length overflow, whitespace-only inputs.
  */
 
-import React from 'react';
+// React auto-injected
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { cleanup, render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { SidepanelGenerationForm } from '@/entrypoints/sidepanel/SidepanelGenerationForm';
@@ -49,7 +49,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -62,7 +62,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl="https://x.co"
         />,
       );
@@ -83,7 +83,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl="https://x.co"
         />,
       );
@@ -106,7 +106,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -129,7 +129,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -145,7 +145,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -166,7 +166,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -179,7 +179,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -192,7 +192,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -210,7 +210,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -238,7 +238,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -260,7 +260,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={'<script>window.HACKED=true</script><img src=x onerror="alert(1)">'}
+          genericIntent={{hasJd: true, jdText: '<script>window.HACKED=true</script><img src=x onerror="alert(1)">', jobTitle: null, company: null}}
           tabUrl={null}
         />,
       );
@@ -279,7 +279,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="b2b-sales"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl={null}
         />,
       );
@@ -297,7 +297,7 @@ describe('SidepanelGenerationForm adversarial', () => {
         <SidepanelGenerationForm
           activeAgentId="job-hunter"
           intent={null}
-          genericJdText={null}
+          genericIntent={null}
           tabUrl="https://boards.greenhouse.io/acme/jobs/1"
         />,
       );

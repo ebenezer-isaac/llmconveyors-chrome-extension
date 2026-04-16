@@ -138,15 +138,35 @@ export function CvArtifactBody({
       return;
     }
     setPdfState({ kind: 'loading' });
+    // Previously the spinner could hang forever if the bg handler never
+    // responded (SW eviction, stuck fetchAuthed, storage outage). Race
+    // the send against a 30s deadline so users see an actionable error
+    // instead of an indefinite 'Loading PDF preview...' state.
+    const FETCH_TIMEOUT_MS = 30_000;
+    const timeoutPromise = new Promise<{ __timeout: true }>((resolve) => {
+      setTimeout(() => resolve({ __timeout: true }), FETCH_TIMEOUT_MS);
+    });
     (async () => {
       try {
-        const raw = await runtime.sendMessage({
-          key: 'ARTIFACT_FETCH_BLOB',
-          data: {
-            sessionId: artifact.sessionId,
-            storageKey: artifact.pdfStorageKey,
-          },
-        });
+        const raw = await Promise.race([
+          runtime.sendMessage({
+            key: 'ARTIFACT_FETCH_BLOB',
+            data: {
+              sessionId: artifact.sessionId,
+              storageKey: artifact.pdfStorageKey,
+            },
+          }),
+          timeoutPromise,
+        ]);
+        if (
+          raw &&
+          typeof raw === 'object' &&
+          (raw as { __timeout?: boolean }).__timeout === true
+        ) {
+          if (cancelled) return;
+          setPdfState({ kind: 'error', reason: 'timed-out-after-30s' });
+          return;
+        }
         if (cancelled) return;
         if (!raw || typeof raw !== 'object') {
           setPdfState({ kind: 'error', reason: 'empty-response' });

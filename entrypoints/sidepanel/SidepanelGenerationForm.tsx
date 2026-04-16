@@ -1,36 +1,40 @@
 // SPDX-License-Identifier: MIT
 /**
- * SidepanelGenerationForm -- direct port of the web app's ChatInterface
- * generation form (e:/llmconveyors.com/src/components/chat/ChatInterface.tsx),
- * sized for the 360-400px sidepanel. Always visible and pinned at the bottom
- * of the sidepanel; the form is the form -- not a toggle that opens a form.
+ * SidepanelGenerationForm -- split into two pieces that share state:
  *
- * Field-for-field parity with the web:
- *   - Mode toggle: Standard / Cold Outreach (fire / snowflake pill).
- *   - Company name (required, max 200).
- *   - Job title (required, max 200).
- *   - Company website (required, url, normalized lowercase-no-spaces).
- *   - Cold-outreach only: Contact Name, Title, Email (each max 200/320).
- *   - Job description textarea (required in standard, optional in cold;
- *     max 40_000 chars; live char counter).
- *   - Action bar: Fresh-research checkbox + Generate button.
- *     Generate is disabled when required fields are empty OR while busy.
- *   - When switching cold -> standard the cold contact fields are folded
- *     into the JD as "Additional outreach context" like the web app does.
+ *   1. <SidepanelGenerationFields /> -- rendered inside the scrollable
+ *      content area of the sidepanel (below the bound session + generation
+ *      view). Contains mode toggle, inputs, JD textarea, fresh-research
+ *      checkbox, inline errors. This IS the form element.
  *
- * Wiring:
- *   - Pre-fills from detected intent + active tab URL; fields the user has
- *     edited are preserved across intent updates.
- *   - Submits via useGeneration().start -> GENERATION_START.
+ *   2. <SidepanelGenerationSubmitBar /> -- rendered in the pinned bottom
+ *      slot (above SurfaceFooter). Just the Generate button, always
+ *      visible. Uses `form="sidepanel-generation-form"` so it submits
+ *      the scrollable form even though it lives outside its DOM subtree.
+ *
+ * Shared state lives in <SidepanelGenerationFormProvider /> at the top of
+ * the sidepanel tree so both pieces see the same values.
+ *
+ * Defaults are derived from both the detected adapter intent AND the
+ * generic scan (jsonld / readability). If the ATS adapter miss happens
+ * but the generic scan surfaced company / jobTitle (e.g. Greenhouse
+ * board page pre-nav), we still pre-fill those fields. This fixes
+ * "why isn't company / job title autofilled" on pages where only the
+ * generic scan matched.
+ *
+ * Field-for-field parity with the web's ChatInterface form
+ * (e:/llmconveyors.com/src/components/chat/ChatInterface.tsx).
  */
 
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentId } from '@/src/background/agents';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
 import { useGeneration } from '../popup/useGeneration';
 import { Spinner } from '../shared/Spinner';
 
 type Mode = 'standard' | 'cold_outreach';
+
+const FORM_ID = 'sidepanel-generation-form';
 
 const INPUT_CLASSES =
   'w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-800 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100';
@@ -46,30 +50,56 @@ function normalizeUrl(value: string): string {
   return value.replace(/\s+/g, '').toLowerCase();
 }
 
-export interface SidepanelGenerationFormProps {
+export interface GenericIntentSeed {
+  readonly hasJd: boolean;
+  readonly jdText: string | null;
+  readonly jobTitle: string | null;
+  readonly company: string | null;
+}
+
+export interface SidepanelGenerationFormBase {
   readonly activeAgentId: AgentId;
   readonly intent: DetectedIntent | null;
-  readonly genericJdText: string | null;
+  readonly genericIntent: GenericIntentSeed | null;
   readonly tabUrl: string | null;
-  /** Ignored (kept for back-compat with earlier call sites). */
-  readonly defaultOpen?: boolean;
 }
 
 interface Defaults {
-  company: string;
-  jobTitle: string;
-  companyWebsite: string;
-  jobDescription: string;
+  readonly company: string;
+  readonly jobTitle: string;
+  readonly companyWebsite: string;
+  readonly jobDescription: string;
 }
 
 function deriveDefaults(
   intent: DetectedIntent | null,
-  genericJdText: string | null,
+  genericIntent: GenericIntentSeed | null,
   tabUrl: string | null,
 ): Defaults {
-  const company = intent?.company ?? '';
-  const jobTitle = intent?.jobTitle ?? '';
-  const jobDescription = genericJdText ?? '';
+  // Prefer adapter-matched values, fall back to generic scan. This is the
+  // fix for the "company / job title aren't being autofilled" report:
+  // on pages where only the jsonld / readability scan matches, the
+  // adapter intent is null but generic carries both fields.
+  const company =
+    (typeof intent?.company === 'string' && intent.company.length > 0
+      ? intent.company
+      : undefined) ??
+    (typeof genericIntent?.company === 'string' && genericIntent.company.length > 0
+      ? genericIntent.company
+      : undefined) ??
+    '';
+  const jobTitle =
+    (typeof intent?.jobTitle === 'string' && intent.jobTitle.length > 0
+      ? intent.jobTitle
+      : undefined) ??
+    (typeof genericIntent?.jobTitle === 'string' && genericIntent.jobTitle.length > 0
+      ? genericIntent.jobTitle
+      : undefined) ??
+    '';
+  const jobDescription =
+    (typeof genericIntent?.jdText === 'string' && genericIntent.jdText.length > 0
+      ? genericIntent.jdText
+      : undefined) ?? '';
   let companyWebsite = '';
   if (tabUrl !== null) {
     try {
@@ -80,6 +110,248 @@ function deriveDefaults(
     }
   }
   return { company, jobTitle, companyWebsite, jobDescription };
+}
+
+interface FormState {
+  readonly activeAgentId: AgentId;
+  readonly mode: Mode;
+  readonly company: string;
+  readonly jobTitle: string;
+  readonly companyWebsite: string;
+  readonly jobDescription: string;
+  readonly contactName: string;
+  readonly contactTitle: string;
+  readonly contactEmail: string;
+  readonly freshResearch: boolean;
+  readonly formErrors: Record<string, string>;
+  readonly busy: boolean;
+  readonly error: string | null;
+  readonly isJobHunter: boolean;
+  readonly isColdOutreach: boolean;
+  readonly jobDescriptionRequired: boolean;
+  readonly submitDisabled: boolean;
+  readonly setCompany: (v: string) => void;
+  readonly setJobTitle: (v: string) => void;
+  readonly setCompanyWebsite: (v: string) => void;
+  readonly setJobDescription: (v: string) => void;
+  readonly setContactName: (v: string) => void;
+  readonly setContactTitle: (v: string) => void;
+  readonly setContactEmail: (v: string) => void;
+  readonly setFreshResearch: (v: boolean) => void;
+  readonly clearFieldError: (name: string) => void;
+  readonly toggleMode: () => void;
+  readonly onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+}
+
+const GenerationFormContext = createContext<FormState | null>(null);
+
+function useFormState(): FormState {
+  const ctx = useContext(GenerationFormContext);
+  if (ctx === null) {
+    throw new Error(
+      'SidepanelGenerationFields / SubmitBar must be rendered inside <SidepanelGenerationFormProvider>',
+    );
+  }
+  return ctx;
+}
+
+export function SidepanelGenerationFormProvider({
+  activeAgentId,
+  intent,
+  genericIntent,
+  tabUrl,
+  children,
+}: SidepanelGenerationFormBase & {
+  readonly children: React.ReactNode;
+}): React.ReactElement {
+  const { start, busy, error } = useGeneration();
+  const isJobHunter = activeAgentId === 'job-hunter';
+
+  const defaults = useMemo(
+    () => deriveDefaults(intent, genericIntent, tabUrl),
+    [intent, genericIntent, tabUrl],
+  );
+  const [mode, setMode] = useState<Mode>('standard');
+  const [company, setCompany] = useState<string>(defaults.company);
+  const [jobTitle, setJobTitle] = useState<string>(defaults.jobTitle);
+  const [companyWebsite, setCompanyWebsite] = useState<string>(
+    defaults.companyWebsite,
+  );
+  const [jobDescription, setJobDescription] = useState<string>(
+    defaults.jobDescription,
+  );
+  const [contactName, setContactName] = useState<string>('');
+  const [contactTitle, setContactTitle] = useState<string>('');
+  const [contactEmail, setContactEmail] = useState<string>('');
+  const [freshResearch, setFreshResearch] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const prevDefaultsRef = useRef(defaults);
+  useEffect(() => {
+    const prev = prevDefaultsRef.current;
+    if (company === prev.company) setCompany(defaults.company);
+    if (jobTitle === prev.jobTitle) setJobTitle(defaults.jobTitle);
+    if (companyWebsite === prev.companyWebsite) setCompanyWebsite(defaults.companyWebsite);
+    if (jobDescription === prev.jobDescription) setJobDescription(defaults.jobDescription);
+    prevDefaultsRef.current = defaults;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaults]);
+
+  const isColdOutreach = mode === 'cold_outreach';
+  const jobDescriptionRequired = !isColdOutreach;
+
+  const clearFieldError = React.useCallback((name: string) => {
+    setFormErrors((prev) => {
+      if (!prev[name]) return prev;
+      const { [name]: _removed, ...rest } = prev;
+      return rest;
+    });
+  }, []);
+
+  const dumpColdFieldsIntoDescription = (): void => {
+    const lines: string[] = [];
+    const n = contactName.trim();
+    const tt = contactTitle.trim();
+    const em = contactEmail.trim();
+    if (n) lines.push(`Contact: ${n}${tt ? ` (${tt})` : ''}`);
+    if (em) lines.push(`Contact email: ${em}`);
+    if (lines.length === 0) return;
+    setJobDescription((prev) => {
+      const segment = `Additional outreach context:\n${lines.join('\n')}`;
+      return prev ? `${prev.trim()}\n\n${segment}` : segment;
+    });
+    setContactName('');
+    setContactTitle('');
+    setContactEmail('');
+  };
+
+  const toggleMode = React.useCallback((): void => {
+    setMode((current) => {
+      const nextMode: Mode = current === 'cold_outreach' ? 'standard' : 'cold_outreach';
+      if (current === 'cold_outreach') dumpColdFieldsIntoDescription();
+      return nextMode;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contactName, contactTitle, contactEmail]);
+
+  const invalid = isJobHunter
+    ? !company.trim() ||
+      !jobTitle.trim() ||
+      !companyWebsite.trim() ||
+      (jobDescriptionRequired && !jobDescription.trim())
+    : !companyWebsite.trim();
+  const submitDisabled = busy || invalid;
+
+  const onSubmit = React.useCallback(
+    (event: React.FormEvent<HTMLFormElement>): void => {
+      event.preventDefault();
+      if (busy) return;
+      void (async () => {
+        if (isJobHunter) {
+          const errors: Record<string, string> = {};
+          if (!company.trim()) errors.companyName = 'Company is required';
+          if (!jobTitle.trim()) errors.jobTitle = 'Job title is required';
+          if (!companyWebsite.trim()) errors.companyWebsite = 'Company website is required';
+          if (jobDescriptionRequired && !jobDescription.trim()) {
+            errors.jobDescription = 'Job description is required';
+          }
+          if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+          }
+          setFormErrors({});
+          await start({
+            agentId: 'job-hunter',
+            payload: {
+              kind: 'job-hunter',
+              mode,
+              jobDescription: jobDescription.trim(),
+              companyName: company.trim(),
+              jobTitle: jobTitle.trim(),
+              companyWebsite: companyWebsite.trim(),
+              contactName: contactName.trim() || undefined,
+              contactTitle: contactTitle.trim() || undefined,
+              contactEmail: contactEmail.trim() || undefined,
+              skipResearchCache: freshResearch || undefined,
+            },
+            tabUrl,
+            pageTitle: jobTitle.trim() || company.trim() || null,
+          });
+        } else {
+          const errors: Record<string, string> = {};
+          if (!companyWebsite.trim()) errors.companyWebsite = 'Company website is required';
+          if (Object.keys(errors).length > 0) {
+            setFormErrors(errors);
+            return;
+          }
+          setFormErrors({});
+          await start({
+            agentId: 'b2b-sales',
+            payload: {
+              kind: 'b2b-sales',
+              companyName: company.trim() || undefined,
+              companyWebsite: companyWebsite.trim(),
+              skipResearchCache: freshResearch || undefined,
+            },
+            tabUrl,
+            pageTitle: company.trim() || null,
+          });
+        }
+      })();
+    },
+    [
+      busy,
+      isJobHunter,
+      company,
+      jobTitle,
+      companyWebsite,
+      jobDescription,
+      jobDescriptionRequired,
+      mode,
+      contactName,
+      contactTitle,
+      contactEmail,
+      freshResearch,
+      start,
+      tabUrl,
+    ],
+  );
+
+  const value: FormState = {
+    activeAgentId,
+    mode,
+    company,
+    jobTitle,
+    companyWebsite,
+    jobDescription,
+    contactName,
+    contactTitle,
+    contactEmail,
+    freshResearch,
+    formErrors,
+    busy,
+    error,
+    isJobHunter,
+    isColdOutreach,
+    jobDescriptionRequired,
+    submitDisabled,
+    setCompany,
+    setJobTitle,
+    setCompanyWebsite,
+    setJobDescription,
+    setContactName,
+    setContactTitle,
+    setContactEmail,
+    setFreshResearch,
+    clearFieldError,
+    toggleMode,
+    onSubmit,
+  };
+  return (
+    <GenerationFormContext.Provider value={value}>
+      {children}
+    </GenerationFormContext.Provider>
+  );
 }
 
 function FireIcon(): React.ReactElement {
@@ -98,7 +370,15 @@ function SnowflakeIcon(): React.ReactElement {
   );
 }
 
-function ModeToggle({ mode, onToggle, disabled }: { mode: Mode; onToggle: () => void; disabled: boolean }): React.ReactElement {
+function ModeToggle({
+  mode,
+  onToggle,
+  disabled,
+}: {
+  mode: Mode;
+  onToggle: () => void;
+  disabled: boolean;
+}): React.ReactElement {
   const isCold = mode === 'cold_outreach';
   return (
     <button
@@ -139,150 +419,14 @@ function FieldError({ message }: { message: string | undefined }): React.ReactEl
   );
 }
 
-export function SidepanelGenerationForm({
-  activeAgentId,
-  intent,
-  genericJdText,
-  tabUrl,
-}: SidepanelGenerationFormProps): React.ReactElement {
-  const { start, busy, error } = useGeneration();
-  const isJobHunter = activeAgentId === 'job-hunter';
-
-  // B2B sales keeps its own lean form (company + website only). The full
-  // Next.js form below is for job-hunter. Rendering the lean variant
-  // inline keeps the pinned section consistent across agents.
-  const defaults = useMemo(
-    () => deriveDefaults(intent, genericJdText, tabUrl),
-    [intent, genericJdText, tabUrl],
-  );
-
-  const [mode, setMode] = useState<Mode>('standard');
-  const [company, setCompany] = useState<string>(defaults.company);
-  const [jobTitle, setJobTitle] = useState<string>(defaults.jobTitle);
-  const [companyWebsite, setCompanyWebsite] = useState<string>(defaults.companyWebsite);
-  const [jobDescription, setJobDescription] = useState<string>(defaults.jobDescription);
-  const [contactName, setContactName] = useState<string>('');
-  const [contactTitle, setContactTitle] = useState<string>('');
-  const [contactEmail, setContactEmail] = useState<string>('');
-  const [freshResearch, setFreshResearch] = useState<boolean>(false);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  const prevDefaultsRef = useRef(defaults);
-  useEffect(() => {
-    const prev = prevDefaultsRef.current;
-    if (company === prev.company) setCompany(defaults.company);
-    if (jobTitle === prev.jobTitle) setJobTitle(defaults.jobTitle);
-    if (companyWebsite === prev.companyWebsite) setCompanyWebsite(defaults.companyWebsite);
-    if (jobDescription === prev.jobDescription) setJobDescription(defaults.jobDescription);
-    prevDefaultsRef.current = defaults;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaults]);
-
-  const isColdOutreach = mode === 'cold_outreach';
-  const jobDescriptionRequired = !isColdOutreach;
-
-  function clearFieldError(name: string): void {
-    setFormErrors((prev) => {
-      if (!prev[name]) return prev;
-      const { [name]: _removed, ...rest } = prev;
-      return rest;
-    });
-  }
-
-  function dumpColdFieldsIntoDescription(): void {
-    const lines: string[] = [];
-    const n = contactName.trim();
-    const tt = contactTitle.trim();
-    const em = contactEmail.trim();
-    if (n) lines.push(`Contact: ${n}${tt ? ` (${tt})` : ''}`);
-    if (em) lines.push(`Contact email: ${em}`);
-    if (lines.length === 0) return;
-    setJobDescription((prev) => {
-      const segment = `Additional outreach context:\n${lines.join('\n')}`;
-      return prev ? `${prev.trim()}\n\n${segment}` : segment;
-    });
-    setContactName('');
-    setContactTitle('');
-    setContactEmail('');
-  }
-
-  function toggleMode(): void {
-    const next: Mode = isColdOutreach ? 'standard' : 'cold_outreach';
-    if (isColdOutreach) dumpColdFieldsIntoDescription();
-    setMode(next);
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    if (busy) return;
-    if (isJobHunter) {
-      const errors: Record<string, string> = {};
-      if (!company.trim()) errors.companyName = 'Company is required';
-      if (!jobTitle.trim()) errors.jobTitle = 'Job title is required';
-      if (!companyWebsite.trim()) errors.companyWebsite = 'Company website is required';
-      if (jobDescriptionRequired && !jobDescription.trim()) {
-        errors.jobDescription = 'Job description is required';
-      }
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        return;
-      }
-      setFormErrors({});
-      await start({
-        agentId: 'job-hunter',
-        payload: {
-          kind: 'job-hunter',
-          mode,
-          jobDescription: jobDescription.trim(),
-          companyName: company.trim(),
-          jobTitle: jobTitle.trim(),
-          companyWebsite: companyWebsite.trim(),
-          contactName: contactName.trim() || undefined,
-          contactTitle: contactTitle.trim() || undefined,
-          contactEmail: contactEmail.trim() || undefined,
-          skipResearchCache: freshResearch || undefined,
-        },
-        tabUrl,
-        pageTitle: jobTitle.trim() || company.trim() || null,
-      });
-    } else {
-      const errors: Record<string, string> = {};
-      if (!companyWebsite.trim()) errors.companyWebsite = 'Company website is required';
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        return;
-      }
-      setFormErrors({});
-      await start({
-        agentId: 'b2b-sales',
-        payload: {
-          kind: 'b2b-sales',
-          companyName: company.trim() || undefined,
-          companyWebsite: companyWebsite.trim(),
-          skipResearchCache: freshResearch || undefined,
-        },
-        tabUrl,
-        pageTitle: company.trim() || null,
-      });
-    }
-  }
-
-  // Disabled mirrors ChatInterface: busy OR any required field empty.
-  const invalid = isJobHunter
-    ? !company.trim() ||
-      !jobTitle.trim() ||
-      !companyWebsite.trim() ||
-      (jobDescriptionRequired && !jobDescription.trim())
-    : !companyWebsite.trim();
-  const submitDisabled = busy || invalid;
-
+export function SidepanelGenerationFields(): React.ReactElement {
+  const s = useFormState();
   return (
     <section
       data-testid="sidepanel-generation-form"
-      data-open="true"
-      data-agent={activeAgentId}
-      data-mode={mode}
-      className="shrink-0 border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+      data-agent={s.activeAgentId}
+      data-mode={s.mode}
+      className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
     >
       <header className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
         <div className="flex flex-col">
@@ -290,23 +434,22 @@ export function SidepanelGenerationForm({
             Mode
           </span>
           <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">
-            {isColdOutreach ? 'Cold Outreach' : 'Standard'}
+            {s.isColdOutreach ? 'Cold Outreach' : 'Standard'}
           </span>
         </div>
-        {isJobHunter ? (
-          <ModeToggle mode={mode} onToggle={toggleMode} disabled={busy} />
+        {s.isJobHunter ? (
+          <ModeToggle mode={s.mode} onToggle={s.toggleMode} disabled={s.busy} />
         ) : null}
       </header>
 
       <form
+        id={FORM_ID}
         noValidate
-        onSubmit={(e) => {
-          void handleSubmit(e);
-        }}
+        onSubmit={s.onSubmit}
         data-testid="sidepanel-generation-form-root"
-        className="flex max-h-[360px] flex-col gap-3 overflow-y-auto p-4"
+        className="flex flex-col gap-3 p-4"
       >
-        {isJobHunter ? (
+        {s.isJobHunter ? (
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
               <span className={LABEL_CLASSES}>
@@ -315,16 +458,16 @@ export function SidepanelGenerationForm({
               <input
                 data-testid="sidepanel-form-company"
                 type="text"
-                value={company}
+                value={s.company}
                 onChange={(e) => {
-                  clearFieldError('companyName');
-                  setCompany(e.target.value);
+                  s.clearFieldError('companyName');
+                  s.setCompany(e.target.value);
                 }}
                 maxLength={MAX_SHORT}
                 className={INPUT_CLASSES}
                 placeholder="Acme Inc"
               />
-              <FieldError message={formErrors.companyName} />
+              <FieldError message={s.formErrors.companyName} />
             </label>
             <label className="flex flex-col gap-1">
               <span className={LABEL_CLASSES}>
@@ -333,16 +476,16 @@ export function SidepanelGenerationForm({
               <input
                 data-testid="sidepanel-form-title"
                 type="text"
-                value={jobTitle}
+                value={s.jobTitle}
                 onChange={(e) => {
-                  clearFieldError('jobTitle');
-                  setJobTitle(e.target.value);
+                  s.clearFieldError('jobTitle');
+                  s.setJobTitle(e.target.value);
                 }}
                 maxLength={MAX_SHORT}
                 className={INPUT_CLASSES}
                 placeholder="Backend Engineer"
               />
-              <FieldError message={formErrors.jobTitle} />
+              <FieldError message={s.formErrors.jobTitle} />
             </label>
           </div>
         ) : (
@@ -351,8 +494,8 @@ export function SidepanelGenerationForm({
             <input
               data-testid="sidepanel-form-company"
               type="text"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
+              value={s.company}
+              onChange={(e) => s.setCompany(e.target.value)}
               maxLength={MAX_SHORT}
               className={INPUT_CLASSES}
               placeholder="Acme Inc"
@@ -371,27 +514,27 @@ export function SidepanelGenerationForm({
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
-            value={companyWebsite}
+            value={s.companyWebsite}
             onChange={(e) => {
-              clearFieldError('companyWebsite');
-              setCompanyWebsite(normalizeUrl(e.target.value));
+              s.clearFieldError('companyWebsite');
+              s.setCompanyWebsite(normalizeUrl(e.target.value));
             }}
             maxLength={2048}
             className={INPUT_CLASSES}
             placeholder="https://example.com"
           />
-          <FieldError message={formErrors.companyWebsite} />
+          <FieldError message={s.formErrors.companyWebsite} />
         </label>
 
-        {isJobHunter && isColdOutreach ? (
+        {s.isJobHunter && s.isColdOutreach ? (
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-1">
               <span className={LABEL_CLASSES}>Contact name</span>
               <input
                 data-testid="sidepanel-form-contact-name"
                 type="text"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
+                value={s.contactName}
+                onChange={(e) => s.setContactName(e.target.value)}
                 maxLength={MAX_SHORT}
                 className={INPUT_CLASSES}
                 placeholder="Jane Smith"
@@ -402,8 +545,8 @@ export function SidepanelGenerationForm({
               <input
                 data-testid="sidepanel-form-contact-title"
                 type="text"
-                value={contactTitle}
-                onChange={(e) => setContactTitle(e.target.value)}
+                value={s.contactTitle}
+                onChange={(e) => s.setContactTitle(e.target.value)}
                 maxLength={MAX_SHORT}
                 className={INPUT_CLASSES}
                 placeholder="Head of Engineering"
@@ -418,8 +561,8 @@ export function SidepanelGenerationForm({
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                value={contactEmail}
-                onChange={(e) => setContactEmail(normalizeUrl(e.target.value))}
+                value={s.contactEmail}
+                onChange={(e) => s.setContactEmail(normalizeUrl(e.target.value))}
                 maxLength={MAX_EMAIL}
                 className={INPUT_CLASSES}
                 placeholder="jane@example.com"
@@ -428,76 +571,107 @@ export function SidepanelGenerationForm({
           </div>
         ) : null}
 
-        {isJobHunter ? (
+        {s.isJobHunter ? (
           <label className="flex flex-col gap-1">
             <span className={LABEL_CLASSES}>
-              Job description{jobDescriptionRequired ? ' *' : ''}
+              Job description{s.jobDescriptionRequired ? ' *' : ''}
             </span>
             <textarea
               data-testid="sidepanel-form-jd"
-              value={jobDescription}
+              value={s.jobDescription}
               onChange={(e) => {
-                clearFieldError('jobDescription');
-                setJobDescription(e.target.value);
+                s.clearFieldError('jobDescription');
+                s.setJobDescription(e.target.value);
               }}
               maxLength={MAX_JD}
               rows={5}
               className={`${INPUT_CLASSES} resize-y`}
               placeholder={
-                isColdOutreach
+                s.isColdOutreach
                   ? 'Paste context about the target or outreach goal...'
                   : 'Paste the job description here...'
               }
             />
             <div className="flex items-center justify-between">
-              <FieldError message={formErrors.jobDescription} />
+              <FieldError message={s.formErrors.jobDescription} />
               <span className="ml-auto text-[10px] text-zinc-400 dark:text-zinc-500">
-                {jobDescription.length.toLocaleString()} / {MAX_JD.toLocaleString()}
+                {s.jobDescription.length.toLocaleString()} / {MAX_JD.toLocaleString()}
               </span>
             </div>
           </label>
         ) : null}
 
-        {error !== null ? (
+        {s.error !== null ? (
           <p
             data-testid="sidepanel-form-error"
             className="rounded-card bg-red-50 px-3 py-1.5 text-xs text-red-800 dark:bg-red-900/40 dark:text-red-100"
           >
-            {error}
+            {s.error}
           </p>
         ) : null}
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-zinc-500 dark:text-zinc-400">
-          <label className="flex cursor-pointer select-none items-center gap-1.5">
-            <input
-              data-testid="sidepanel-form-fresh-research"
-              type="checkbox"
-              checked={freshResearch}
-              onChange={(e) => setFreshResearch(e.target.checked)}
-              disabled={busy}
-              className="h-3.5 w-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-100"
-            />
-            <span>Fresh research</span>
-          </label>
-          <button
-            type="submit"
-            data-testid="sidepanel-form-submit"
-            disabled={submitDisabled}
-            className="ml-auto inline-flex items-center justify-center gap-2 rounded-card bg-zinc-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
-          >
-            {busy ? (
-              <>
-                <Spinner size="sm" inline />
-                <span>Starting...</span>
-              </>
-            ) : isJobHunter ? (
-              'Generate'
-            ) : (
-              'Research'
-            )}
-          </button>
-        </div>
+        <label className="flex cursor-pointer select-none items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <input
+            data-testid="sidepanel-form-fresh-research"
+            type="checkbox"
+            checked={s.freshResearch}
+            onChange={(e) => s.setFreshResearch(e.target.checked)}
+            disabled={s.busy}
+            className="h-3.5 w-3.5 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-100"
+          />
+          <span>Fresh research</span>
+        </label>
       </form>
     </section>
+  );
+}
+
+/**
+ * Pinned submit bar. Uses `form={FORM_ID}` so the button submits the
+ * <form> in SidepanelGenerationFields even though the two live in
+ * different DOM subtrees.
+ */
+export function SidepanelGenerationSubmitBar(): React.ReactElement {
+  const s = useFormState();
+  return (
+    <div
+      data-testid="sidepanel-generation-submit-bar"
+      className="shrink-0 border-t border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900"
+    >
+      <button
+        type="submit"
+        form={FORM_ID}
+        data-testid="sidepanel-form-submit"
+        disabled={s.submitDisabled}
+        className="flex w-full items-center justify-center gap-2 rounded-card bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+      >
+        {s.busy ? (
+          <>
+            <Spinner size="sm" inline />
+            <span>Starting...</span>
+          </>
+        ) : s.isJobHunter ? (
+          'Generate'
+        ) : (
+          'Research'
+        )}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Back-compat: the earlier monolithic component still exists for callers
+ * that don't want to split rendering across two slots. Internally it
+ * composes Provider + Fields + SubmitBar in one section.
+ */
+export function SidepanelGenerationForm(
+  props: SidepanelGenerationFormBase,
+): React.ReactElement {
+  return (
+    <SidepanelGenerationFormProvider {...props}>
+      <SidepanelGenerationFields />
+      <SidepanelGenerationSubmitBar />
+    </SidepanelGenerationFormProvider>
   );
 }

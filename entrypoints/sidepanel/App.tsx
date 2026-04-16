@@ -34,7 +34,11 @@ import {
 import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import { accentFor } from './lib/accent';
-import { SidepanelGenerationForm } from './SidepanelGenerationForm';
+import {
+  SidepanelGenerationFormProvider,
+  SidepanelGenerationFields,
+  SidepanelGenerationSubmitBar,
+} from './SidepanelGenerationForm';
 import { Spinner } from './Spinner';
 import { useIntent } from '../popup/useIntent';
 import { useGenericIntent } from '../popup/useGenericIntent';
@@ -434,31 +438,59 @@ function SidepanelBody(): React.ReactElement {
           <Spinner label="Checking for prior session..." />
         </div>
       ) : null}
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        {showBoundPanel && binding.session !== null ? (
-          <BoundSessionPanel
-            session={binding.session}
-            logs={binding.logs}
-            artifacts={binding.artifacts}
-            urlBound={binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0}
-            accentBorder={accent.border}
-            agentId={agent.id}
-          />
-        ) : null}
-        <GenerationView
-          activeAgentType={agentType}
-          mode={showBoundPanel ? 'active-only' : 'both'}
-        />
-      </div>
       {signedIn ? (
-        <SidepanelGenerationForm
+        <SidepanelGenerationFormProvider
           activeAgentId={agent.id}
           intent={intent}
-          genericJdText={genericIntent.jdText}
+          genericIntent={{
+            hasJd: genericIntent.hasJd,
+            jdText: genericIntent.jdText,
+            jobTitle: genericIntent.jobTitle,
+            company: genericIntent.company,
+          }}
           tabUrl={tabUrl}
-          defaultOpen={!showBoundPanel}
-        />
-      ) : null}
+        >
+          <div className="flex flex-1 flex-col overflow-y-auto">
+            {showBoundPanel && binding.session !== null ? (
+              <BoundSessionPanel
+                session={binding.session}
+                logs={binding.logs}
+                artifacts={binding.artifacts}
+                urlBound={
+                  binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
+                }
+                accentBorder={accent.border}
+                agentId={agent.id}
+              />
+            ) : null}
+            <GenerationView
+              activeAgentType={agentType}
+              mode={showBoundPanel ? 'active-only' : 'both'}
+            />
+            <SidepanelGenerationFields />
+          </div>
+          <SidepanelGenerationSubmitBar />
+        </SidepanelGenerationFormProvider>
+      ) : (
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          {showBoundPanel && binding.session !== null ? (
+            <BoundSessionPanel
+              session={binding.session}
+              logs={binding.logs}
+              artifacts={binding.artifacts}
+              urlBound={
+                binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
+              }
+              accentBorder={accent.border}
+              agentId={agent.id}
+            />
+          ) : null}
+          <GenerationView
+            activeAgentType={agentType}
+            mode={showBoundPanel ? 'active-only' : 'both'}
+          />
+        </div>
+      )}
       <SurfaceFooter
         credits={credits}
         loading={creditsLoading}

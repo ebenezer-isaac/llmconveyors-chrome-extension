@@ -5,7 +5,7 @@
  * races without leaking blob URLs or crashing React.
  */
 
-import React from 'react';
+// React auto-injected
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { CvArtifactBody } from '@/entrypoints/sidepanel/artifacts/CvArtifactBody';

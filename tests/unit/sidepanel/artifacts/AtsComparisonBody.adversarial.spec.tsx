@@ -5,7 +5,7 @@
  * crashes, XSS sinks, and silent data corruption.
  */
 
-import React from 'react';
+// React auto-injected
 import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { AtsComparisonBody } from '@/entrypoints/sidepanel/artifacts/AtsComparisonBody';
