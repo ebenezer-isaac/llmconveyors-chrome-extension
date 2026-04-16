@@ -29,6 +29,7 @@ import {
 } from './useSessionForCurrentTab';
 import { buildAgentUrl } from '@/src/background/agents/agent-registry';
 import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
+import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -45,15 +46,6 @@ function getRuntime(): RuntimeMessenger | null {
     browser?: { runtime?: RuntimeMessenger };
   };
   return g.chrome?.runtime ?? g.browser?.runtime ?? null;
-}
-
-function formatTimestamp(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return '';
-  try {
-    return new Date(ms).toLocaleString();
-  } catch {
-    return '';
-  }
 }
 
 function BoundSessionPanel(props: {
@@ -99,39 +91,13 @@ function BoundSessionPanel(props: {
         ) : null}
       </header>
 
+      <div data-testid="bound-session-logs">
+        <GenerationLogsPanel logs={logs} sessionStatus={session.status} />
+      </div>
+
       <div data-testid="bound-session-artifacts">
         <ArtifactsPanel artifacts={artifacts} defaultOpen={true} />
       </div>
-
-      {logs.length > 0 ? (
-        <div
-          data-testid="bound-session-logs"
-          className="flex flex-col gap-1"
-        >
-          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
-            Generation log
-          </span>
-          <ol className="flex max-h-40 flex-col gap-1 overflow-y-auto">
-            {logs.map((entry, idx) => (
-              <li
-                key={idx}
-                data-testid="bound-log-entry"
-                className="flex flex-col text-xs text-zinc-700 dark:text-zinc-300"
-              >
-                <span className="flex items-center gap-2">
-                  {entry.phase !== null ? (
-                    <span className="font-semibold">{entry.phase}</span>
-                  ) : null}
-                  {entry.timestamp > 0 ? (
-                    <span className="text-zinc-400">{formatTimestamp(entry.timestamp)}</span>
-                  ) : null}
-                </span>
-                {entry.message.length > 0 ? <span>{entry.message}</span> : null}
-              </li>
-            ))}
-          </ol>
-        </div>
-      ) : null}
 
       <button
         type="button"
