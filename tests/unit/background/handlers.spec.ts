@@ -183,6 +183,7 @@ describe('HANDLERS record shape', () => {
         'SESSION_HYDRATE_GET',
         'SESSION_BINDING_PUT',
         'SESSION_BINDING_GET',
+        'SESSION_SELECTED',
         'GENERIC_INTENT_DETECT',
         'AUTH_COOKIE_EXCHANGE',
       ].sort(),

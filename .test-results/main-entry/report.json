@@ -1,0 +1,51 @@
+{
+  "swUrl": "chrome-extension://kepefhkhcamgfpefobckbcdpgamebimd/background.js",
+  "snapshot1": {
+    "keys": [
+      "llmc.sw.main-entered"
+    ],
+    "dump": {
+      "llmc.sw.main-entered": {
+        "at": 1776335804196
+      }
+    },
+    "hasChrome": true,
+    "hasBrowser": false,
+    "hasDoc": false,
+    "hasWin": false
+  },
+  "pingResult": {
+    "bootPing": null,
+    "authStatus": {
+      "signedIn": false
+    }
+  },
+  "snapshot2": {
+    "llmc.sw.main-entered": {
+      "at": 1776335804196
+    }
+  },
+  "hasListener": true,
+  "console": [
+    {
+      "type": "info",
+      "text": "[llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {\"keys\":32}"
+    },
+    {
+      "type": "info",
+      "text": "[llmc-ext:bg.auth.cookie] INFO cookie-watcher: registered onChanged listener "
+    },
+    {
+      "type": "info",
+      "text": "[llmc-ext:bg] INFO service worker booted "
+    },
+    {
+      "type": "info",
+      "text": "[llmc-ext:bg] INFO boot: cookie exchange {\"kind\":\"no-cookie\"}"
+    },
+    {
+      "type": "info",
+      "text": "[llmc-ext:bg] INFO installed "
+    }
+  ]
+}

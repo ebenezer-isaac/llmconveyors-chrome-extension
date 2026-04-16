@@ -562,6 +562,11 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     return undefined;
   };
 
+  // ---- SESSION_SELECTED (broadcast-only; bg just no-ops so the
+  // dispatcher does not reject the key. Destined for the sidepanel's
+  // onMessage listener.)
+  const handleSessionSelected: HandlerFor<'SESSION_SELECTED'> = async () => undefined;
+
   // ---- GENERATION_STARTED / GENERATION_COMPLETE (broadcast-only) ----
   const handleGenerationStarted: HandlerFor<'GENERATION_STARTED'> = async () => undefined;
   const handleGenerationComplete: HandlerFor<'GENERATION_COMPLETE'> = async () => {
@@ -803,6 +808,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     SESSION_HYDRATE_GET: sessionHandlers.SESSION_HYDRATE_GET as HandlerFor<'SESSION_HYDRATE_GET'>,
     SESSION_BINDING_PUT: handleSessionBindingPut,
     SESSION_BINDING_GET: handleSessionBindingGet,
+    SESSION_SELECTED: handleSessionSelected,
     GENERIC_INTENT_DETECT: genericIntentHandler as HandlerFor<'GENERIC_INTENT_DETECT'>,
   });
 }

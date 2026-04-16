@@ -133,6 +133,22 @@ export interface ProtocolMap {
   SESSION_BINDING_PUT: (data: SessionBindingPutRequest) => SessionBindingPutResponse;
   SESSION_BINDING_GET: (data: SessionBindingGetRequest) => SessionBindingGetResponse;
 
+  // --- Session selection (1) ---
+  /**
+   * Broadcast emitted when a user explicitly selects a session from a
+   * surface that owns the list (popup's SessionList). Every other surface
+   * that renders session state (sidepanel) listens for this and swaps
+   * its hydrated session accordingly. Read/write goes through
+   * src/background/sessions/session-selection.ts so the selection also
+   * persists to chrome.storage.local -- surfaces that open AFTER the
+   * broadcast can still catch up.
+   */
+  SESSION_SELECTED: (data: {
+    readonly sessionId: string;
+    readonly agentId: 'job-hunter' | 'b2b-sales';
+    readonly tabUrl?: string;
+  }) => void;
+
   // --- Generic intent (1) ---
   GENERIC_INTENT_DETECT: (data: GenericIntentDetectRequest) => GenericIntentDetectResponse;
 }
@@ -174,6 +190,7 @@ export const BG_HANDLED_KEYS = [
   'SESSION_HYDRATE_GET',
   'SESSION_BINDING_PUT',
   'SESSION_BINDING_GET',
+  'SESSION_SELECTED',
   'GENERIC_INTENT_DETECT',
 ] as const;
 

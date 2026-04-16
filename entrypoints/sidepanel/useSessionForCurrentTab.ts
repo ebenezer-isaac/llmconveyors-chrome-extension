@@ -27,6 +27,10 @@ import type { AgentId } from '@/src/background/agents';
 import { SessionBindingEntrySchema } from '@/src/background/messaging/schemas/session-binding.schema';
 import type { SessionBindingEntry } from '@/src/background/messaging/schemas/session-binding.schema';
 import {
+  readSelectedSession,
+  clearSelectedSession,
+} from '@/src/background/sessions/session-selection';
+import {
   SessionHydrateGetResponseSchema,
   type SessionHydrateGetResponse,
   type HydratePayload,
@@ -410,6 +414,9 @@ export function useSessionForCurrentTab(
     setLogs([]);
     setArtifacts([]);
     setError(null);
+    // If an explicit selection was driving this panel, wipe it so a
+    // subsequent run falls back to URL-binding / most-recent.
+    void clearSelectedSession();
   }, [binding]);
 
   const refresh = useCallback(() => {
@@ -432,6 +439,64 @@ export function useSessionForCurrentTab(
         }
         return;
       }
+
+      // Priority 1: explicit selection from the popup's session list.
+      // Persisted in chrome.storage.local so the sidepanel picks it up
+      // even when it was opened by the same click that selected.
+      const selected = await readSelectedSession();
+      if (cancelled) return;
+      if (selected !== null && selected.agentId === opts.agentId) {
+        setStatus('loading');
+        setError(null);
+        const resolved: SessionBindingEntry = {
+          urlKey: '',
+          agentId: opts.agentId,
+          sessionId: selected.sessionId,
+          generationId: '',
+          pageTitle: null,
+          createdAt: 0,
+          updatedAt: selected.selectedAt,
+        };
+        setBinding(resolved);
+        let outcome = await fetchHydrated(resolved.sessionId, sendMessage);
+        if (cancelled) return;
+        if (outcome.kind === 'bg-unreachable') {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          if (cancelled) return;
+          outcome = await fetchHydrated(resolved.sessionId, sendMessage);
+          if (cancelled) return;
+        }
+        if (outcome.kind === 'ok') {
+          setSession(outcome.summary);
+          setLogs(outcome.logs);
+          setArtifacts(outcome.artifacts);
+          setStatus('found');
+          return;
+        }
+        if (outcome.kind === 'not-found') {
+          // Selection references a deleted session; clear it and fall
+          // through to the URL-binding / most-recent flow below.
+          await clearSelectedSession();
+        } else if (outcome.kind === 'signed-out') {
+          setStatus('idle');
+          setBinding(null);
+          setSession(null);
+          setLogs([]);
+          setArtifacts([]);
+          return;
+        } else if (outcome.kind === 'bg-unreachable') {
+          setStatus('bg-unreachable');
+          setError('background unreachable');
+          return;
+        } else {
+          // Network / shape error on an explicit selection: surface
+          // rather than silently falling back. The user made a choice.
+          setStatus('error');
+          setError(outcome.error);
+          return;
+        }
+      }
+
       const tabUrl = await resolveActiveTabUrl(opts.tabId);
       if (cancelled) return;
       if (typeof tabUrl !== 'string' || tabUrl.length === 0) {
@@ -549,8 +614,35 @@ export function useSessionForCurrentTab(
       setError(outcome.error);
     }
     void run();
+
+    // Live sync: if the popup broadcasts SESSION_SELECTED while the
+    // sidepanel is already mounted, re-run the resolver so the new
+    // session hydrates. The durable storage path covers the case where
+    // the sidepanel mounts AFTER the broadcast.
+    const runtimeG = globalThis as unknown as {
+      chrome?: {
+        runtime?: {
+          onMessage?: {
+            addListener: (fn: (msg: unknown) => void) => void;
+            removeListener: (fn: (msg: unknown) => void) => void;
+          };
+        };
+      };
+    };
+    const onRuntimeMessage = (msg: unknown): void => {
+      if (!msg || typeof msg !== 'object') return;
+      const env = msg as { key?: string; data?: { agentId?: string } };
+      if (env.key !== 'SESSION_SELECTED') return;
+      if (env.data?.agentId !== opts.agentId) return;
+      // Clear the dismiss flag for any prior session and re-run.
+      dismissedRef.current = null;
+      setNonce((n) => n + 1);
+    };
+    runtimeG.chrome?.runtime?.onMessage?.addListener(onRuntimeMessage);
+
     return () => {
       cancelled = true;
+      runtimeG.chrome?.runtime?.onMessage?.removeListener(onRuntimeMessage);
     };
   }, [opts.tabId, opts.agentId, opts.signedIn, opts.sendMessage, nonce]);
 

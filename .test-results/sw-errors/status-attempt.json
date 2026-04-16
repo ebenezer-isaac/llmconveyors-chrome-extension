@@ -1,0 +1,8 @@
+{
+  "ping": {
+    "error": "timeout 3s"
+  },
+  "status": {
+    "error": "timeout 3s"
+  }
+}

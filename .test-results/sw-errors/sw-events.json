@@ -1,0 +1,25 @@
+[
+  {
+    "kind": "bootInfo",
+    "data": {}
+  },
+  {
+    "kind": "introspection",
+    "data": {
+      "hasChrome": true,
+      "hasBrowser": false,
+      "hasChromeStorage": true,
+      "hasBrowserStorage": false,
+      "hasChromeRuntime": true,
+      "onMessageHasListener": false
+    }
+  },
+  {
+    "kind": "errors-clicked",
+    "val": false
+  },
+  {
+    "kind": "chrome-extensions-errors",
+    "data": []
+  }
+]

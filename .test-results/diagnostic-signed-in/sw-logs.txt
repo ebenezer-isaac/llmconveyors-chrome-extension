@@ -1,0 +1,9 @@
+[sw] info: [llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {"keys":33}
+[sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: registered onChanged listener 
+[sw] info: [llmc-ext:bg] INFO service worker booted 
+[sw] info: [llmc-ext:bg] INFO installed 
+[sw] warning: [llmc-ext:bg.auth.cookie-exchange] WARN cookie-exchange: exchange returned non-200 {"status":401}
+[sw] info: [llmc-ext:bg] INFO boot: cookie exchange {"kind":"exchange-failed"}
+[sw] warning: [llmc-ext:bg.handlers] WARN cookie-exchange: exchange returned non-200 {"status":401}
+[sw] warning: [llmc-ext:bg.handlers] WARN cookie-exchange: exchange returned non-200 {"status":401}
+[sw] warning: [llmc-ext:bg.handlers] WARN cookie-exchange: exchange returned non-200 {"status":401}

@@ -27,6 +27,7 @@ export default defineConfig({
       'sidePanel',
       'notifications',
       'cookies',
+      'downloads',
     ],
     host_permissions: [
       'https://*.greenhouse.io/*',

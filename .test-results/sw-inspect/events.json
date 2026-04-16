@@ -1,0 +1,164 @@
+[
+  {
+    "kind": "targets",
+    "list": [
+      {
+        "type": "service_worker",
+        "url": "chrome-extension://kepefhkhcamgfpefobckbcdpgamebimd/background.js"
+      },
+      {
+        "type": "page",
+        "url": "about:blank"
+      },
+      {
+        "type": "page",
+        "url": "about:blank"
+      }
+    ]
+  },
+  {
+    "kind": "attached",
+    "type": "service_worker",
+    "url": "chrome-extension://kepefhkhcamgfpefobckbcdpgamebimd/background.js"
+  },
+  {
+    "kind": "sw-attached",
+    "sessionId": "DE0D8E7E3E2196918ACBCAF40C096AE7"
+  },
+  {
+    "kind": "sw-introspection",
+    "hasListener": {
+      "result": {
+        "type": "object",
+        "subtype": "error",
+        "className": "TypeError",
+        "description": "TypeError: Cannot read properties of undefined (reading 'onMessage')\n    at <anonymous>:1:16",
+        "objectId": "-2222430892663276388.3.1"
+      },
+      "exceptionDetails": {
+        "exceptionId": 1,
+        "text": "Uncaught",
+        "lineNumber": 0,
+        "columnNumber": 15,
+        "scriptId": "17",
+        "stackTrace": {
+          "callFrames": [
+            {
+              "functionName": "",
+              "scriptId": "17",
+              "url": "",
+              "lineNumber": 0,
+              "columnNumber": 15
+            }
+          ]
+        },
+        "exception": {
+          "type": "object",
+          "subtype": "error",
+          "className": "TypeError",
+          "description": "TypeError: Cannot read properties of undefined (reading 'onMessage')\n    at <anonymous>:1:16",
+          "objectId": "-2222430892663276388.3.2"
+        }
+      }
+    },
+    "storageKeys": {
+      "result": {
+        "type": "object",
+        "value": {}
+      },
+      "exceptionDetails": {
+        "exceptionId": 2,
+        "text": "Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'local')",
+        "lineNumber": 1,
+        "columnNumber": 33,
+        "scriptId": "18",
+        "stackTrace": {
+          "callFrames": [
+            {
+              "functionName": "",
+              "scriptId": "18",
+              "url": "",
+              "lineNumber": 0,
+              "columnNumber": 32
+            },
+            {
+              "functionName": "",
+              "scriptId": "18",
+              "url": "",
+              "lineNumber": 0,
+              "columnNumber": 0
+            }
+          ]
+        },
+        "exception": {
+          "type": "object",
+          "subtype": "error",
+          "className": "TypeError",
+          "description": "TypeError: Cannot read properties of undefined (reading 'local')\n    at <anonymous>:1:33\n    at new Promise (<anonymous>)\n    at <anonymous>:1:1",
+          "objectId": "-2222430892663276388.3.3"
+        }
+      }
+    },
+    "storageDump": {
+      "result": {
+        "type": "object",
+        "value": {}
+      },
+      "exceptionDetails": {
+        "exceptionId": 3,
+        "text": "Uncaught (in promise) TypeError: Cannot read properties of undefined (reading 'local')",
+        "lineNumber": 1,
+        "columnNumber": 33,
+        "scriptId": "19",
+        "stackTrace": {
+          "callFrames": [
+            {
+              "functionName": "",
+              "scriptId": "19",
+              "url": "",
+              "lineNumber": 0,
+              "columnNumber": 32
+            },
+            {
+              "functionName": "",
+              "scriptId": "19",
+              "url": "",
+              "lineNumber": 0,
+              "columnNumber": 0
+            }
+          ]
+        },
+        "exception": {
+          "type": "object",
+          "subtype": "error",
+          "className": "TypeError",
+          "description": "TypeError: Cannot read properties of undefined (reading 'local')\n    at <anonymous>:1:33\n    at new Promise (<anonymous>)\n    at <anonymous>:1:1",
+          "objectId": "-2222430892663276388.3.4"
+        }
+      }
+    },
+    "swGlobals": {
+      "result": {
+        "type": "object",
+        "subtype": "error",
+        "className": "SyntaxError",
+        "description": "SyntaxError: Cannot use import statement outside a module",
+        "objectId": "-2222430892663276388.3.5"
+      },
+      "exceptionDetails": {
+        "exceptionId": 4,
+        "text": "Uncaught",
+        "lineNumber": 0,
+        "columnNumber": 152,
+        "scriptId": "20",
+        "exception": {
+          "type": "object",
+          "subtype": "error",
+          "className": "SyntaxError",
+          "description": "SyntaxError: Cannot use import statement outside a module",
+          "objectId": "-2222430892663276388.3.6"
+        }
+      }
+    }
+  }
+]

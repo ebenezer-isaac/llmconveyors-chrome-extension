@@ -28,6 +28,7 @@ import {
   type SessionSummary,
 } from './useSessionForCurrentTab';
 import { buildAgentUrl } from '@/src/background/agents/agent-registry';
+import { downloadUrl } from './lib/download';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -117,14 +118,18 @@ function BoundSessionPanel(props: {
                   {artifact.label}
                 </span>
                 {artifact.downloadUrl !== null ? (
-                  <a
-                    href={artifact.downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void downloadUrl(
+                        artifact.downloadUrl!,
+                        `${artifact.type}.txt`,
+                      );
+                    }}
                     className="text-brand-600 hover:underline dark:text-brand-400"
                   >
                     Download
-                  </a>
+                  </button>
                 ) : (
                   <span className="text-zinc-400 dark:text-zinc-500">unavailable</span>
                 )}
@@ -300,7 +305,10 @@ function SidepanelBody(): React.ReactElement {
         />
       ) : null}
       <div className="flex-1">
-        <GenerationView activeAgentType={agentType} />
+        <GenerationView
+          activeAgentType={agentType}
+          mode={showBoundPanel ? 'active-only' : 'both'}
+        />
       </div>
     </div>
   );

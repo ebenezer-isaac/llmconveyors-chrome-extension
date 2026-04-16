@@ -38,6 +38,16 @@ function getRuntime(): RuntimeMessenger | null {
 
 export interface GenerationViewProps {
   readonly activeAgentType: 'job-hunter' | 'b2b-sales';
+  /**
+   * Controls what the view renders when no generation is in flight.
+   *   'both' (default) - show the idle "Click a Generate button" message.
+   *   'active-only'    - render null when idle. Use this when the caller
+   *                      is already showing a prior-session panel above
+   *                      and does not want the trailing idle copy.
+   *   'idle-only'      - render idle copy only; never attach to a live
+   *                      generation (used by documentation/story surfaces).
+   */
+  readonly mode?: 'both' | 'active-only' | 'idle-only';
 }
 
 interface PhaseEntry {
@@ -62,24 +72,15 @@ function statusColor(status: GenerationUpdateBroadcast['status']): string {
   }
 }
 
-function downloadArtifact(artifact: GenerationArtifact): void {
-  try {
-    const blob = new Blob([artifact.content], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${artifact.kind}.txt`;
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 2_000);
-  } catch {
-    // ignore - caller falls back to dashboard link
-  }
-}
-
 import { AGENT_REGISTRY, buildAgentUrl } from '@/src/background/agents/agent-registry';
+import { downloadBlob } from './lib/download';
+import { buildArtifactFilename, defaultFilenameForType } from './lib/filename';
+
+function downloadArtifact(artifact: GenerationArtifact): void {
+  const { suffix, ext } = defaultFilenameForType(artifact.kind, 'text/plain');
+  const filename = buildArtifactFilename({}, suffix, ext);
+  void downloadBlob(artifact.content, filename, 'application/octet-stream');
+}
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 
@@ -110,12 +111,14 @@ function openDashboard(_generationId: string, agentId: AgentId): void {
 
 export function GenerationView({
   activeAgentType,
+  mode = 'both',
 }: GenerationViewProps): React.ReactElement | null {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [latest, setLatest] = useState<GenerationUpdateBroadcast | null>(null);
   const [phases, setPhases] = useState<readonly PhaseEntry[]>([]);
 
   useEffect(() => {
+    if (mode === 'idle-only') return;
     const runtime = getRuntime();
     if (runtime === null) return;
     const listener = (msg: unknown): void => {
@@ -168,7 +171,7 @@ export function GenerationView({
     };
     runtime.onMessage.addListener(listener);
     return () => runtime.onMessage.removeListener(listener);
-  }, [generationId]);
+  }, [generationId, mode]);
 
   const progressPct = useMemo(() => {
     if (latest === null) return 0;
@@ -179,6 +182,11 @@ export function GenerationView({
   }, [latest]);
 
   if (generationId === null) {
+    if (mode === 'active-only') {
+      // Caller (App.tsx) is showing a prior-session panel above and
+      // does not want the idle hint appended. Collapse to nothing.
+      return null;
+    }
     return (
       <div
         data-testid="generation-view-idle"

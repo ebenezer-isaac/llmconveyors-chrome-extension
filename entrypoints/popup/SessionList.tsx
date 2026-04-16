@@ -12,6 +12,7 @@ import { clientEnv } from '@/src/shared/env';
 import { t } from '@/src/shared/i18n';
 import { AGENT_REGISTRY, buildAgentUrl } from '@/src/background/agents/agent-registry';
 import type { AgentId } from '@/src/background/agents';
+import { writeSelectedSession } from '@/src/background/sessions/session-selection';
 
 function dashboardUrl(agentId: AgentId | null): string {
   // Scope "View all" to the agent-specific dashboard so the link lands
@@ -94,34 +95,57 @@ export interface SessionListProps {
   readonly activeAgentId: SessionListItem['agentType'] | null;
 }
 
-function openSessionInSidePanel(sessionId: string): void {
+async function selectSessionAndOpenSidepanel(
+  item: SessionListItem,
+): Promise<void> {
   const g = globalThis as unknown as {
     chrome?: {
       sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
       tabs?: {
         query: (opts: { active: boolean; currentWindow: boolean }) => Promise<
-          Array<{ id?: number }>
+          Array<{ id?: number; url?: string }>
         >;
         create?: (opts: { url: string }) => void;
       };
     };
   };
-  const url = `https://llmconveyors.com/session/${encodeURIComponent(sessionId)}`;
-  const sp = g.chrome?.sidePanel;
+
   const tabs = g.chrome?.tabs;
-  if (sp && tabs) {
-    void tabs.query({ active: true, currentWindow: true }).then((list) => {
+  let activeTabId: number | undefined;
+  let activeTabUrl: string | undefined;
+  if (tabs) {
+    try {
+      const list = await tabs.query({ active: true, currentWindow: true });
       const active = list[0];
-      if (active && typeof active.id === 'number') {
-        void sp.open({ tabId: active.id });
-      }
-    });
+      activeTabId = typeof active?.id === 'number' ? active.id : undefined;
+      activeTabUrl = typeof active?.url === 'string' ? active.url : undefined;
+    } catch {
+      // ignore tab resolution failure; selection broadcast still works
+    }
+  }
+
+  // Persist + broadcast so the sidepanel (opening now or already open)
+  // picks up the chosen session.
+  await writeSelectedSession({
+    sessionId: item.sessionId,
+    agentId: item.agentType,
+    ...(activeTabUrl !== undefined ? { tabUrl: activeTabUrl } : {}),
+  });
+
+  const sp = g.chrome?.sidePanel;
+  if (sp && activeTabId !== undefined) {
+    try {
+      await sp.open({ tabId: activeTabId });
+    } catch {
+      // User-gesture constraints can throw; the broadcast already fired.
+    }
     return;
   }
+  const fallbackUrl = dashboardUrl(item.agentType);
   if (tabs?.create) {
-    tabs.create({ url });
+    tabs.create({ url: fallbackUrl });
   } else {
-    window.open(url, '_blank', 'noopener');
+    window.open(fallbackUrl, '_blank', 'noopener');
   }
 }
 
@@ -204,7 +228,9 @@ export function SessionList({
                   type="button"
                   data-testid={`session-item-${item.sessionId}`}
                   data-status={item.status}
-                  onClick={() => openSessionInSidePanel(item.sessionId)}
+                  onClick={() => {
+                    void selectSessionAndOpenSidepanel(item);
+                  }}
                   className="flex w-full items-center justify-between gap-2 rounded-card px-2 py-1 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 >
                   <span className="flex flex-col">
