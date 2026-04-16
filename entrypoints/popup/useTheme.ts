@@ -46,10 +46,64 @@ export function useTheme(): UseThemeResult {
       setLoading(false);
     });
 
+    // Listen for THEME_CHANGED broadcasts so other extension surfaces
+    // (e.g. sidepanel) re-apply the theme when the popup flips it, and
+    // vice-versa. Also listen for chrome.storage.local changes as a
+    // fallback in case the sender cannot broadcast (e.g. popup already
+    // closed before the runtime message fires).
+    const g = globalThis as unknown as {
+      chrome?: {
+        runtime?: {
+          onMessage?: {
+            addListener: (fn: (msg: unknown) => void) => void;
+            removeListener: (fn: (msg: unknown) => void) => void;
+          };
+        };
+        storage?: {
+          onChanged?: {
+            addListener: (
+              fn: (changes: Record<string, { newValue?: unknown }>, area: string) => void,
+            ) => void;
+            removeListener: (
+              fn: (changes: Record<string, { newValue?: unknown }>, area: string) => void,
+            ) => void;
+          };
+        };
+      };
+    };
+
+    const applyIfValid = (raw: unknown): void => {
+      if (raw !== 'light' && raw !== 'dark' && raw !== 'system') return;
+      disposerRef.current?.();
+      disposerRef.current = applyTheme(raw);
+      setThemeState(raw);
+    };
+
+    const onMessage = (msg: unknown): void => {
+      if (!msg || typeof msg !== 'object') return;
+      const env = msg as { key?: string; data?: { pref?: unknown } };
+      if (env.key !== 'THEME_CHANGED') return;
+      applyIfValid(env.data?.pref);
+    };
+    const onStorage = (
+      changes: Record<string, { newValue?: unknown }>,
+      area: string,
+    ): void => {
+      if (area !== 'local') return;
+      const change = changes['llmc.theme'];
+      if (change === undefined) return;
+      applyIfValid(change.newValue);
+    };
+
+    g.chrome?.runtime?.onMessage?.addListener(onMessage);
+    g.chrome?.storage?.onChanged?.addListener(onStorage);
+
     return () => {
       cancelled = true;
       disposerRef.current?.();
       disposerRef.current = null;
+      g.chrome?.runtime?.onMessage?.removeListener(onMessage);
+      g.chrome?.storage?.onChanged?.removeListener(onStorage);
     };
   }, []);
 
