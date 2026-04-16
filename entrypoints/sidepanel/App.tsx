@@ -30,6 +30,7 @@ import {
 import { buildAgentUrl } from '@/src/background/agents/agent-registry';
 import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
+import { accentFor } from './lib/accent';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -55,8 +56,9 @@ function BoundSessionPanel(props: {
   readonly onStartNew: () => void;
   /** False when this is the fallback "most recent" session (no URL binding). */
   readonly urlBound: boolean;
+  readonly accentBorder: string;
 }): React.ReactElement {
-  const { session, logs, artifacts, onStartNew, urlBound } = props;
+  const { session, logs, artifacts, onStartNew, urlBound, accentBorder } = props;
   const title =
     session.jobTitle ?? session.companyName ?? `Session ${session.sessionId.slice(0, 8)}`;
   return (
@@ -64,7 +66,7 @@ function BoundSessionPanel(props: {
       data-testid="bound-session-panel"
       data-session-id={session.sessionId}
       data-url-bound={urlBound ? 'true' : 'false'}
-      className="flex flex-col gap-3 border-b border-zinc-200 p-4 dark:border-zinc-700"
+      className={`flex flex-col gap-3 border-b p-4 ${accentBorder}`}
     >
       <header className="flex flex-col gap-1">
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -196,16 +198,20 @@ function SidepanelBody(): React.ReactElement {
 
   const showBoundPanel = binding.status === 'found' && binding.session !== null;
   const showLoading = binding.status === 'loading';
+  const accent = accentFor(agent.id);
 
   return (
     <div
       data-testid="sidepanel-root"
       data-active-agent={agent.id}
+      data-accent={agent.id === 'b2b-sales' ? 'purple' : 'emerald'}
       data-binding-status={binding.status}
       className="flex h-screen w-full flex-col bg-white dark:bg-zinc-900"
     >
-      <div className="flex items-center justify-between border-b border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
-        <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
+      <div
+        className={`flex items-center justify-between border-b px-3 py-2 ${accent.header}`}
+      >
+        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-100">
           {agent.label}
         </span>
         <button
@@ -232,6 +238,7 @@ function SidepanelBody(): React.ReactElement {
           artifacts={binding.artifacts}
           onStartNew={binding.dismiss}
           urlBound={binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0}
+          accentBorder={accent.border}
         />
       ) : null}
       <div className="flex-1">
