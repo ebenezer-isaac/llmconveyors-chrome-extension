@@ -55,6 +55,27 @@ export type GenericScanResult =
 function scanForGenericIntent(agent: GenericScanAgent): GenericScanResult {
   const MAX_TEXT = 20_000;
 
+  // Never scan our own surfaces. Without this guard, the URL heuristic
+  // (see hasJobPostingMarkers) falsely fires on job-hunt.llmconveyors.com
+  // because the hostname contains the substring "job".
+  const currentUrl = document.location?.href ?? '';
+  const currentHost = (() => {
+    try {
+      return new URL(currentUrl).hostname;
+    } catch {
+      return '';
+    }
+  })();
+  if (
+    currentUrl.startsWith('chrome-extension://') ||
+    currentUrl.startsWith('chrome://') ||
+    currentUrl.startsWith('about:') ||
+    currentHost === 'llmconveyors.com' ||
+    currentHost.endsWith('.llmconveyors.com')
+  ) {
+    return { ok: false, reason: 'no-match' };
+  }
+
   function findJsonLdObjects(doc: Document): unknown[] {
     const nodes = doc.querySelectorAll('script[type="application/ld+json"]');
     const out: unknown[] = [];
