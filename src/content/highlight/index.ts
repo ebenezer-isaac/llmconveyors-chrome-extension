@@ -7,14 +7,13 @@
  * be listening before the popup can trigger them.
  */
 
-import { browser } from 'wxt/browser';
 import {
   applyHighlights,
   detectPageIntent,
   extractJobDescription,
   removeAllHighlights,
 } from 'ats-autofill-engine/dom';
-import { onMessage } from '@/src/background/messaging/protocol';
+import { onMessage, sendMessage } from '@/src/background/messaging/protocol';
 import { createLogger } from '@/src/background/log';
 import { createApplyHandler } from './apply-handler';
 import { createClearHandler } from './clear-handler';
@@ -51,18 +50,11 @@ export function registerHighlightHandlers(
     extractJobDescription,
     detectPageIntent,
     sendKeywordsExtract: async (args): Promise<KeywordsExtractResponse> => {
-      // Bypass webext-core's sendMessage because A5's bg dispatcher returns
-      // raw handler values, not {res, err} envelopes. We talk to the bg
-      // listener directly with the {key, data} shape its dispatcher accepts.
-      const response = (await browser.runtime.sendMessage({
-        key: 'KEYWORDS_EXTRACT',
-        data: {
-          text: args.text,
-          url: args.url,
-          topK: args.topK,
-        },
-      })) as KeywordsExtractResponse;
-      return response;
+      return sendMessage('KEYWORDS_EXTRACT', {
+        text: args.text,
+        url: args.url,
+        topK: args.topK,
+      }) as Promise<KeywordsExtractResponse>;
     },
   });
 
