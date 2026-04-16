@@ -90,6 +90,10 @@ import {
 } from './schemas/intent.schema';
 import { FillRequestSchema } from './schemas/fill.schema';
 import {
+  HighlightApplyRequestSchema,
+  HighlightClearRequestSchema,
+} from './schemas/highlight.schema';
+import {
   KeywordsExtractRequestSchema,
   ExtractSkillsBackendResponseSchema,
 } from './schemas/keywords.schema';
@@ -489,6 +493,53 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
   };
 
+  // ---- HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR (forwarders) ----
+  // Popup calls chrome.runtime.sendMessage({key:'HIGHLIGHT_APPLY',...})
+  // because it can't target a specific tab directly. The bg takes the
+  // runtime message and re-dispatches it to the content script on the
+  // requested tab via chrome.tabs.sendMessage. Same pattern as
+  // FILL_REQUEST above. Without this the popup message went to no
+  // listener and the popup saw "no response".
+  const handleHighlightApply: HandlerFor<'HIGHLIGHT_APPLY'> = async ({ data }) => {
+    const parsed = HighlightApplyRequestSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, reason: 'no-tab' };
+    }
+    try {
+      const resp = await deps.broadcast.sendToTab(parsed.data.tabId, {
+        key: 'HIGHLIGHT_APPLY',
+        data: parsed.data,
+      });
+      if (!resp || typeof resp !== 'object') {
+        return { ok: false, reason: 'api-error' };
+      }
+      return resp as Awaited<ReturnType<HandlerFor<'HIGHLIGHT_APPLY'>>>;
+    } catch (err) {
+      log.warn('HIGHLIGHT_APPLY: forward failed', { error: String(err) });
+      return { ok: false, reason: 'api-error' };
+    }
+  };
+
+  const handleHighlightClear: HandlerFor<'HIGHLIGHT_CLEAR'> = async ({ data }) => {
+    const parsed = HighlightClearRequestSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, reason: 'no-tab' };
+    }
+    try {
+      const resp = await deps.broadcast.sendToTab(parsed.data.tabId, {
+        key: 'HIGHLIGHT_CLEAR',
+        data: parsed.data,
+      });
+      if (!resp || typeof resp !== 'object') {
+        return { ok: false, reason: 'api-error' };
+      }
+      return resp as Awaited<ReturnType<HandlerFor<'HIGHLIGHT_CLEAR'>>>;
+    } catch (err) {
+      log.warn('HIGHLIGHT_CLEAR: forward failed', { error: String(err) });
+      return { ok: false, reason: 'api-error' };
+    }
+  };
+
   // ---- KEYWORDS_EXTRACT ----
   const handleKeywordsExtract: HandlerFor<'KEYWORDS_EXTRACT'> = async ({ data }) => {
     const parsed = KeywordsExtractRequestSchema.safeParse(data);
@@ -793,6 +844,8 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     INTENT_DETECTED: handleIntentDetected,
     INTENT_GET: handleIntentGet,
     FILL_REQUEST: handleFillRequest,
+    HIGHLIGHT_APPLY: handleHighlightApply,
+    HIGHLIGHT_CLEAR: handleHighlightClear,
     KEYWORDS_EXTRACT: handleKeywordsExtract,
     HIGHLIGHT_STATUS: handleHighlightStatus,
     GENERATION_START: generationHandlers.GENERATION_START as HandlerFor<'GENERATION_START'>,

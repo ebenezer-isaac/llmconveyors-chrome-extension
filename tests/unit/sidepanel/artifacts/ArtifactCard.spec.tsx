@@ -132,7 +132,25 @@ describe('ArtifactCard', () => {
       <ArtifactCard
         artifact={baseArtifact({
           type: 'ats-comparison',
-          payload: { before: { score: 10 }, after: { score: 20 } },
+          payload: {
+            // Production AtsComparisonPayload shape: overallScore + grade
+            // + matchedKeywords + missingKeywords (see AtsScoreResultSchema
+            // in libs/shared-types). The extension body mirrors the
+            // web's AtsComparisonCard so it requires the full shape.
+            before: {
+              overallScore: 60,
+              grade: 'C',
+              matchedKeywords: [],
+              missingKeywords: ['python'],
+            },
+            after: {
+              overallScore: 85,
+              grade: 'B',
+              matchedKeywords: [{ keyword: 'python' }],
+              missingKeywords: [],
+            },
+            improvement: 25,
+          },
           content: null,
           downloadUrl: 'https://x/y.json',
         })}

@@ -160,6 +160,8 @@ describe('HANDLERS record shape', () => {
         'INTENT_DETECTED',
         'INTENT_GET',
         'FILL_REQUEST',
+        'HIGHLIGHT_APPLY',
+        'HIGHLIGHT_CLEAR',
         'KEYWORDS_EXTRACT',
         'HIGHLIGHT_STATUS',
         'GENERATION_START',
@@ -190,10 +192,13 @@ describe('HANDLERS record shape', () => {
       ].sort(),
     );
   });
-  it('omits HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR (content-script owned)', () => {
+  it('registers HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR as bg forwarders', () => {
+    // Moved in to fix popup "no response" error. The bg forwards to the
+    // content script via chrome.tabs.sendMessage (same pattern as
+    // FILL_REQUEST). Content script still owns the actual handler logic.
     const handlers = createHandlers(buildDeps());
-    expect(handlers).not.toHaveProperty('HIGHLIGHT_APPLY');
-    expect(handlers).not.toHaveProperty('HIGHLIGHT_CLEAR');
+    expect(handlers).toHaveProperty('HIGHLIGHT_APPLY');
+    expect(handlers).toHaveProperty('HIGHLIGHT_CLEAR');
   });
   it('omits the legacy PROFILE writer keys (master-resume owns writes)', () => {
     const handlers = createHandlers(buildDeps());

@@ -13,8 +13,12 @@ import {
  * displayName, photoURL) to the popup avatar.
  */
 describe('ProtocolMap key registry', () => {
-  it('BG_HANDLED_KEYS has exactly 34 entries', () => {
-    expect(BG_HANDLED_KEYS).toHaveLength(34);
+  it('BG_HANDLED_KEYS has exactly 36 entries', () => {
+    // +2 from 34: HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR moved in as bg
+    // forwarders (see handlers.ts) so the popup's runtime.sendMessage
+    // reaches the content script. Previously they were content-script
+    // only and the popup got "no response".
+    expect(BG_HANDLED_KEYS).toHaveLength(36);
   });
 
   it('ALL_PROTOCOL_KEYS has exactly 36 entries', () => {
@@ -71,10 +75,10 @@ describe('ProtocolMap key registry', () => {
     expect(actual).toEqual(required);
   });
 
-  it('HIGHLIGHT_APPLY and HIGHLIGHT_CLEAR are NOT in BG_HANDLED_KEYS', () => {
+  it('HIGHLIGHT_APPLY and HIGHLIGHT_CLEAR are in BG_HANDLED_KEYS (forwarders)', () => {
     const bgSet = new Set(BG_HANDLED_KEYS as readonly string[]);
-    expect(bgSet.has('HIGHLIGHT_APPLY')).toBe(false);
-    expect(bgSet.has('HIGHLIGHT_CLEAR')).toBe(false);
+    expect(bgSet.has('HIGHLIGHT_APPLY')).toBe(true);
+    expect(bgSet.has('HIGHLIGHT_CLEAR')).toBe(true);
   });
 
   it('the deprecated PROFILE writer keys stay removed (master-resume owns writes)', () => {

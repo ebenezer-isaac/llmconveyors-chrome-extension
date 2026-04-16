@@ -171,8 +171,10 @@ export interface ProtocolMap {
 
 /**
  * The keys the background worker registers handlers for. HIGHLIGHT_APPLY
- * and HIGHLIGHT_CLEAR are registered by the content script (A9); the bg
- * never receives them directly.
+ * and HIGHLIGHT_CLEAR ride through the bg as forwarders (the bg receives
+ * the popup's runtime.sendMessage, then re-dispatches via
+ * chrome.tabs.sendMessage to the content script) -- same pattern as
+ * FILL_REQUEST.
  */
 export const BG_HANDLED_KEYS = [
   'AUTH_SIGN_IN',
@@ -183,6 +185,8 @@ export const BG_HANDLED_KEYS = [
   'INTENT_DETECTED',
   'INTENT_GET',
   'FILL_REQUEST',
+  'HIGHLIGHT_APPLY',
+  'HIGHLIGHT_CLEAR',
   'KEYWORDS_EXTRACT',
   'HIGHLIGHT_STATUS',
   'GENERATION_START',
@@ -217,11 +221,7 @@ export type BgHandledKey = (typeof BG_HANDLED_KEYS)[number];
  * All ProtocolMap keys enumerated at runtime. Used by the schema
  * generator and validators.
  */
-export const ALL_PROTOCOL_KEYS = [
-  ...BG_HANDLED_KEYS,
-  'HIGHLIGHT_APPLY',
-  'HIGHLIGHT_CLEAR',
-] as const;
+export const ALL_PROTOCOL_KEYS = BG_HANDLED_KEYS;
 
 export type ProtocolKey = (typeof ALL_PROTOCOL_KEYS)[number];
 

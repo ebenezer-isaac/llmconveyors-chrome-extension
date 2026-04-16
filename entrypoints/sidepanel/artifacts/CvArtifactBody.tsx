@@ -88,10 +88,22 @@ type PdfState =
   | { kind: 'error'; reason: string };
 
 function base64ToBlobUrl(base64: string, mimeType: string): string {
-  const binary = atob(base64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  // Base64 -> Uint8Array -> Blob -> object URL. `Uint8Array.fromBase64`
+  // (Baseline 2024, Chrome 135+) is ~5-10x faster than the atob + manual
+  // loop for multi-MB PDFs because it runs the decode in C++ with no
+  // intermediate JS binary string. Fallback covers older Chromium cores.
+  const U8 = Uint8Array as unknown as {
+    fromBase64?: (b: string) => Uint8Array;
+  };
+  let bytes: Uint8Array;
+  if (typeof U8.fromBase64 === 'function') {
+    bytes = U8.fromBase64(base64);
+  } else {
+    const binary = atob(base64);
+    const len = binary.length;
+    bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  }
   const blob = new Blob([bytes], { type: mimeType });
   return URL.createObjectURL(blob);
 }
@@ -157,6 +169,10 @@ export function CvArtifactBody({
           env.content,
           typeof env.mimeType === 'string' ? env.mimeType : 'application/pdf',
         );
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
         setPdfState({ kind: 'ready', url });
       } catch (err: unknown) {
         if (cancelled) return;

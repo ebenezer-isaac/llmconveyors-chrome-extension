@@ -181,8 +181,34 @@ export function useAuthState(): UseAuthStateResult {
           // Cookie exchange unavailable or failed; show signed-out panel
         }
         if (mountedRef.current) setLoading(false);
-      } else if (mountedRef.current) {
-        setLoading(false);
+      } else {
+        // Cross-account sync: extension is signed in, but the website may
+        // have switched to a different account since the extension last
+        // authenticated. Run cookie-exchange to check; it reads the web's
+        // sAccessToken cookie and re-issues a header-mode session for
+        // whoever the cookie's current owner is. If the returned userId
+        // matches currentState.userId -> benign refresh (no state change).
+        // If it differs -> the user switched accounts on the website, so
+        // swap the extension's session to match. If no cookie (website
+        // signed out) -> the extension keeps its valid stored session;
+        // the cookie-watcher handles explicit sign-out separately.
+        try {
+          const exchangeResult = await runtime.sendMessage({
+            key: 'AUTH_COOKIE_EXCHANGE',
+            data: {},
+          });
+          if (
+            mountedRef.current &&
+            isAuthState(exchangeResult) &&
+            exchangeResult.signedIn &&
+            exchangeResult.userId !== currentState.userId
+          ) {
+            setState(exchangeResult);
+          }
+        } catch {
+          // Exchange unavailable; keep the existing signed-in state.
+        }
+        if (mountedRef.current) setLoading(false);
       }
     }
 
