@@ -68,6 +68,12 @@ export default defineConfig({
       sourcemap: true,
       minify: 'esbuild',
       target: 'chrome120',
+      // Disable Vite's module-preload helper entirely. The default helper
+      // calls `document.createElement('link')` which crashes MV3 service
+      // workers. `resolveDependencies: () => []` short-circuits dependency
+      // resolution so the helper is never injected even when a shared chunk
+      // has dynamic imports. See Vite #18551 and WXT #392.
+      modulePreload: { polyfill: false, resolveDependencies: () => [] },
     },
   }),
 

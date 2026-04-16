@@ -4,4 +4,10 @@
  */
 
 export { createGenericIntentHandler } from './generic-intent-handler';
-export type { GenericIntentDeps } from './generic-intent-handler';
+export type {
+  GenericIntentDeps,
+  GenericScanAgent,
+  GenericScanResult,
+  GenericScanJdResult,
+  GenericScanCompanyResult,
+} from './generic-intent-handler';

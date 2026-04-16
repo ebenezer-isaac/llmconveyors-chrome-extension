@@ -71,7 +71,7 @@ import {
 } from './schemas/session-binding.schema';
 import type { SessionListItem } from './schemas/session-list.schema';
 import { createGenericIntentHandler } from '../generic-intent';
-import type { GenericScanAgent, GenericScanResult } from '@/src/content/generic-scan';
+import type { GenericScanAgent, GenericScanResult } from '../generic-intent';
 import {
   AuthSignInRequestSchema,
   AuthSignOutRequestSchema,
