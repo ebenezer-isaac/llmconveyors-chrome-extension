@@ -334,6 +334,22 @@ function isHandledKey(key: string): key is BgHandledKey {
 }
 
 /**
+ * webext-core/messaging wraps every sendMessage in `{id, type, data, timestamp}`
+ * and expects responses wrapped as `{res, err}`. Detect its format so we can
+ * emit the matching envelope; raw chrome.runtime.sendMessage callers that use
+ * `{key, data}` get the plain result.
+ */
+function isWebextCoreMessage(msg: unknown): boolean {
+  if (msg === null || typeof msg !== 'object') return false;
+  const m = msg as Record<string, unknown>;
+  return (
+    typeof m.type === 'string' &&
+    typeof m.timestamp === 'number' &&
+    typeof m.id !== 'undefined'
+  );
+}
+
+/**
  * Dispatch a single incoming message to the matching handler. Returns the
  * handler's resolved value, or `undefined` when no key matches (so the
  * runtime lets other listeners try).
@@ -396,22 +412,35 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
   // the presence of the callback argument: when Chrome is real it arrives
   // as a function; under fake-browser it is undefined and we return the
   // dispatch Promise directly instead.
+  //
+  // Response envelope: when the incoming message is webext-core format
+  // ({id, type, timestamp, data}), the caller unwraps `response.res`
+  // and throws `response.err`. Raw chrome senders expect the plain
+  // result. We detect webext-core by the presence of numeric `timestamp`
+  // + `id` and wrap the response accordingly.
   browser.runtime.onMessage.addListener(
     (
       message: unknown,
       sender: chrome.runtime.MessageSender,
       sendResponse: ((resp: unknown) => void) | undefined,
     ) => {
-      const promise = dispatch(handlers, message, sender).catch(
+      const isWebextCore = isWebextCoreMessage(message);
+      const resultPromise = dispatch(handlers, message, sender).then(
+        (result) => (isWebextCore ? { res: result } : result),
         (err: unknown) => {
           logger.warn('dispatch rejected', {
             error: err instanceof Error ? err.message : String(err),
           });
+          if (isWebextCore) {
+            return {
+              err: err instanceof Error ? { message: err.message } : { message: String(err) },
+            };
+          }
           return undefined;
         },
       );
       if (typeof sendResponse === 'function') {
-        promise.then((result) => {
+        resultPromise.then((result) => {
           try {
             sendResponse(result);
           } catch {
@@ -420,7 +449,7 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
         });
         return true;
       }
-      return promise;
+      return resultPromise;
     },
   );
 
