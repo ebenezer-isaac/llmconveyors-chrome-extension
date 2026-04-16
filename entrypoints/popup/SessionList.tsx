@@ -71,6 +71,13 @@ function formatTime(ts: number | null | undefined): string {
 
 export interface SessionListProps {
   readonly enabled: boolean;
+  /**
+   * Scope the list to the currently-selected agent. Matches the web
+   * dashboard's client-side filter on `metadata.agentType` so the popup
+   * and the web never disagree about which sessions belong to the user's
+   * current agent context.
+   */
+  readonly activeAgentId: SessionListItem['agentType'] | null;
 }
 
 function openSessionInSidePanel(sessionId: string): void {
@@ -116,10 +123,19 @@ function openDashboard(): void {
   }
 }
 
-export function SessionList({ enabled }: SessionListProps): React.ReactElement | null {
+export function SessionList({
+  enabled,
+  activeAgentId,
+}: SessionListProps): React.ReactElement | null {
   const [expanded, setExpanded] = useState<boolean>(true);
-  const { items, loading, error } = useSessionList(enabled, 5);
-  const visible = useMemo(() => items.slice(0, 5), [items]);
+  const { items, loading, error } = useSessionList(enabled, 20);
+  const visible = useMemo(() => {
+    const scoped =
+      activeAgentId === null
+        ? items
+        : items.filter((item) => item.agentType === activeAgentId);
+    return scoped.slice(0, 5);
+  }, [items, activeAgentId]);
 
   if (!enabled) return null;
 

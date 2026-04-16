@@ -155,7 +155,9 @@ function PopupBody(): React.ReactElement {
         </section>
       )}
 
-      {signedIn ? <SessionList enabled={signedIn} /> : null}
+      {signedIn ? (
+        <SessionList enabled={signedIn} activeAgentId={activeAgentId} />
+      ) : null}
 
       {authError !== null ? (
         <p
