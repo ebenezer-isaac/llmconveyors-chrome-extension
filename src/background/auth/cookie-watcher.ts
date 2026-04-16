@@ -15,6 +15,7 @@
  */
 
 import type { Logger } from '../log';
+import type { StoredSession } from '../messaging/schemas/auth.schema';
 
 const COOKIE_NAME = 'sAccessToken';
 const COOKIE_DOMAIN_SUFFIX = 'llmconveyors.com';
@@ -31,7 +32,10 @@ interface CookieChangeInfo {
 export interface CookieWatcherDeps {
   readonly logger: Logger;
   readonly clearSession: () => Promise<void>;
+  readonly readSession: () => Promise<StoredSession | null>;
   readonly broadcast: (message: { readonly key: string; readonly data: unknown }) => Promise<void>;
+  /** Attempt cookie-based exchange. Does NOT modify cookies (no loop risk). */
+  readonly attemptCookieExchange: () => Promise<void>;
 }
 
 interface CookiesApi {
@@ -115,8 +119,24 @@ export function registerCookieWatcher(deps: CookieWatcherDeps): () => void {
         }
       })();
     }
-    // All other events (removed with cause 'overwrite', or set events) are
-    // ignored to prevent the refresh-loop.
+    // Cookie appeared (new sign-in on web while extension is signed out).
+    // Unlike the old launchWebAuthFlow approach, cookie exchange reads the
+    // cookie value and calls the exchange endpoint with a Bearer header.
+    // It does NOT modify any cookies, so there is no feedback loop.
+    if (!info.removed) {
+      void (async () => {
+        const session = await deps.readSession();
+        if (session !== null) return; // already signed in
+        try {
+          await deps.attemptCookieExchange();
+          deps.logger.info('cookie-watcher: auto-exchanged on cookie set');
+        } catch (err: unknown) {
+          deps.logger.debug('cookie-watcher: exchange on cookie-set failed', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
+    }
   };
 
   cookies.onChanged.addListener(handler);

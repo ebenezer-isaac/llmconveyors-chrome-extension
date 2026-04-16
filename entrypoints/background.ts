@@ -8,7 +8,7 @@
  */
 
 import { createLogger } from '@/src/background/log';
-import { LOG_SCOPES } from '@/src/background/config';
+import { LOG_SCOPES, AUTH_EXCHANGE_ENDPOINT } from '@/src/background/config';
 import { registerHandlers } from '@/src/background/messaging/register-handlers';
 import { clearTabState } from '@/src/background/storage/tab-state';
 import { initSessionManager } from '@/src/background/session/session-manager';
@@ -17,7 +17,7 @@ import {
   writeSession,
   clearSession,
 } from '@/src/background/storage/session-storage';
-import { registerCookieWatcher } from '@/src/background/auth';
+import { registerCookieWatcher, createCookieExchange } from '@/src/background/auth';
 
 const logger = createLogger(LOG_SCOPES.background);
 
@@ -54,9 +54,22 @@ export default defineBackground({
     // removed or refreshed, mirror the change into the extension's stored
     // session so the popup reflects the real auth state without requiring
     // a manual sign in / sign out.
+    const cookieExchangeFn = createCookieExchange({
+      logger: createLogger('bg.auth.cookie-exchange.watcher'),
+      fetch: globalThis.fetch.bind(globalThis),
+      exchangeEndpoint: AUTH_EXCHANGE_ENDPOINT,
+      storage: { writeSession },
+      broadcast: {
+        sendRuntime: async (msg) => {
+          try { await browser.runtime.sendMessage(msg); } catch {}
+        },
+      },
+    });
+
     registerCookieWatcher({
       logger: createLogger('bg.auth.cookie'),
       clearSession,
+      readSession,
       broadcast: async (message) => {
         try {
           await browser.runtime.sendMessage(message);
@@ -66,7 +79,37 @@ export default defineBackground({
           });
         }
       },
+      attemptCookieExchange: async () => {
+        await cookieExchangeFn();
+      },
     });
+
+    // Proactive session recovery on service worker boot: if no stored
+    // session exists but the user has a valid SuperTokens web cookie,
+    // exchange it immediately so the popup opens in signed-in state.
+    void (async () => {
+      const existingSession = await readSession();
+      if (existingSession !== null) return;
+      try {
+        const exchange = createCookieExchange({
+          logger: createLogger('bg.auth.cookie-exchange'),
+          fetch: globalThis.fetch.bind(globalThis),
+          exchangeEndpoint: AUTH_EXCHANGE_ENDPOINT,
+          storage: { writeSession },
+          broadcast: {
+            sendRuntime: async (msg) => {
+              try { await browser.runtime.sendMessage(msg); } catch {}
+            },
+          },
+        });
+        const result = await exchange();
+        logger.info('boot: cookie exchange', { kind: result.kind });
+      } catch (err) {
+        logger.debug('boot: cookie exchange failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
 
     browser.runtime.onInstalled.addListener(({ reason }) => {
       if (reason === 'install') {

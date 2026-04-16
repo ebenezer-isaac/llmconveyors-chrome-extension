@@ -158,11 +158,29 @@ export function useAuthState(): UseAuthStateResult {
         // Service worker may be spinning up; the broadcast listener will
         // still catch a subsequent sign-in.
       }
-      // Attempt a silent sign-in only when we already know the user is
-      // unauthed. Keep `loading: true` so the popup does not flash the
-      // signed-out panel before the silent flow resolves.
+      // Attempt cookie-based exchange when unauthed. Reads the web's
+      // sAccessToken cookie directly via chrome.cookies.get() and exchanges
+      // it for a header-mode session. No bridge page, no JS execution in a
+      // hidden window. Falls back gracefully if no cookie exists.
       if (currentState.signedIn === false) {
-        await runSignIn(false);
+        try {
+          const exchangeResult = await runtime.sendMessage({
+            key: 'AUTH_COOKIE_EXCHANGE',
+            data: {},
+          });
+          if (
+            mountedRef.current &&
+            isAuthState(exchangeResult) &&
+            exchangeResult.signedIn
+          ) {
+            setState(exchangeResult);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Cookie exchange unavailable or failed; show signed-out panel
+        }
+        if (mountedRef.current) setLoading(false);
       } else if (mountedRef.current) {
         setLoading(false);
       }
