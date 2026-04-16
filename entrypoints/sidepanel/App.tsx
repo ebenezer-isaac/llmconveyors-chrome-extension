@@ -60,19 +60,22 @@ function BoundSessionPanel(props: {
   readonly logs: readonly SessionLogEntry[];
   readonly artifacts: readonly SessionArtifact[];
   readonly onStartNew: () => void;
+  /** False when this is the fallback "most recent" session (no URL binding). */
+  readonly urlBound: boolean;
 }): React.ReactElement {
-  const { session, logs, artifacts, onStartNew } = props;
+  const { session, logs, artifacts, onStartNew, urlBound } = props;
   const title =
     session.jobTitle ?? session.companyName ?? `Session ${session.sessionId.slice(0, 8)}`;
   return (
     <section
       data-testid="bound-session-panel"
       data-session-id={session.sessionId}
+      data-url-bound={urlBound ? 'true' : 'false'}
       className="flex flex-col gap-3 border-b border-zinc-200 p-4 dark:border-zinc-700"
     >
       <header className="flex flex-col gap-1">
         <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Previous session for this page
+          {urlBound ? 'Previous session for this page' : 'Most recent session'}
         </span>
         <span
           data-testid="bound-session-title"
@@ -293,6 +296,7 @@ function SidepanelBody(): React.ReactElement {
           logs={binding.logs}
           artifacts={binding.artifacts}
           onStartNew={binding.dismiss}
+          urlBound={binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0}
         />
       ) : null}
       <div className="flex-1">

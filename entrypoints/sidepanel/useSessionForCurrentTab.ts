@@ -296,6 +296,34 @@ async function fetchBinding(
   return parsed.data;
 }
 
+/**
+ * Fallback: when no tab-bound session exists for the current URL, look up
+ * the most recent session for this agent so the sidepanel can still show
+ * something useful (last artifacts + logs) instead of the empty
+ * "No active generation" state. Mirrors what the web dashboard does on
+ * initial load.
+ */
+async function fetchMostRecentAgentSessionId(
+  agentId: AgentId,
+  sendMessage: (msg: unknown) => Promise<unknown>,
+): Promise<string | null> {
+  const raw = await sendMessage({
+    key: 'SESSION_LIST',
+    data: { limit: 20, forceRefresh: false },
+  });
+  if (raw === null || typeof raw !== 'object') return null;
+  const env = raw as { ok?: boolean; items?: unknown };
+  if (env.ok !== true || !Array.isArray(env.items)) return null;
+  for (const item of env.items) {
+    if (!item || typeof item !== 'object') continue;
+    const it = item as { agentType?: unknown; sessionId?: unknown };
+    if (it.agentType === agentId && typeof it.sessionId === 'string') {
+      return it.sessionId;
+    }
+  }
+  return null;
+}
+
 type FetchHydratedOutcome =
   | {
       readonly kind: 'ok';
@@ -436,22 +464,47 @@ export function useSessionForCurrentTab(
         return;
       }
       if (cancelled) return;
+      let resolved: SessionBindingEntry;
       if (found === null) {
-        setStatus('not-found');
-        setBinding(null);
-        setSession(null);
-        setLogs([]);
-        setArtifacts([]);
-        return;
+        // Fallback: hydrate the user's most-recent session for this agent
+        // so the sidepanel always has content to show on load (matching
+        // the web dashboard's default landing behaviour).
+        const fallbackId = await fetchMostRecentAgentSessionId(
+          opts.agentId,
+          sendMessage,
+        );
+        if (cancelled) return;
+        if (fallbackId === null) {
+          setStatus('not-found');
+          setBinding(null);
+          setSession(null);
+          setLogs([]);
+          setArtifacts([]);
+          return;
+        }
+        // Synthesize a binding-like entry so the existing render path
+        // picks up the session. urlKey is '' because this is not a
+        // URL-bound session; consumers that care can check `binding.urlKey`.
+        resolved = {
+          urlKey: '',
+          agentId: opts.agentId,
+          sessionId: fallbackId,
+          generationId: '',
+          pageTitle: null,
+          createdAt: 0,
+          updatedAt: 0,
+        };
+      } else {
+        resolved = found;
       }
-      const dismissKey = `${found.urlKey}|${found.agentId}`;
+      const dismissKey = `${resolved.urlKey}|${resolved.agentId}`;
       if (dismissedRef.current === dismissKey) {
         setStatus('not-found');
         setBinding(null);
         return;
       }
-      setBinding(found);
-      let outcome = await fetchHydrated(found.sessionId, sendMessage);
+      setBinding(resolved);
+      let outcome = await fetchHydrated(resolved.sessionId, sendMessage);
       if (cancelled) return;
       if (outcome.kind === 'bg-unreachable') {
         // Service worker likely asleep on first message after sidepanel
@@ -460,7 +513,7 @@ export function useSessionForCurrentTab(
         // the unreachable state to the UI.
         await new Promise((resolve) => setTimeout(resolve, 200));
         if (cancelled) return;
-        outcome = await fetchHydrated(found.sessionId, sendMessage);
+        outcome = await fetchHydrated(resolved.sessionId, sendMessage);
         if (cancelled) return;
       }
       if (outcome.kind === 'ok') {
