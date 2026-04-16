@@ -35,6 +35,9 @@ export default defineConfig({
       'https://api.llmconveyors.com/*',
       'https://*.llmconveyors.com/*',
       'https://llmconveyors.com/*',
+      // E2E fixture server. Only present when WXT_E2E=true so production
+      // never ships with localhost permissions.
+      ...(process.env.WXT_E2E === 'true' ? ['http://localhost:5174/*'] : []),
     ],
     content_security_policy: {
       // Lock the extension runtime: no remote scripts, no eval, no inline.

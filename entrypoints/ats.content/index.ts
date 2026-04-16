@@ -23,11 +23,19 @@ import { initIntentDetection } from '@/src/content/intent';
 
 const logger = createLogger('content:ats');
 
+// E2E fixture server runs on http://localhost:5174. Including it in
+// content_scripts.matches lets Playwright exercise detection + highlight
+// flows without needing privileged injection. The flag is opt-in via
+// WXT_E2E=true so production builds never ship a localhost matcher.
+const E2E_MATCHES: readonly string[] =
+  import.meta.env.WXT_E2E === 'true' ? ['http://localhost:5174/*'] : [];
+
 export default defineContentScript({
   matches: [
     'https://*.greenhouse.io/*',
     'https://jobs.lever.co/*',
     'https://*.myworkdayjobs.com/*',
+    ...E2E_MATCHES,
   ],
   runAt: 'document_idle',
   world: 'ISOLATED',
