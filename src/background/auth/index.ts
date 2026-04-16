@@ -58,3 +58,10 @@ export { AUTH_MODULE_BLUEPRINT, blueprint } from './blueprint';
 
 export { registerCookieWatcher } from './cookie-watcher';
 export type { CookieWatcherDeps } from './cookie-watcher';
+
+export { createFetchAuthed } from './fetch-authed';
+export type {
+  FetchAuthed,
+  FetchAuthedDeps,
+  FetchAuthedResult,
+} from './fetch-authed';

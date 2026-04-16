@@ -3,7 +3,7 @@
 **Generated file.** Edit source schemas at `src/background/messaging/schemas/**` and run `pnpm generate:protocol-schema`.
 
 Schema version: 1.0.0
-Total keys: 26
+Total keys: 27
 
 ## Key Table
 
@@ -32,6 +32,7 @@ Total keys: 26
 | `PROFILE_GET` | background | no |
 | `SESSION_LIST` | background | no |
 | `SESSION_GET` | background | no |
+| `SESSION_HYDRATE_GET` | background | no |
 | `SESSION_BINDING_PUT` | background | no |
 | `SESSION_BINDING_GET` | background | no |
 | `GENERIC_INTENT_DETECT` | background | no |
@@ -1792,6 +1793,141 @@ Response schema:
       "required": [
         "ok",
         "session"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": false
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "signed-out",
+            "not-found",
+            "network-error",
+            "api-error",
+            "shape-mismatch"
+          ]
+        },
+        "status": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ok",
+        "reason"
+      ],
+      "additionalProperties": false
+    }
+  ],
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### SESSION_HYDRATE_GET
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  },
+  "required": [
+    "sessionId"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "updatedAt": {
+                  "type": [
+                    "string",
+                    "number"
+                  ]
+                }
+              },
+              "additionalProperties": true
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "storageKey": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "generationLogs": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "required": [
+            "session"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "ok",
+        "payload"
       ],
       "additionalProperties": false
     },

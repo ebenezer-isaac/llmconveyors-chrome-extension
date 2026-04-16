@@ -11,6 +11,8 @@
 import type { Logger } from '../log';
 import type { StoredSession } from './schemas/auth.schema';
 import type { DetectedIntent } from './schemas/intent.schema';
+import type { FetchAuthed } from '../auth';
+import type { SessionManager } from '../session/session-manager';
 import type {
   AuthState,
   AuthSignInResponse,
@@ -56,7 +58,10 @@ import {
   type AgentClient,
 } from '../generation';
 import { createSessionHandlers } from '../sessions';
-import type { SessionListClientOutcome } from '../sessions';
+import type {
+  SessionListClientOutcome,
+  SessionHydrateClientOutcome,
+} from '../sessions';
 import type { CachedSessionList } from '../sessions';
 import type { SessionBindingStore } from '../sessions';
 import { canonicalizeUrl } from '../sessions';
@@ -89,7 +94,6 @@ import { HighlightStatusRequestSchema } from './schemas/highlight.schema';
 import { GenerationUpdateBroadcastSchema } from './schemas/generation.schema';
 import { CreditsGetRequestSchema } from './schemas/credits.schema';
 import { ProfileGetRequestSchema } from './schemas/profile.schema';
-import { SessionExpiredError } from './errors';
 import type { BgHandledKey, ProtocolMap } from './protocol';
 import {
   AuthError,
@@ -161,6 +165,9 @@ export interface SessionHandlerAdapters {
       cursor?: string;
     }) => Promise<SessionListClientOutcome>;
   };
+  readonly hydrateClient: {
+    hydrate: (sessionId: string) => Promise<SessionHydrateClientOutcome>;
+  };
   readonly cache: {
     read: () => Promise<CachedSessionList | null>;
     write: (entry: {
@@ -204,6 +211,8 @@ export interface GenericIntentHandlerAdapters {
 export interface HandlerDeps {
   readonly logger: Logger;
   readonly fetch: typeof globalThis.fetch;
+  readonly fetchAuthed: FetchAuthed;
+  readonly sessionManager: SessionManager;
   readonly now: () => number;
   readonly storage: HandlerStorage;
   readonly tabState: HandlerTabState;
@@ -226,14 +235,6 @@ export type HandlerFor<K extends BgHandledKey> = (msg: {
 }) => Promise<ReturnType<ProtocolMap[K]>>;
 
 export type Handlers = { readonly [K in BgHandledKey]: HandlerFor<K> };
-
-async function safeSignedIn(storage: HandlerStorage): Promise<StoredSession | null> {
-  try {
-    return await storage.readSession();
-  } catch {
-    return null;
-  }
-}
 
 export function createHandlers(deps: HandlerDeps): Handlers {
   const log = deps.logger;
@@ -378,7 +379,12 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (!parsed.success) {
       log.warn('AUTH_STATUS: ignoring invalid request shape');
     }
-    const session = await safeSignedIn(deps.storage);
+    let session: StoredSession | null = null;
+    try {
+      session = await deps.storage.readSession();
+    } catch {
+      session = null;
+    }
     if (session === null) return UNAUTHED;
     return { signedIn: true, userId: session.userId };
   };
@@ -459,30 +465,23 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (!parsed.success) {
       return { ok: false, reason: 'empty-text' };
     }
-    const session = await safeSignedIn(deps.storage);
-    if (session === null) {
+    const started = deps.now();
+    const result = await deps.fetchAuthed(deps.endpoints.extractSkills, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        text: parsed.data.text,
+        options: { topK: parsed.data.topK ?? 40 },
+      }),
+    });
+    if (result.kind === 'unauthenticated') {
       return { ok: false, reason: 'signed-out' };
     }
-    const started = deps.now();
-    let res: Response;
-    try {
-      res = await deps.fetch(deps.endpoints.extractSkills, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.accessToken}`,
-        },
-        body: JSON.stringify({
-          text: parsed.data.text,
-          options: { topK: parsed.data.topK ?? 40 },
-        }),
-      });
-    } catch (err) {
-      if (err instanceof SessionExpiredError) return { ok: false, reason: 'signed-out' };
-      log.warn('KEYWORDS_EXTRACT: network', { error: String(err) });
+    if (result.kind === 'network-error') {
+      log.warn('KEYWORDS_EXTRACT: network', { error: result.error.message });
       return { ok: false, reason: 'network-error' };
     }
-    if (res.status === 401 || res.status === 403) return { ok: false, reason: 'signed-out' };
+    const res = result.response;
     if (res.status === 429) return { ok: false, reason: 'rate-limited' };
     if (!res.ok) return { ok: false, reason: 'api-error' };
 
@@ -570,27 +569,27 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   // optional so the extension keeps rendering gracefully until the backend
   // ships them.
   async function fetchSettingsProfile(): Promise<Record<string, unknown> | null> {
-    const session = await safeSignedIn(deps.storage);
-    if (session === null) return null;
-    try {
-      const res = await deps.fetch(deps.endpoints.settingsProfile, {
-        method: 'GET',
-        headers: { authorization: `Bearer ${session.accessToken}` },
+    const result = await deps.fetchAuthed(deps.endpoints.settingsProfile, {
+      method: 'GET',
+    });
+    if (result.kind === 'unauthenticated') return null;
+    if (result.kind === 'network-error') {
+      log.warn('settings/profile fetch: network', {
+        error: result.error.message,
       });
-      if (!res.ok) return null;
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        return null;
-      }
-      if (typeof body !== 'object' || body === null) return null;
-      const obj = body as Record<string, unknown>;
-      return (obj.data as Record<string, unknown> | undefined) ?? obj;
-    } catch (err) {
-      log.warn('settings/profile fetch: network', { error: String(err) });
       return null;
     }
+    const res = result.response;
+    if (!res.ok) return null;
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      return null;
+    }
+    if (typeof body !== 'object' || body === null) return null;
+    const obj = body as Record<string, unknown>;
+    return (obj.data as Record<string, unknown> | undefined) ?? obj;
   }
 
   const handleCreditsGet: HandlerFor<'CREDITS_GET'> = async ({ data }) => {
@@ -652,6 +651,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
 
   const sessionHandlers = createSessionHandlers({
     client: deps.sessions.client,
+    hydrateClient: deps.sessions.hydrateClient,
     cache: deps.sessions.cache,
     now: deps.now,
     logger: log,
@@ -771,6 +771,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     AGENT_MANIFEST_GET: agentHandlers.AGENT_MANIFEST_GET,
     SESSION_LIST: sessionHandlers.SESSION_LIST as HandlerFor<'SESSION_LIST'>,
     SESSION_GET: sessionHandlers.SESSION_GET as HandlerFor<'SESSION_GET'>,
+    SESSION_HYDRATE_GET: sessionHandlers.SESSION_HYDRATE_GET as HandlerFor<'SESSION_HYDRATE_GET'>,
     SESSION_BINDING_PUT: handleSessionBindingPut,
     SESSION_BINDING_GET: handleSessionBindingGet,
     GENERIC_INTENT_DETECT: genericIntentHandler as HandlerFor<'GENERIC_INTENT_DETECT'>,

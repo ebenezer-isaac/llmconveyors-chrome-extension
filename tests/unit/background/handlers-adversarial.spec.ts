@@ -25,6 +25,25 @@ import {
   type HandlerDeps,
 } from '../../../src/background/messaging/handlers';
 import type { StoredSession } from '../../../src/background/messaging/schemas/auth.schema';
+import type {
+  FetchAuthed,
+  FetchAuthedResult,
+} from '../../../src/background/auth';
+import type { SessionManager } from '../../../src/background/session/session-manager';
+
+function buildFakeSessionManager(session: StoredSession | null): SessionManager {
+  return {
+    getSession: vi.fn(async () => session),
+  } as unknown as SessionManager;
+}
+
+function buildFakeFetchAuthed(
+  impl: (url: string, init?: RequestInit) => Promise<FetchAuthedResult> = async () => ({
+    kind: 'unauthenticated',
+  }),
+): FetchAuthed {
+  return vi.fn(impl);
+}
 
 const sender = { tab: { id: 42 } } as chrome.runtime.MessageSender;
 
@@ -39,6 +58,8 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
     fetch: vi.fn(
       async () => new Response('{}', { status: 200 }),
     ) as unknown as typeof fetch,
+    fetchAuthed: buildFakeFetchAuthed(),
+    sessionManager: buildFakeSessionManager(null),
     now: () => 1_713_000_000_000,
     storage: {
       readSession: vi.fn(async (): Promise<StoredSession | null> => null),
@@ -102,6 +123,9 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
     sessions: {
       client: {
         list: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
+      },
+      hydrateClient: {
+        hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
       },
       cache: {
         read: vi.fn(async () => null),
@@ -231,9 +255,10 @@ describe('handlers adversarial -- empty + max-size payloads', () => {
   it('KEYWORDS_EXTRACT with 50K text is accepted (at max boundary)', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
-      async () =>
-        new Response(
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({
+        kind: 'ok',
+        response: new Response(
           JSON.stringify({
             success: true,
             data: {
@@ -249,12 +274,10 @@ describe('handlers adversarial -- empty + max-size payloads', () => {
               tookMs: 10,
             },
           }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
-    ) as unknown as typeof fetch;
+      }),
+    );
     const h = createHandlers(deps);
     const r = await h.KEYWORDS_EXTRACT({
       data: {
@@ -296,19 +319,18 @@ describe('handlers adversarial -- Unicode edge cases', () => {
   it('KEYWORDS_EXTRACT with jd text of Unicode combining marks accepted', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
-      async () =>
-        new Response(
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({
+        kind: 'ok',
+        response: new Response(
           JSON.stringify({
             success: true,
             data: { keywords: [], tookMs: 0 },
           }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
-    ) as unknown as typeof fetch;
+      }),
+    );
     const h = createHandlers(deps);
     const r = await h.KEYWORDS_EXTRACT({
       data: {
@@ -377,19 +399,18 @@ describe('handlers adversarial -- concurrent re-entry', () => {
   it('KEYWORDS_EXTRACT x10 in parallel all return typed envelope', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
-      async () =>
-        new Response(
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({
+        kind: 'ok',
+        response: new Response(
           JSON.stringify({
             success: true,
             data: { keywords: [], tookMs: 1 },
           }),
-          {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          },
+          { status: 200, headers: { 'content-type': 'application/json' } },
         ),
-    ) as unknown as typeof fetch;
+      }),
+    );
     const h = createHandlers(deps);
     const results = await Promise.all(
       Array.from({ length: 10 }, () =>
@@ -418,12 +439,12 @@ describe('handlers adversarial -- storage + fetch errors', () => {
     expect(r).toEqual({ signedIn: false });
   });
 
-  it('KEYWORDS_EXTRACT returns network-error when fetch rejects', async () => {
+  it('KEYWORDS_EXTRACT returns network-error when fetchAuthed reports network error', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => {
-      throw new TypeError('disconnected');
-    }) as unknown as typeof fetch;
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({ kind: 'network-error', error: new TypeError('disconnected') }),
+    );
     const h = createHandlers(deps);
     const r = await h.KEYWORDS_EXTRACT({
       data: { text: 'x', url: 'https://job.example/1' },
@@ -432,11 +453,12 @@ describe('handlers adversarial -- storage + fetch errors', () => {
     expect(r).toEqual({ ok: false, reason: 'network-error' });
   });
 
-  it('KEYWORDS_EXTRACT returns signed-out on 403', async () => {
+  it('KEYWORDS_EXTRACT returns signed-out when fetchAuthed exhausts silent retry', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(async () => new Response('', { status: 403 })) as
-      unknown as typeof fetch;
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({ kind: 'unauthenticated' }),
+    );
     const h = createHandlers(deps);
     const r = await h.KEYWORDS_EXTRACT({
       data: { text: 'x', url: 'https://job.example/1' },
@@ -448,13 +470,15 @@ describe('handlers adversarial -- storage + fetch errors', () => {
   it('KEYWORDS_EXTRACT returns api-error on invalid JSON', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
-      async () =>
-        new Response('not-json at all', {
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({
+        kind: 'ok',
+        response: new Response('not-json at all', {
           status: 200,
           headers: { 'content-type': 'application/json' },
         }),
-    ) as unknown as typeof fetch;
+      }),
+    );
     const h = createHandlers(deps);
     const r = await h.KEYWORDS_EXTRACT({
       data: { text: 'x', url: 'https://job.example/1' },
@@ -482,10 +506,12 @@ describe('handlers adversarial -- storage + fetch errors', () => {
   it('CREDITS_GET returns fallback on API shape drift', async () => {
     const deps = buildDeps();
     deps.storage.readSession = vi.fn(async () => validSession);
-    (deps as unknown as { fetch: typeof fetch }).fetch = vi.fn(
-      async () =>
-        new Response('not-json', { status: 200 }),
-    ) as unknown as typeof fetch;
+    (deps as unknown as { fetchAuthed: FetchAuthed }).fetchAuthed = buildFakeFetchAuthed(
+      async () => ({
+        kind: 'ok',
+        response: new Response('not-json', { status: 200 }),
+      }),
+    );
     const h = createHandlers(deps);
     const r = await h.CREDITS_GET({ data: {}, sender });
     expect(r).toEqual({ credits: 0, tier: 'free', byoKeyEnabled: false });

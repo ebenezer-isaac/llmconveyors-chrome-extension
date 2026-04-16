@@ -47,16 +47,17 @@ function install(opts: {
   readonly hydrateBody?: unknown;
   readonly hydrateStatus?: number;
 }): FakeChrome {
-  const fetchImpl = vi.fn(async () => {
+  function hydrateReply(): unknown {
     if (opts.hydrateStatus === 404) {
-      return new Response('not-found', { status: 404 });
+      return { ok: false, reason: 'not-found' };
     }
-    return new Response(JSON.stringify(opts.hydrateBody ?? {}), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    });
-  });
-  (globalThis as unknown as { fetch: typeof fetch }).fetch = fetchImpl as unknown as typeof fetch;
+    const body = opts.hydrateBody as { data?: unknown } | undefined;
+    const payload =
+      body && typeof body === 'object' && 'data' in body
+        ? (body as { data: unknown }).data
+        : body;
+    return { ok: true, payload };
+  }
 
   const sendMessage = vi.fn(async (msg: unknown) => {
     const env = msg as { key?: string };
@@ -88,6 +89,8 @@ function install(opts: {
         return opts.signedIn ? { signedIn: true, userId: 'u1' } : { signedIn: false };
       case 'SESSION_BINDING_GET':
         return opts.binding;
+      case 'SESSION_HYDRATE_GET':
+        return hydrateReply();
       default:
         return undefined;
     }

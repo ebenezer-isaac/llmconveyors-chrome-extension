@@ -46,6 +46,7 @@ import {
   createSessionListClient,
   createSessionListCache,
   createSessionBindingStore,
+  createSessionHydrateClient,
 } from '../sessions';
 import {
   createAgentClient,
@@ -65,11 +66,88 @@ import { BG_HANDLED_KEYS } from './protocol';
 import { createHandlers, type Handlers, type HandlerDeps } from './handlers';
 import type { DetectedIntent } from './schemas/intent.schema';
 import type { HighlightStatus } from './schemas/highlight.schema';
+import {
+  createFetchAuthed,
+  createSignInOrchestrator,
+  DEFAULT_BRIDGE_URL,
+  defaultParseAuthFragmentDeps,
+  defaultWebAuthFlowDeps,
+  launchWebAuthFlow,
+  type FetchAuthed,
+} from '../auth';
+import { SessionManager } from '../session/session-manager';
+import { getSessionManager } from '../session/session-manager';
 
 const logger = createLogger(LOG_SCOPES.handlers);
 
+const REFRESH_ENDPOINT = `${API_BASE_URL}/api/v1/auth/session/refresh`;
+
+function resolveSessionManager(): SessionManager {
+  const existing = getSessionManager();
+  if (existing !== null) return existing;
+  // Fallback for test harnesses that import register-handlers without
+  // calling initSessionManager first. Production wiring in
+  // entrypoints/background.ts always initialises before this path runs.
+  return new SessionManager({
+    readSession,
+    writeSession,
+    clearSession,
+    fetch: globalThis.fetch.bind(globalThis),
+    now: () => Date.now(),
+    logger: createLogger(LOG_SCOPES.session),
+    refreshEndpoint: REFRESH_ENDPOINT,
+  });
+}
+
+function buildSilentSignIn(logCtx: ReturnType<typeof createLogger>): () => Promise<boolean> {
+  return async function silentSignIn(): Promise<boolean> {
+    const orchestrator = createSignInOrchestrator({
+      webAuthFlow: defaultWebAuthFlowDeps,
+      storage: {
+        writeSession,
+        readSession,
+      },
+      broadcast: {
+        sendRuntime: async (msg) => {
+          try {
+            await browser.runtime.sendMessage(msg);
+          } catch (err: unknown) {
+            logCtx.debug('silent-signin broadcast: no listener', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        },
+      },
+      parseDeps: defaultParseAuthFragmentDeps,
+      logger: logCtx,
+      now: () => Date.now(),
+      bridgeUrl: DEFAULT_BRIDGE_URL,
+      launch: launchWebAuthFlow,
+    });
+    try {
+      const state = await orchestrator({ interactive: false });
+      return state.signedIn === true;
+    } catch (err: unknown) {
+      logCtx.debug('silent-signin: failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  };
+}
+
 function buildProductionDeps(): HandlerDeps {
   const fetchFn = globalThis.fetch.bind(globalThis);
+  const sessionManager = resolveSessionManager();
+  const silentSignInLogger = createLogger('bg.auth.silent');
+  const fetchAuthed: FetchAuthed = createFetchAuthed({
+    sessionManager,
+    fetch: fetchFn,
+    silentSignIn: buildSilentSignIn(silentSignInLogger),
+    logger: createLogger('bg.fetchAuthed'),
+    now: () => Date.now(),
+  });
+
   const chromeStorage = {
     get: async (key: string) => {
       const raw = await chrome.storage.local.get(key);
@@ -88,13 +166,9 @@ function buildProductionDeps(): HandlerDeps {
     now: () => Date.now(),
   });
   const masterResumeClient = createMasterResumeClient({
-    fetch: fetchFn,
+    fetchAuthed,
     logger,
     endpoint: MASTER_RESUME_ENDPOINT,
-    accessToken: async () => {
-      const session = await readSession();
-      return session?.accessToken ?? null;
-    },
   });
   const agentPreference = createAgentPreference({
     storage: chromeStorage,
@@ -102,24 +176,22 @@ function buildProductionDeps(): HandlerDeps {
     now: () => Date.now(),
   });
   const agentManifestClient = createAgentManifestClient({
-    fetch: fetchFn,
+    fetchAuthed,
     logger,
     buildUrl: (agentId) => `${API_BASE_URL}/api/v1/agents/${agentId}/manifest`,
-    accessToken: async () => {
-      const session = await readSession();
-      return session?.accessToken ?? null;
-    },
   });
 
   const sessionsLogger = createLogger('bg.sessions');
   const sessionListClient = createSessionListClient({
-    fetch: fetchFn,
+    fetchAuthed,
     logger: sessionsLogger,
     baseUrl: SESSIONS_ENDPOINT,
-    accessToken: async () => {
-      const session = await readSession();
-      return session?.accessToken ?? null;
-    },
+  });
+  const sessionHydrateClient = createSessionHydrateClient({
+    fetchAuthed,
+    logger: sessionsLogger,
+    buildUrl: (sessionId) =>
+      `${SESSIONS_ENDPOINT}/${encodeURIComponent(sessionId)}/hydrate`,
   });
   const sessionListCache = createSessionListCache({
     storage: chromeStorage,
@@ -134,23 +206,16 @@ function buildProductionDeps(): HandlerDeps {
 
   const generationLogger = createLogger('bg.generation');
   const agentClient = createAgentClient({
-    fetch: fetchFn,
+    fetchAuthed,
     logger: generationLogger,
     buildGenerateUrl: (agentType: AgentType) => buildAgentGenerateUrl(agentType),
     buildInteractUrl: (agentType: AgentType) => buildAgentInteractUrl(agentType),
-    accessToken: async () => {
-      const session = await readSession();
-      return session?.accessToken ?? null;
-    },
   });
   const sseManager = createSseManager({
     fetch: fetchFn,
     logger: generationLogger,
     buildUrl: (generationId: string) => buildSseStreamUrl(generationId),
-    accessToken: async () => {
-      const session = await readSession();
-      return session?.accessToken ?? null;
-    },
+    sessionManager,
     broadcast: async (msg) => {
       try {
         await browser.runtime.sendMessage(msg);
@@ -191,6 +256,8 @@ function buildProductionDeps(): HandlerDeps {
   return {
     logger,
     fetch: fetchFn,
+    fetchAuthed,
+    sessionManager,
     now: () => Date.now(),
     storage: {
       readSession,
@@ -235,6 +302,7 @@ function buildProductionDeps(): HandlerDeps {
     },
     sessions: {
       client: sessionListClient,
+      hydrateClient: sessionHydrateClient,
       cache: sessionListCache,
       bindings: sessionBindingStore,
     },
@@ -243,24 +311,19 @@ function buildProductionDeps(): HandlerDeps {
       sse: sseManager,
       cancelEndpoint: {
         cancel: async (generationId: string): Promise<{ ok: boolean }> => {
-          const session = await readSession();
-          if (!session) return { ok: false };
-          try {
-            const res = await fetchFn(GENERATION_CANCEL_ENDPOINT, {
-              method: 'POST',
-              headers: {
-                'content-type': 'application/json',
-                authorization: `Bearer ${session.accessToken}`,
-              },
-              body: JSON.stringify({ generationId }),
-            });
-            return { ok: res.ok };
-          } catch (err: unknown) {
+          const result = await fetchAuthed(GENERATION_CANCEL_ENDPOINT, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ generationId }),
+          });
+          if (result.kind === 'unauthenticated') return { ok: false };
+          if (result.kind === 'network-error') {
             generationLogger.warn('cancel endpoint failed', {
-              error: err instanceof Error ? err.message : String(err),
+              error: result.error.message,
             });
             return { ok: false };
           }
+          return { ok: result.response.ok };
         },
       },
     },

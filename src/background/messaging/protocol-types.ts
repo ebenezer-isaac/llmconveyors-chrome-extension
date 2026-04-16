@@ -61,6 +61,8 @@ import type {
   SessionListResultSchema,
   SessionGetRequestSchema,
   SessionGetResultSchema,
+  SessionHydrateGetRequestSchema,
+  SessionHydrateGetResponseSchema,
 } from './schemas/session-list.schema';
 import type {
   GenericIntentDetectRequestSchema,
@@ -133,6 +135,8 @@ export type SessionListRequest = z.infer<typeof SessionListRequestSchema>;
 export type SessionListResult = z.infer<typeof SessionListResultSchema>;
 export type SessionGetRequest = z.infer<typeof SessionGetRequestSchema>;
 export type SessionGetResult = z.infer<typeof SessionGetResultSchema>;
+export type SessionHydrateGetRequest = z.infer<typeof SessionHydrateGetRequestSchema>;
+export type SessionHydrateGetResponse = z.infer<typeof SessionHydrateGetResponseSchema>;
 
 // Generic intent
 export type GenericIntentDetectRequest = z.infer<typeof GenericIntentDetectRequestSchema>;

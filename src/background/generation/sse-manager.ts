@@ -10,9 +10,16 @@
  * when it observes a completion frame (status in
  * {'completed','failed','cancelled'}), emits a GENERATION_COMPLETE broadcast
  * so downstream caches (session list) can invalidate themselves.
+ *
+ * Authentication: SSE is a long-lived streaming connection so it does not
+ * go through `fetchAuthed`'s 401-then-retry path. It consults the
+ * SessionManager for a refreshed access token before opening the stream.
+ * A 401 during the initial handshake terminates the subscription; the
+ * popup re-subscribes after the next sign-in.
  */
 
 import type { Logger } from '../log';
+import type { SessionManager } from '../session/session-manager';
 import {
   GenerationUpdateBroadcastSchema,
   type GenerationUpdateBroadcast,
@@ -31,7 +38,7 @@ export interface SseManagerDeps {
   readonly fetch: typeof globalThis.fetch;
   readonly logger: Logger;
   readonly buildUrl: (generationId: string) => string;
-  readonly accessToken: () => Promise<string | null>;
+  readonly sessionManager: SessionManager;
   readonly broadcast: Broadcaster;
 }
 
@@ -216,15 +223,15 @@ export function createSseManager(deps: SseManagerDeps): {
       if (active.has(generationId)) {
         return { ok: false, reason: 'already-subscribed' };
       }
-      const token = await deps.accessToken();
-      if (token === null || token.length === 0) {
+      const session = await deps.sessionManager.getSession();
+      if (session === null) {
         return { ok: false, reason: 'signed-out' };
       }
       const controller = new AbortController();
       active.set(generationId, { generationId, controller });
       // Fire-and-forget; the pump lifetime is managed by the controller and
       // any terminal frame.
-      void pump(generationId, token, controller);
+      void pump(generationId, session.accessToken, controller);
       return { ok: true };
     },
     unsubscribe(generationId: string): void {

@@ -9,6 +9,11 @@ export type {
   SessionListClientOutcome,
   SessionListQuery,
 } from './session-list-client';
+export { createSessionHydrateClient } from './session-hydrate-client';
+export type {
+  SessionHydrateClientDeps,
+  SessionHydrateClientOutcome,
+} from './session-hydrate-client';
 export { createSessionListCache } from './session-list-cache';
 export type { CachedSessionList, SessionListCacheDeps } from './session-list-cache';
 export { createSessionHandlers } from './session-handlers';

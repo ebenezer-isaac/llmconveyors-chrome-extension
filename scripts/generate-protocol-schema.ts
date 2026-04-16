@@ -272,6 +272,13 @@ async function loadModules(): Promise<{
       handlerLocation: 'background',
       broadcastOnly: false,
     },
+    {
+      key: 'SESSION_HYDRATE_GET',
+      requestSchema: sessionList.SessionHydrateGetRequestSchema,
+      responseSchema: sessionList.SessionHydrateGetResponseSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
     // Session bindings
     {
       key: 'SESSION_BINDING_PUT',

@@ -66,20 +66,6 @@ export default defineBackground({
           });
         }
       },
-      attemptSilentSignIn: async () => {
-        // Forward through the handler surface so the same Zod validation
-        // and mutex semantics apply.
-        try {
-          await browser.runtime.sendMessage({
-            key: 'AUTH_SIGN_IN',
-            data: { interactive: false },
-          });
-        } catch (err: unknown) {
-          logger.debug('cookie-watcher: silent AUTH_SIGN_IN failed', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      },
     });
 
     browser.runtime.onInstalled.addListener(({ reason }) => {

@@ -35,6 +35,7 @@ describe('SESSION_LIST handler', () => {
     const client = { list: vi.fn(async () => ({ kind: 'unauthenticated' as const })) };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 150,
       logger: logger(),
@@ -79,6 +80,7 @@ describe('SESSION_LIST handler', () => {
     };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 200,
       logger: logger(),
@@ -104,6 +106,7 @@ describe('SESSION_LIST handler', () => {
     const client = { list: vi.fn(async () => ({ kind: 'unauthenticated' as const })) };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 100,
       logger: logger(),
@@ -123,6 +126,7 @@ describe('SESSION_LIST handler', () => {
     const client = { list: vi.fn() };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 0,
       logger: logger(),
@@ -154,6 +158,7 @@ describe('SESSION_LIST handler', () => {
     };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 0,
       logger: logger(),
@@ -185,6 +190,7 @@ describe('SESSION_GET handler', () => {
     const client = { list: vi.fn() };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 0,
       logger: logger(),
@@ -217,6 +223,7 @@ describe('SESSION_GET handler', () => {
     };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 0,
       logger: logger(),
@@ -238,6 +245,7 @@ describe('invalidateCache', () => {
     const client = { list: vi.fn() };
     const h = createSessionHandlers({
       client,
+      hydrateClient: { hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })) },
       cache,
       now: () => 0,
       logger: logger(),

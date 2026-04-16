@@ -323,6 +323,19 @@ export const blueprint: ModuleBlueprint = {
       sourceRef: { file: '../sessions/session-handlers.ts', line: 1 },
     },
     {
+      key: 'SESSION_HYDRATE_GET',
+      description:
+        'Fetch a session hydrate payload (session doc, artifacts, logs) via ' +
+        'the background so the SessionManager refresh + silent 401 retry ' +
+        'path applies. Called from the sidepanel binding panel.',
+      handlerLocation: 'background',
+      requestSchemaRef: './schemas/session-list.schema',
+      responseSchemaRef: './schemas/session-list.schema',
+      broadcastOnly: false,
+      invariants: [],
+      sourceRef: { file: '../sessions/session-handlers.ts', line: 1 },
+    },
+    {
       key: 'SESSION_BINDING_PUT',
       description:
         'Bind the current tab URL (canonicalized) + agent to a generation ' +

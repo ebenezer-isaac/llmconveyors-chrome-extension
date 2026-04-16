@@ -1632,6 +1632,134 @@
       }
     },
     {
+      "key": "SESSION_HYDRATE_GET",
+      "handlerLocation": "background",
+      "broadcastOnly": false,
+      "request": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "const": true
+              },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "_id": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "updatedAt": {
+                        "type": [
+                          "string",
+                          "number"
+                        ]
+                      }
+                    },
+                    "additionalProperties": true
+                  },
+                  "artifacts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "storageKey": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "generationLogs": {
+                    "type": "array",
+                    "items": {}
+                  }
+                },
+                "required": [
+                  "session"
+                ],
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "ok",
+              "payload"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean",
+                "const": false
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "signed-out",
+                  "not-found",
+                  "network-error",
+                  "api-error",
+                  "shape-mismatch"
+                ]
+              },
+              "status": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "ok",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "key": "SESSION_BINDING_PUT",
       "handlerLocation": "background",
       "broadcastOnly": false,

@@ -8,10 +8,17 @@
  * and UI copy. The extension treats the manifest as a best-effort enrichment
  * layer on top of the static AGENT_REGISTRY; if the fetch fails the UI still
  * renders using registry defaults.
+ *
+ * Authentication and 401 recovery are delegated to the shared `fetchAuthed`
+ * helper. This endpoint may be reachable without a session (public manifest
+ * for marketing pages); `fetchAuthed` returns `unauthenticated` when the
+ * caller has no session, which the client maps to `{ kind: 'unauthenticated' }`
+ * for the popup to fall back to registry defaults.
  */
 
 import { z } from 'zod';
 import type { Logger } from '../log';
+import type { FetchAuthed } from '../auth';
 import type { AgentId } from './agent-registry';
 import { ApiEnvelopeSchema } from '../master-resume';
 
@@ -37,10 +44,9 @@ export type AgentManifestOutcome =
   | { readonly kind: 'api-error'; readonly status: number };
 
 export interface AgentManifestClientDeps {
-  readonly fetch: typeof globalThis.fetch;
+  readonly fetchAuthed: FetchAuthed;
   readonly logger: Logger;
   readonly buildUrl: (agentId: AgentId) => string;
-  readonly accessToken: () => Promise<string | null>;
 }
 
 export function createAgentManifestClient(deps: AgentManifestClientDeps): {
@@ -48,22 +54,14 @@ export function createAgentManifestClient(deps: AgentManifestClientDeps): {
 } {
   return {
     async get(agentId: AgentId): Promise<AgentManifestOutcome> {
-      const token = await deps.accessToken();
-      const headers: Record<string, string> = {};
-      if (typeof token === 'string' && token.length > 0) {
-        headers.authorization = `Bearer ${token}`;
+      const result = await deps.fetchAuthed(deps.buildUrl(agentId), {
+        method: 'GET',
+      });
+      if (result.kind === 'unauthenticated') return { kind: 'unauthenticated' };
+      if (result.kind === 'network-error') {
+        return { kind: 'network-error', message: result.error.message };
       }
-      let res: Response;
-      try {
-        res = await deps.fetch(deps.buildUrl(agentId), {
-          method: 'GET',
-          headers,
-        });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { kind: 'network-error', message };
-      }
-      if (res.status === 401 || res.status === 403) return { kind: 'unauthenticated' };
+      const res = result.response;
       if (res.status === 404) return { kind: 'not-found' };
       if (!res.ok) return { kind: 'api-error', status: res.status };
       let body: unknown = null;

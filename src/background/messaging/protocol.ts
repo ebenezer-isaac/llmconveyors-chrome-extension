@@ -46,6 +46,8 @@ import type {
   SessionListResult,
   SessionGetRequest,
   SessionGetResult,
+  SessionHydrateGetRequest,
+  SessionHydrateGetResponse,
   GenericIntentDetectRequest,
   GenericIntentDetectResponse,
   SessionBindingPutRequest,
@@ -120,9 +122,10 @@ export interface ProtocolMap {
   AGENT_REGISTRY_LIST: (data: AgentRegistryListRequest) => AgentRegistryListResponse;
   AGENT_MANIFEST_GET: (data: AgentManifestGetRequest) => AgentManifestGetResponse;
 
-  // --- Sessions (2) ---
+  // --- Sessions (3) ---
   SESSION_LIST: (data: SessionListRequest) => SessionListResult;
   SESSION_GET: (data: SessionGetRequest) => SessionGetResult;
+  SESSION_HYDRATE_GET: (data: SessionHydrateGetRequest) => SessionHydrateGetResponse;
 
   // --- Session bindings (2) ---
   SESSION_BINDING_PUT: (data: SessionBindingPutRequest) => SessionBindingPutResponse;
@@ -165,6 +168,7 @@ export const BG_HANDLED_KEYS = [
   'AGENT_MANIFEST_GET',
   'SESSION_LIST',
   'SESSION_GET',
+  'SESSION_HYDRATE_GET',
   'SESSION_BINDING_PUT',
   'SESSION_BINDING_GET',
   'GENERIC_INTENT_DETECT',

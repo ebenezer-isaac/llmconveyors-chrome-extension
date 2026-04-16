@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 import { describe, it, expect, vi } from 'vitest';
 import { parseSseFrames, createSseManager } from '../../../../src/background/generation/sse-manager';
+import type { SessionManager } from '../../../../src/background/session/session-manager';
+import type { StoredSession } from '../../../../src/background/messaging/schemas/auth.schema';
 
 describe('parseSseFrames', () => {
   it('splits on blank lines and concatenates multi-line data frames', () => {
@@ -43,6 +45,19 @@ function logger() {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 }
 
+function fakeSessionManager(session: StoredSession | null): SessionManager {
+  return {
+    getSession: vi.fn(async () => session),
+  } as unknown as SessionManager;
+}
+
+const VALID_SESSION: StoredSession = {
+  accessToken: 'tok',
+  refreshToken: 'rt',
+  expiresAt: Date.now() + 3_600_000,
+  userId: 'u',
+};
+
 describe('createSseManager', () => {
   it('broadcasts a well-formed update frame', async () => {
     const seen: Array<{ key: string; data: unknown }> = [];
@@ -59,7 +74,7 @@ describe('createSseManager', () => {
       fetch: fetchFn as unknown as typeof globalThis.fetch,
       logger: logger(),
       buildUrl: (id) => `https://x/${id}`,
-      accessToken: async () => 'tok',
+      sessionManager: fakeSessionManager(VALID_SESSION),
       broadcast,
     });
     const r = await m.subscribe({ generationId: 'g1' });
@@ -85,7 +100,7 @@ describe('createSseManager', () => {
       fetch: fetchFn as unknown as typeof globalThis.fetch,
       logger: logger(),
       buildUrl: (id) => `https://x/${id}`,
-      accessToken: async () => 'tok',
+      sessionManager: fakeSessionManager(VALID_SESSION),
       broadcast,
     });
     await m.subscribe({ generationId: 'g2' });
@@ -105,7 +120,7 @@ describe('createSseManager', () => {
       fetch: fetchFn as unknown as typeof globalThis.fetch,
       logger: logger(),
       buildUrl: (id) => `https://x/${id}`,
-      accessToken: async () => 'tok',
+      sessionManager: fakeSessionManager(VALID_SESSION),
       broadcast,
     });
     const a = await m.subscribe({ generationId: 'g3' });
@@ -115,12 +130,12 @@ describe('createSseManager', () => {
     if (!b.ok) expect(b.reason).toBe('already-subscribed');
   });
 
-  it('returns signed-out when the access token is absent', async () => {
+  it('returns signed-out when the SessionManager reports no session', async () => {
     const m = createSseManager({
       fetch: vi.fn() as unknown as typeof globalThis.fetch,
       logger: logger(),
       buildUrl: () => 'https://x',
-      accessToken: async () => null,
+      sessionManager: fakeSessionManager(null),
       broadcast: vi.fn(async () => undefined),
     });
     const r = await m.subscribe({ generationId: 'g4' });

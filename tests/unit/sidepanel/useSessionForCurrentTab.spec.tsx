@@ -18,45 +18,17 @@ interface FakeChrome {
       info: { active?: boolean; currentWindow?: boolean },
     ) => Promise<Array<{ id?: number; url?: string }>>;
   };
-  storage: {
-    local: {
-      get: (key: string) => Promise<Record<string, unknown>>;
-      set: (items: Record<string, unknown>) => Promise<void>;
-      remove: (key: string) => Promise<void>;
-    };
-  };
 }
 
-function installChrome(
-  opts: {
-    readonly sendMessage: (msg: unknown) => Promise<unknown>;
-    readonly tabUrl: string | null;
-    readonly accessToken?: string | null;
-  },
-): FakeChrome {
+function installChrome(opts: {
+  readonly sendMessage: (msg: unknown) => Promise<unknown>;
+  readonly tabUrl: string | null;
+}): FakeChrome {
   const fake: FakeChrome = {
     runtime: { sendMessage: opts.sendMessage },
     tabs: {
       get: (_id, cb) => cb(opts.tabUrl === null ? undefined : { url: opts.tabUrl }),
       query: async () => (opts.tabUrl === null ? [] : [{ id: 42, url: opts.tabUrl }]),
-    },
-    storage: {
-      local: {
-        get: async (_key: string) => {
-          if (opts.accessToken === undefined) return {};
-          if (opts.accessToken === null) return {};
-          return {
-            'llmc.session.v1': {
-              accessToken: opts.accessToken,
-              refreshToken: 'r',
-              expiresAt: Date.now() + 60_000,
-              userId: 'u1',
-            },
-          };
-        },
-        set: async () => undefined,
-        remove: async () => undefined,
-      },
     },
   };
   (globalThis as unknown as { chrome: FakeChrome }).chrome = fake;
@@ -73,13 +45,13 @@ function Probe(props: {
   readonly tabId: number | null;
   readonly agentId: 'job-hunter' | 'b2b-sales' | null;
   readonly signedIn: boolean;
-  readonly fetchImpl?: typeof globalThis.fetch;
+  readonly sendMessage?: (msg: unknown) => Promise<unknown>;
 }): React.ReactElement {
   capture.current = useSessionForCurrentTab({
     tabId: props.tabId,
     agentId: props.agentId,
     signedIn: props.signedIn,
-    fetchImpl: props.fetchImpl,
+    sendMessage: props.sendMessage,
   });
   return <div />;
 }
@@ -104,7 +76,7 @@ async function mount(props: {
   tabId: number | null;
   agentId: 'job-hunter' | 'b2b-sales' | null;
   signedIn: boolean;
-  fetchImpl?: typeof globalThis.fetch;
+  sendMessage?: (msg: unknown) => Promise<unknown>;
 }): Promise<void> {
   await act(async () => {
     root = createRoot(container!);
@@ -183,55 +155,49 @@ describe('useSessionForCurrentTab', () => {
       createdAt: 1,
       updatedAt: 2,
     };
-    const hydrateBody = {
-      success: true,
-      data: {
-        session: {
-          id: 's1',
-          status: 'completed',
-          metadata: {
-            agentType: 'job-hunter',
-            companyName: 'Acme',
-            jobTitle: 'Engineer',
-          },
-          updatedAt: '2026-04-15T00:00:00.000Z',
+    const hydratePayload = {
+      session: {
+        id: 's1',
+        status: 'completed',
+        metadata: {
+          agentType: 'job-hunter',
+          companyName: 'Acme',
+          jobTitle: 'Engineer',
         },
-        artifacts: [
-          {
-            type: 'resume',
-            storageKey: 'users/u1/sessions/s1/resume.json',
-            label: 'Resume',
-          },
-        ],
-        generationLogs: [
-          {
-            phase: 'extract',
-            message: 'Extracted JD',
-            timestamp: '2026-04-15T00:00:00.000Z',
-          },
-        ],
+        updatedAt: '2026-04-15T00:00:00.000Z',
       },
+      artifacts: [
+        {
+          type: 'resume',
+          storageKey: 'users/u1/sessions/s1/resume.json',
+          label: 'Resume',
+        },
+      ],
+      generationLogs: [
+        {
+          phase: 'extract',
+          message: 'Extracted JD',
+          timestamp: '2026-04-15T00:00:00.000Z',
+        },
+      ],
     };
-    const fetchImpl = vi.fn(async (_url: string) => {
-      return new Response(JSON.stringify(hydrateBody), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }) as unknown as typeof globalThis.fetch;
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string };
+      if (env.key === 'SESSION_BINDING_GET') return binding;
+      if (env.key === 'SESSION_HYDRATE_GET') {
+        return { ok: true, payload: hydratePayload };
+      }
+      return null;
+    });
     installChrome({
-      sendMessage: vi.fn(async (msg: unknown) => {
-        const env = msg as { key?: string };
-        if (env.key === 'SESSION_BINDING_GET') return binding;
-        return null;
-      }),
+      sendMessage,
       tabUrl: 'https://example.com/jd',
-      accessToken: 'token-abc',
     });
     await mount({
       tabId: 42,
       agentId: 'job-hunter',
       signedIn: true,
-      fetchImpl,
+      sendMessage,
     });
     await flush();
     await flush();
@@ -243,7 +209,7 @@ describe('useSessionForCurrentTab', () => {
     expect(capture.current?.logs.length).toBeGreaterThan(0);
   });
 
-  it('falls back to not-found when the hydrate endpoint 404s (deleted session)', async () => {
+  it('falls back to not-found when the hydrate response is not-found (deleted session)', async () => {
     const binding = {
       sessionId: 's1',
       generationId: 'g1',
@@ -253,21 +219,23 @@ describe('useSessionForCurrentTab', () => {
       createdAt: 1,
       updatedAt: 2,
     };
-    const fetchImpl = vi.fn(async () => new Response('not found', { status: 404 })) as unknown as typeof globalThis.fetch;
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string };
+      if (env.key === 'SESSION_BINDING_GET') return binding;
+      if (env.key === 'SESSION_HYDRATE_GET') {
+        return { ok: false, reason: 'not-found' };
+      }
+      return null;
+    });
     installChrome({
-      sendMessage: vi.fn(async (msg: unknown) => {
-        const env = msg as { key?: string };
-        if (env.key === 'SESSION_BINDING_GET') return binding;
-        return null;
-      }),
+      sendMessage,
       tabUrl: 'https://example.com/jd',
-      accessToken: 'token-abc',
     });
     await mount({
       tabId: 42,
       agentId: 'job-hunter',
       signedIn: true,
-      fetchImpl,
+      sendMessage,
     });
     await flush();
     await flush();
@@ -275,7 +243,7 @@ describe('useSessionForCurrentTab', () => {
     expect(capture.current?.session).toBeNull();
   });
 
-  it('surfaces an error status when the hydrate fetch rejects', async () => {
+  it('surfaces an error status when hydrate sendMessage rejects', async () => {
     const binding = {
       sessionId: 's1',
       generationId: 'g1',
@@ -285,27 +253,61 @@ describe('useSessionForCurrentTab', () => {
       createdAt: 1,
       updatedAt: 2,
     };
-    const fetchImpl = vi.fn(async () => {
-      throw new Error('boom');
-    }) as unknown as typeof globalThis.fetch;
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string };
+      if (env.key === 'SESSION_BINDING_GET') return binding;
+      if (env.key === 'SESSION_HYDRATE_GET') {
+        throw new Error('boom');
+      }
+      return null;
+    });
     installChrome({
-      sendMessage: vi.fn(async (msg: unknown) => {
-        const env = msg as { key?: string };
-        if (env.key === 'SESSION_BINDING_GET') return binding;
-        return null;
-      }),
+      sendMessage,
       tabUrl: 'https://example.com/jd',
-      accessToken: 'token-abc',
     });
     await mount({
       tabId: 42,
       agentId: 'job-hunter',
       signedIn: true,
-      fetchImpl,
+      sendMessage,
     });
     await flush();
     await flush();
     expect(capture.current?.status).toBe('error');
     expect(capture.current?.error).toContain('boom');
+  });
+
+  it('reverts to idle when hydrate reports signed-out', async () => {
+    const binding = {
+      sessionId: 's1',
+      generationId: 'g1',
+      agentId: 'job-hunter',
+      urlKey: 'https://example.com/jd',
+      pageTitle: null,
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string };
+      if (env.key === 'SESSION_BINDING_GET') return binding;
+      if (env.key === 'SESSION_HYDRATE_GET') {
+        return { ok: false, reason: 'signed-out' };
+      }
+      return null;
+    });
+    installChrome({
+      sendMessage,
+      tabUrl: 'https://example.com/jd',
+    });
+    await mount({
+      tabId: 42,
+      agentId: 'job-hunter',
+      signedIn: true,
+      sendMessage,
+    });
+    await flush();
+    await flush();
+    expect(capture.current?.status).toBe('idle');
+    expect(capture.current?.session).toBeNull();
   });
 });

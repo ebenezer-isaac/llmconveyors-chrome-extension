@@ -7,9 +7,11 @@
  *   POST /api/v1/agents/:agentType/interact
  *
  * Keeps the envelope handling in one place so handlers can focus on routing.
+ * Authentication and 401 recovery are delegated to `fetchAuthed`.
  */
 
 import type { Logger } from '../log';
+import type { FetchAuthed } from '../auth';
 
 export type AgentType = 'job-hunter' | 'b2b-sales';
 
@@ -46,11 +48,10 @@ export type AgentInteractOutcome =
   | { readonly kind: 'api-error'; readonly status: number };
 
 export interface AgentClientDeps {
-  readonly fetch: typeof globalThis.fetch;
+  readonly fetchAuthed: FetchAuthed;
   readonly logger: Logger;
   readonly buildGenerateUrl: (agentType: AgentType) => string;
   readonly buildInteractUrl: (agentType: AgentType) => string;
-  readonly accessToken: () => Promise<string | null>;
 }
 
 function pickString(obj: Record<string, unknown>, key: string): string | null {
@@ -64,25 +65,19 @@ export function createAgentClient(deps: AgentClientDeps): {
 } {
   return {
     async start(req: AgentStartRequest): Promise<AgentStartOutcome> {
-      const token = await deps.accessToken();
-      if (token === null || token.length === 0) return { kind: 'unauthenticated' };
-      let res: Response;
-      try {
-        res = await deps.fetch(deps.buildGenerateUrl(req.agentType), {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(req.inputs ?? {}),
-        });
-      } catch (err: unknown) {
+      const result = await deps.fetchAuthed(deps.buildGenerateUrl(req.agentType), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(req.inputs ?? {}),
+      });
+      if (result.kind === 'unauthenticated') return { kind: 'unauthenticated' };
+      if (result.kind === 'network-error') {
         deps.logger.warn('agent-client.start: network', {
-          error: err instanceof Error ? err.message : String(err),
+          error: result.error.message,
         });
         return { kind: 'network-error' };
       }
-      if (res.status === 401 || res.status === 403) return { kind: 'unauthenticated' };
+      const res = result.response;
       if (res.status < 200 || res.status >= 300) {
         return { kind: 'api-error', status: res.status };
       }
@@ -105,30 +100,24 @@ export function createAgentClient(deps: AgentClientDeps): {
       return { kind: 'ok', generationId, sessionId };
     },
     async interact(req: AgentInteractRequest): Promise<AgentInteractOutcome> {
-      const token = await deps.accessToken();
-      if (token === null || token.length === 0) return { kind: 'unauthenticated' };
-      let res: Response;
-      try {
-        res = await deps.fetch(deps.buildInteractUrl(req.agentType), {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            generationId: req.generationId,
-            interactionId: req.interactionId,
-            interactionType: req.interactionType,
-            interactionData: req.interactionData ?? null,
-          }),
-        });
-      } catch (err: unknown) {
+      const result = await deps.fetchAuthed(deps.buildInteractUrl(req.agentType), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          generationId: req.generationId,
+          interactionId: req.interactionId,
+          interactionType: req.interactionType,
+          interactionData: req.interactionData ?? null,
+        }),
+      });
+      if (result.kind === 'unauthenticated') return { kind: 'unauthenticated' };
+      if (result.kind === 'network-error') {
         deps.logger.warn('agent-client.interact: network', {
-          error: err instanceof Error ? err.message : String(err),
+          error: result.error.message,
         });
         return { kind: 'network-error' };
       }
-      if (res.status === 401 || res.status === 403) return { kind: 'unauthenticated' };
+      const res = result.response;
       if (res.status === 404) return { kind: 'not-found' };
       if (res.status < 200 || res.status >= 300) {
         return { kind: 'api-error', status: res.status };

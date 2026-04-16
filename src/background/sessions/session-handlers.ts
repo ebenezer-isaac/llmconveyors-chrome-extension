@@ -13,11 +13,14 @@ import type { Logger } from '../log';
 import {
   SessionListRequestSchema,
   SessionGetRequestSchema,
+  SessionHydrateGetRequestSchema,
   type SessionListItem,
   type SessionListResult,
   type SessionGetResult,
+  type SessionHydrateGetResponse,
 } from '../messaging/schemas/session-list.schema';
 import type { SessionListClientOutcome } from './session-list-client';
+import type { SessionHydrateClientOutcome } from './session-hydrate-client';
 import type { CachedSessionList } from './session-list-cache';
 
 export interface SessionHandlerDeps {
@@ -26,6 +29,9 @@ export interface SessionHandlerDeps {
       limit?: number;
       cursor?: string;
     }) => Promise<SessionListClientOutcome>;
+  };
+  readonly hydrateClient: {
+    hydrate: (sessionId: string) => Promise<SessionHydrateClientOutcome>;
   };
   readonly cache: {
     read: () => Promise<CachedSessionList | null>;
@@ -59,6 +65,9 @@ function outcomeToReason(
 export function createSessionHandlers(deps: SessionHandlerDeps): {
   SESSION_LIST: (msg: { readonly data: unknown }) => Promise<SessionListResult>;
   SESSION_GET: (msg: { readonly data: unknown }) => Promise<SessionGetResult>;
+  SESSION_HYDRATE_GET: (msg: {
+    readonly data: unknown;
+  }) => Promise<SessionHydrateGetResponse>;
   invalidateCache: () => Promise<void>;
 } {
   return {
@@ -136,6 +145,27 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
         return { ok: false, reason: 'not-found' };
       }
       return { ok: false, ...outcomeToReason(outcome) };
+    },
+    async SESSION_HYDRATE_GET(msg): Promise<SessionHydrateGetResponse> {
+      const parsed = SessionHydrateGetRequestSchema.safeParse(msg.data);
+      if (!parsed.success) {
+        return { ok: false, reason: 'shape-mismatch' };
+      }
+      const outcome = await deps.hydrateClient.hydrate(parsed.data.sessionId);
+      switch (outcome.kind) {
+        case 'ok':
+          return { ok: true, payload: outcome.payload };
+        case 'unauthenticated':
+          return { ok: false, reason: 'signed-out' };
+        case 'not-found':
+          return { ok: false, reason: 'not-found' };
+        case 'network-error':
+          return { ok: false, reason: 'network-error' };
+        case 'shape-mismatch':
+          return { ok: false, reason: 'shape-mismatch' };
+        case 'api-error':
+          return { ok: false, reason: 'api-error', status: outcome.status };
+      }
     },
     async invalidateCache(): Promise<void> {
       await deps.cache.clear();

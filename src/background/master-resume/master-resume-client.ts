@@ -8,10 +8,14 @@
  * Responses are validated with MasterResumeResponseSchema; shape drift
  * surfaces as `'shape-mismatch'` so downstream consumers can log and fall
  * back without poisoning the autofill pipeline.
+ *
+ * Authentication and 401 recovery are delegated to the shared `fetchAuthed`
+ * helper. This client never touches access tokens directly.
  */
 
 import { z } from 'zod';
 import type { Logger } from '../log';
+import type { FetchAuthed } from '../auth';
 import {
   ApiEnvelopeSchema,
   MasterResumeResponseSchema,
@@ -37,10 +41,9 @@ export type MasterResumePutOutcome =
   | { readonly kind: 'api-error'; readonly status: number };
 
 export interface MasterResumeClientDeps {
-  readonly fetch: typeof globalThis.fetch;
+  readonly fetchAuthed: FetchAuthed;
   readonly logger: Logger;
   readonly endpoint: string;
-  readonly accessToken: () => Promise<string | null>;
 }
 
 function unwrapEnvelope(body: unknown): unknown {
@@ -53,12 +56,6 @@ export function createMasterResumeClient(deps: MasterResumeClientDeps): {
   get: () => Promise<MasterResumeGetOutcome>;
   put: (payload: MasterResumeUpsert) => Promise<MasterResumePutOutcome>;
 } {
-  async function authHeaders(): Promise<Record<string, string> | null> {
-    const token = await deps.accessToken();
-    if (typeof token !== 'string' || token.length === 0) return null;
-    return { authorization: `Bearer ${token}` };
-  }
-
   async function parseJson(res: Response): Promise<unknown> {
     try {
       return await res.json();
@@ -69,18 +66,12 @@ export function createMasterResumeClient(deps: MasterResumeClientDeps): {
 
   return {
     async get(): Promise<MasterResumeGetOutcome> {
-      const headers = await authHeaders();
-      if (headers === null) return { kind: 'unauthenticated' };
-      let res: Response;
-      try {
-        res = await deps.fetch(deps.endpoint, { method: 'GET', headers });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { kind: 'network-error', message };
+      const result = await deps.fetchAuthed(deps.endpoint, { method: 'GET' });
+      if (result.kind === 'unauthenticated') return { kind: 'unauthenticated' };
+      if (result.kind === 'network-error') {
+        return { kind: 'network-error', message: result.error.message };
       }
-      if (res.status === 401 || res.status === 403) {
-        return { kind: 'unauthenticated' };
-      }
+      const res = result.response;
       if (res.status === 404) return { kind: 'not-found' };
       if (!res.ok) return { kind: 'api-error', status: res.status };
       const body = await parseJson(res);
@@ -103,22 +94,16 @@ export function createMasterResumeClient(deps: MasterResumeClientDeps): {
           issues: validated.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
         };
       }
-      const headers = await authHeaders();
-      if (headers === null) return { kind: 'unauthenticated' };
-      let res: Response;
-      try {
-        res = await deps.fetch(deps.endpoint, {
-          method: 'PUT',
-          headers: { ...headers, 'content-type': 'application/json' },
-          body: JSON.stringify(validated.data),
-        });
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return { kind: 'network-error', message };
+      const result = await deps.fetchAuthed(deps.endpoint, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(validated.data),
+      });
+      if (result.kind === 'unauthenticated') return { kind: 'unauthenticated' };
+      if (result.kind === 'network-error') {
+        return { kind: 'network-error', message: result.error.message };
       }
-      if (res.status === 401 || res.status === 403) {
-        return { kind: 'unauthenticated' };
-      }
+      const res = result.response;
       if (res.status === 400) {
         const body = await parseJson(res);
         const issues = extractValidationIssues(body);

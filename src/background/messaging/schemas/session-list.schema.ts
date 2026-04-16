@@ -133,6 +133,74 @@ export type SessionGetRequest = z.infer<typeof SessionGetRequestSchema>;
 export type SessionGetResult = z.infer<typeof SessionGetResultSchema>;
 
 /**
+ * SESSION_HYDRATE_GET: the sidepanel asks the background to fetch
+ * `/api/v1/sessions/:id/hydrate` so the auth refresh / silent retry path
+ * runs inside the background (where the SessionManager lives) rather than
+ * in a popup/sidepanel React component. The response mirrors the backend
+ * envelope closely; downstream normalization lives in the sidepanel hook.
+ */
+export const SessionHydrateGetRequestSchema = z
+  .object({
+    sessionId: z.string().min(1).max(128),
+  })
+  .strict();
+
+export const HydrateArtifactSchema = z
+  .object({
+    type: z.string(),
+    storageKey: z.string().optional(),
+    label: z.string().optional(),
+    name: z.string().optional(),
+  })
+  .passthrough();
+
+export const HydrateSessionDocSchema = z
+  .object({
+    id: z.string().optional(),
+    _id: z.string().optional(),
+    status: z.string().optional(),
+    metadata: z.record(z.unknown()).optional(),
+    updatedAt: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough();
+
+export const HydratePayloadSchema = z
+  .object({
+    session: HydrateSessionDocSchema,
+    artifacts: z.array(HydrateArtifactSchema).optional(),
+    generationLogs: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
+
+export const SessionHydrateGetResponseSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      ok: z.literal(true),
+      payload: HydratePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      reason: z.enum([
+        'signed-out',
+        'not-found',
+        'network-error',
+        'api-error',
+        'shape-mismatch',
+      ]),
+      status: z.number().int().optional(),
+    })
+    .strict(),
+]);
+
+export type SessionHydrateGetRequest = z.infer<typeof SessionHydrateGetRequestSchema>;
+export type SessionHydrateGetResponse = z.infer<typeof SessionHydrateGetResponseSchema>;
+export type HydrateArtifact = z.infer<typeof HydrateArtifactSchema>;
+export type HydrateSessionDoc = z.infer<typeof HydrateSessionDocSchema>;
+export type HydratePayload = z.infer<typeof HydratePayloadSchema>;
+
+/**
  * Normalize a raw backend session document into a `SessionListItem`.
  * Strictly guards the agent-type enum so a backend drift that ships a new
  * agent id does not poison the extension's UI; unknown agents fall through

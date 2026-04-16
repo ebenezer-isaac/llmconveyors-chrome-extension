@@ -6,6 +6,25 @@ import {
   type HandlerDeps,
 } from '../../../src/background/messaging/handlers';
 import type { StoredSession } from '../../../src/background/messaging/schemas/auth.schema';
+import type {
+  FetchAuthed,
+  FetchAuthedResult,
+} from '../../../src/background/auth';
+import type { SessionManager } from '../../../src/background/session/session-manager';
+
+function buildFakeSessionManager(session: StoredSession | null): SessionManager {
+  return {
+    getSession: vi.fn(async () => session),
+  } as unknown as SessionManager;
+}
+
+function buildFakeFetchAuthed(
+  impl: (url: string, init?: RequestInit) => Promise<FetchAuthedResult> = async () => ({
+    kind: 'unauthenticated',
+  }),
+): FetchAuthed {
+  return vi.fn(impl);
+}
 
 const senderStub = { tab: { id: 42 } } as chrome.runtime.MessageSender;
 
@@ -57,6 +76,8 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
   return {
     logger,
     fetch: vi.fn(async () => new Response('{}', { status: 200 })) as unknown as typeof fetch,
+    fetchAuthed: buildFakeFetchAuthed(),
+    sessionManager: buildFakeSessionManager(null),
     now: () => 1_713_000_000_000,
     storage,
     tabState,
@@ -82,6 +103,9 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
     sessions: {
       client: {
         list: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
+      },
+      hydrateClient: {
+        hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
       },
       cache: {
         read: vi.fn(async () => null),
@@ -156,6 +180,7 @@ describe('HANDLERS record shape', () => {
         'GENERATION_COMPLETE',
         'SESSION_LIST',
         'SESSION_GET',
+        'SESSION_HYDRATE_GET',
         'SESSION_BINDING_PUT',
         'SESSION_BINDING_GET',
         'GENERIC_INTENT_DETECT',
@@ -214,7 +239,7 @@ describe('AUTH_SIGN_OUT', () => {
 });
 
 describe('KEYWORDS_EXTRACT', () => {
-  it('returns signed-out when no session', async () => {
+  it('returns signed-out when fetchAuthed reports unauthenticated', async () => {
     const handlers = createHandlers(buildDeps());
     const r = await handlers.KEYWORDS_EXTRACT({
       data: { text: 'we use typescript', url: 'https://job.example/1', topK: 40 },
@@ -222,14 +247,8 @@ describe('KEYWORDS_EXTRACT', () => {
     });
     expect(r).toEqual({ ok: false, reason: 'signed-out' });
   });
-  it('rejects empty text', async () => {
+  it('rejects empty text before dispatch', async () => {
     const deps = buildDeps();
-    deps.storage.readSession = vi.fn(async () => ({
-      accessToken: 'AT',
-      refreshToken: 'RT',
-      expiresAt: 999,
-      userId: 'u',
-    }));
     const handlers = createHandlers(deps);
     const r = await handlers.KEYWORDS_EXTRACT({
       data: { text: '', url: 'https://job.example/1' },
@@ -239,15 +258,12 @@ describe('KEYWORDS_EXTRACT', () => {
   });
   it('returns rate-limited on 429', async () => {
     const base = buildDeps();
-    base.storage.readSession = vi.fn(async () => ({
-      accessToken: 'AT',
-      refreshToken: 'RT',
-      expiresAt: 999,
-      userId: 'u',
-    }));
     const deps: HandlerDeps = {
       ...base,
-      fetch: vi.fn(async () => new Response('', { status: 429 })) as unknown as typeof fetch,
+      fetchAuthed: buildFakeFetchAuthed(async () => ({
+        kind: 'ok',
+        response: new Response('', { status: 429 }),
+      })),
     };
     const handlers = createHandlers(deps);
     const r = await handlers.KEYWORDS_EXTRACT({
@@ -258,21 +274,15 @@ describe('KEYWORDS_EXTRACT', () => {
   });
   it('returns api-error on backend shape drift', async () => {
     const base = buildDeps();
-    base.storage.readSession = vi.fn(async () => ({
-      accessToken: 'AT',
-      refreshToken: 'RT',
-      expiresAt: 999,
-      userId: 'u',
-    }));
     const deps: HandlerDeps = {
       ...base,
-      fetch: vi.fn(
-        async () =>
-          new Response(JSON.stringify({ wrong: 'shape' }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          }),
-      ) as unknown as typeof fetch,
+      fetchAuthed: buildFakeFetchAuthed(async () => ({
+        kind: 'ok',
+        response: new Response(JSON.stringify({ wrong: 'shape' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      })),
     };
     const handlers = createHandlers(deps);
     const r = await handlers.KEYWORDS_EXTRACT({
@@ -283,35 +293,29 @@ describe('KEYWORDS_EXTRACT', () => {
   });
   it('returns ok on valid backend response', async () => {
     const base = buildDeps();
-    base.storage.readSession = vi.fn(async () => ({
-      accessToken: 'AT',
-      refreshToken: 'RT',
-      expiresAt: 999,
-      userId: 'u',
-    }));
     const deps: HandlerDeps = {
       ...base,
-      fetch: vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              success: true,
-              data: {
-                keywords: [
-                  {
-                    term: 'typescript',
-                    category: 'hard',
-                    score: 0.9,
-                    occurrences: 3,
-                    canonicalForm: 'typescript',
-                  },
-                ],
-                tookMs: 12,
-              },
-            }),
-            { status: 200, headers: { 'content-type': 'application/json' } },
-          ),
-      ) as unknown as typeof fetch,
+      fetchAuthed: buildFakeFetchAuthed(async () => ({
+        kind: 'ok',
+        response: new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              keywords: [
+                {
+                  term: 'typescript',
+                  category: 'hard',
+                  score: 0.9,
+                  occurrences: 3,
+                  canonicalForm: 'typescript',
+                },
+              ],
+              tookMs: 12,
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      })),
     };
     const handlers = createHandlers(deps);
     const r = await handlers.KEYWORDS_EXTRACT({

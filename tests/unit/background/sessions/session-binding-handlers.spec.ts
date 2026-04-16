@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 import { describe, it, expect, vi } from 'vitest';
 import { createHandlers, type HandlerDeps } from '@/src/background/messaging/handlers';
+import type { FetchAuthed } from '@/src/background/auth';
+import type { SessionManager } from '@/src/background/session/session-manager';
 
 function silentLogger() {
   return {
@@ -15,6 +17,10 @@ function baseDeps(bindings: HandlerDeps['sessions']['bindings']): HandlerDeps {
   return {
     logger: silentLogger(),
     fetch: vi.fn() as unknown as typeof globalThis.fetch,
+    fetchAuthed: vi.fn(async () => ({ kind: 'unauthenticated' as const })) as unknown as FetchAuthed,
+    sessionManager: {
+      getSession: vi.fn(async () => null),
+    } as unknown as SessionManager,
     now: () => 1_000,
     storage: {
       readSession: vi.fn(async () => null),
@@ -63,6 +69,9 @@ function baseDeps(bindings: HandlerDeps['sessions']['bindings']): HandlerDeps {
     sessions: {
       client: {
         list: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
+      },
+      hydrateClient: {
+        hydrate: vi.fn(async () => ({ kind: 'unauthenticated' as const })),
       },
       cache: {
         read: vi.fn(async () => null),

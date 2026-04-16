@@ -11,9 +11,14 @@
  * this client normalizes them via `normalizeBackendSession` into the flat
  * `SessionListItem` shape the popup consumes. Entries with unknown agent
  * types or invalid timestamps are dropped.
+ *
+ * Authentication, proactive refresh, and silent 401 retry are delegated to
+ * the shared `fetchAuthed` helper. This client never touches access tokens
+ * directly.
  */
 
 import type { Logger } from '../log';
+import type { FetchAuthed } from '../auth';
 import {
   SessionListResponseSchema,
   normalizeBackendSession,
@@ -33,10 +38,9 @@ export type SessionListClientOutcome =
   | { readonly kind: 'api-error'; readonly status: number };
 
 export interface SessionListClientDeps {
-  readonly fetch: typeof globalThis.fetch;
+  readonly fetchAuthed: FetchAuthed;
   readonly logger: Logger;
   readonly baseUrl: string;
-  readonly accessToken: () => Promise<string | null>;
 }
 
 export interface SessionListQuery {
@@ -59,22 +63,16 @@ export function createSessionListClient(
 ): { list: (q: SessionListQuery) => Promise<SessionListClientOutcome> } {
   return {
     async list(q: SessionListQuery): Promise<SessionListClientOutcome> {
-      const token = await deps.accessToken();
-      if (token === null || token.length === 0) return { kind: 'unauthenticated' };
       const url = `${deps.baseUrl}${buildQueryString(q)}`;
-      let res: Response;
-      try {
-        res = await deps.fetch(url, {
-          method: 'GET',
-          headers: { authorization: `Bearer ${token}` },
-        });
-      } catch (err: unknown) {
+      const result = await deps.fetchAuthed(url, { method: 'GET' });
+      if (result.kind === 'unauthenticated') return { kind: 'unauthenticated' };
+      if (result.kind === 'network-error') {
         deps.logger.warn('session-list: network', {
-          error: err instanceof Error ? err.message : String(err),
+          error: result.error.message,
         });
         return { kind: 'network-error' };
       }
-      if (res.status === 401 || res.status === 403) return { kind: 'unauthenticated' };
+      const res = result.response;
       if (!res.ok) return { kind: 'api-error', status: res.status };
       let body: unknown;
       try {

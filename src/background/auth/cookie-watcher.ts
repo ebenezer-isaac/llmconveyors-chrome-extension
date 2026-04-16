@@ -32,12 +32,6 @@ export interface CookieWatcherDeps {
   readonly logger: Logger;
   readonly clearSession: () => Promise<void>;
   readonly broadcast: (message: { readonly key: string; readonly data: unknown }) => Promise<void>;
-  /**
-   * Silent re-exchange trigger. Receives `undefined` and returns nothing.
-   * The production wiring invokes the orchestrator with
-   * `{ interactive: false }`; tests pass a spy.
-   */
-  readonly attemptSilentSignIn: () => Promise<void>;
 }
 
 interface CookiesApi {

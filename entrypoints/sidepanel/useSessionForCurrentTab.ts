@@ -10,6 +10,11 @@
  *   (GET /api/v1/sessions/:id/hydrate returns
  *    { session, artifacts, generationLogs, ... }).
  *
+ * The hydrate fetch is delegated to the background via SESSION_HYDRATE_GET
+ * so the SessionManager's proactive refresh + silent 401 retry path applies
+ * to every authenticated backend call. React components never call the
+ * backend with a bearer token directly.
+ *
  * Status lifecycle:
  *   idle      -> loading -> found / not-found / error
  *
@@ -21,7 +26,12 @@ import { z } from 'zod';
 import type { AgentId } from '@/src/background/agents';
 import { SessionBindingEntrySchema } from '@/src/background/messaging/schemas/session-binding.schema';
 import type { SessionBindingEntry } from '@/src/background/messaging/schemas/session-binding.schema';
-import { readSession } from '@/src/background/storage/session-storage';
+import {
+  SessionHydrateGetResponseSchema,
+  type SessionHydrateGetResponse,
+  type HydratePayload,
+  type HydrateSessionDoc,
+} from '@/src/background/messaging/schemas/session-list.schema';
 import { clientEnv } from '@/src/shared/env';
 
 type RuntimeMessenger = {
@@ -117,15 +127,6 @@ export interface UseSessionForCurrentTabResult {
 
 const SessionBindingGetResponseSchema = SessionBindingEntrySchema.nullable();
 
-const ArtifactSchema = z
-  .object({
-    type: z.string(),
-    storageKey: z.string().optional(),
-    label: z.string().optional(),
-    name: z.string().optional(),
-  })
-  .passthrough();
-
 const LogEntrySchema = z
   .object({
     phase: z.string().optional().nullable(),
@@ -135,31 +136,6 @@ const LogEntrySchema = z
     timestamp: z.union([z.string(), z.number()]).optional(),
     createdAt: z.union([z.string(), z.number()]).optional(),
     level: z.string().optional().nullable(),
-  })
-  .passthrough();
-
-const HydrateSessionDocSchema = z
-  .object({
-    id: z.string().optional(),
-    _id: z.string().optional(),
-    status: z.string().optional(),
-    metadata: z.record(z.unknown()).optional().default({}),
-    updatedAt: z.union([z.string(), z.number()]).optional(),
-  })
-  .passthrough();
-
-const HydratePayloadSchema = z
-  .object({
-    session: HydrateSessionDocSchema,
-    artifacts: z.array(ArtifactSchema).optional().default([]),
-    generationLogs: z.array(z.unknown()).optional().default([]),
-  })
-  .passthrough();
-
-const HydrateEnvelopeSchema = z
-  .object({
-    success: z.boolean().optional(),
-    data: HydratePayloadSchema.optional(),
   })
   .passthrough();
 
@@ -229,9 +205,17 @@ function normalizeArtifacts(
   artifactsRaw: readonly unknown[],
   sessionId: string,
 ): readonly SessionArtifact[] {
+  const ArtifactShape = z
+    .object({
+      type: z.string(),
+      storageKey: z.string().optional(),
+      label: z.string().optional(),
+      name: z.string().optional(),
+    })
+    .passthrough();
   const out: SessionArtifact[] = [];
   for (const raw of artifactsRaw) {
-    const parsed = ArtifactSchema.safeParse(raw);
+    const parsed = ArtifactShape.safeParse(raw);
     if (!parsed.success) continue;
     const storageKey =
       typeof parsed.data.storageKey === 'string' && parsed.data.storageKey.length > 0
@@ -257,9 +241,7 @@ function normalizeArtifacts(
   return out;
 }
 
-function extractSummary(
-  sessionDoc: z.infer<typeof HydrateSessionDocSchema>,
-): SessionSummary {
+function extractSummary(sessionDoc: HydrateSessionDoc): SessionSummary {
   const metadata = (sessionDoc.metadata ?? {}) as Record<string, unknown>;
   const companyName =
     typeof metadata.companyName === 'string' && metadata.companyName.length > 0
@@ -292,17 +274,19 @@ export interface UseSessionForCurrentTabOptions {
   readonly tabId: number | null;
   readonly agentId: AgentId | null;
   readonly signedIn: boolean;
-  readonly accessToken?: () => Promise<string | null>;
-  readonly fetchImpl?: typeof globalThis.fetch;
+  /**
+   * Test-only override for the runtime messenger. Production uses
+   * `chrome.runtime.sendMessage` via the default resolver.
+   */
+  readonly sendMessage?: (msg: unknown) => Promise<unknown>;
 }
 
 async function fetchBinding(
   url: string,
   agentId: AgentId,
+  sendMessage: (msg: unknown) => Promise<unknown>,
 ): Promise<SessionBindingEntry | null> {
-  const runtime = getRuntime();
-  if (runtime === null) return null;
-  const raw = await runtime.sendMessage({
+  const raw = await sendMessage({
     key: 'SESSION_BINDING_GET',
     data: { url, agentId },
   });
@@ -313,8 +297,7 @@ async function fetchBinding(
 
 async function fetchHydrated(
   sessionId: string,
-  token: string | null,
-  fetchImpl: typeof globalThis.fetch,
+  sendMessage: (msg: unknown) => Promise<unknown>,
 ): Promise<
   | {
       readonly kind: 'ok';
@@ -326,53 +309,55 @@ async function fetchHydrated(
   | { readonly kind: 'signed-out' }
   | { readonly kind: 'error'; readonly error: string }
 > {
-  if (token === null || token.length === 0) return { kind: 'signed-out' };
-  const url = `${clientEnv.apiBaseUrl}/api/v1/sessions/${encodeURIComponent(sessionId)}/hydrate`;
-  let res: Response;
+  let raw: unknown;
   try {
-    res = await fetchImpl(url, {
-      method: 'GET',
-      headers: { authorization: `Bearer ${token}` },
+    raw = await sendMessage({
+      key: 'SESSION_HYDRATE_GET',
+      data: { sessionId },
     });
   } catch (err: unknown) {
     return { kind: 'error', error: err instanceof Error ? err.message : String(err) };
   }
-  if (res.status === 401 || res.status === 403) return { kind: 'signed-out' };
-  if (res.status === 404) return { kind: 'not-found' };
-  if (!res.ok) return { kind: 'error', error: `status ${res.status}` };
-  let body: unknown;
-  try {
-    body = await res.json();
-  } catch {
-    return { kind: 'error', error: 'invalid json' };
+  const parsed = SessionHydrateGetResponseSchema.safeParse(raw);
+  if (!parsed.success) return { kind: 'error', error: 'shape-mismatch' };
+  return translateHydrateResponse(parsed.data, sessionId);
+}
+
+function translateHydrateResponse(
+  response: SessionHydrateGetResponse,
+  sessionId: string,
+):
+  | {
+      readonly kind: 'ok';
+      readonly summary: SessionSummary;
+      readonly logs: readonly SessionLogEntry[];
+      readonly artifacts: readonly SessionArtifact[];
+    }
+  | { readonly kind: 'not-found' }
+  | { readonly kind: 'signed-out' }
+  | { readonly kind: 'error'; readonly error: string } {
+  if (!response.ok) {
+    if (response.reason === 'not-found') return { kind: 'not-found' };
+    if (response.reason === 'signed-out') return { kind: 'signed-out' };
+    return { kind: 'error', error: response.reason };
   }
-  const envelope = HydrateEnvelopeSchema.safeParse(body);
-  if (!envelope.success) return { kind: 'error', error: 'shape-mismatch' };
-  const payload = envelope.data.data ?? (body as z.infer<typeof HydratePayloadSchema>);
-  const payloadParsed = HydratePayloadSchema.safeParse(payload);
-  if (!payloadParsed.success) return { kind: 'error', error: 'shape-mismatch' };
-  const summary = extractSummary(payloadParsed.data.session);
+  const payload: HydratePayload = response.payload;
+  const summary = extractSummary(payload.session);
   return {
     kind: 'ok',
-    summary: { ...summary, sessionId: summary.sessionId.length > 0 ? summary.sessionId : sessionId },
-    logs: normalizeLogs(payloadParsed.data.generationLogs ?? [], '') ?? [],
-    artifacts: normalizeArtifacts(payloadParsed.data.artifacts ?? [], sessionId),
+    summary: {
+      ...summary,
+      sessionId: summary.sessionId.length > 0 ? summary.sessionId : sessionId,
+    },
+    logs: normalizeLogs(payload.generationLogs ?? [], ''),
+    artifacts: normalizeArtifacts(payload.artifacts ?? [], sessionId),
   };
 }
 
-async function resolveAccessToken(
-  override: (() => Promise<string | null>) | undefined,
-): Promise<string | null> {
-  if (override !== undefined) return override();
-  // chrome.storage.local is shared across the extension's service worker,
-  // popup, and sidepanel contexts; reading the persisted session row here
-  // avoids adding a token-exposing protocol key.
-  try {
-    const session = await readSession();
-    return session?.accessToken ?? null;
-  } catch {
-    return null;
-  }
+function defaultSendMessage(msg: unknown): Promise<unknown> {
+  const runtime = getRuntime();
+  if (runtime === null) return Promise.resolve(null);
+  return runtime.sendMessage(msg);
 }
 
 export function useSessionForCurrentTab(
@@ -404,6 +389,7 @@ export function useSessionForCurrentTab(
 
   useEffect(() => {
     let cancelled = false;
+    const sendMessage = opts.sendMessage ?? defaultSendMessage;
     async function run(): Promise<void> {
       if (!opts.signedIn || opts.agentId === null) {
         if (!cancelled) {
@@ -440,7 +426,7 @@ export function useSessionForCurrentTab(
       setError(null);
       let found: SessionBindingEntry | null;
       try {
-        found = await fetchBinding(tabUrl, opts.agentId);
+        found = await fetchBinding(tabUrl, opts.agentId, sendMessage);
       } catch (err: unknown) {
         if (cancelled) return;
         setStatus('error');
@@ -463,10 +449,7 @@ export function useSessionForCurrentTab(
         return;
       }
       setBinding(found);
-      const token = await resolveAccessToken(opts.accessToken);
-      if (cancelled) return;
-      const fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis);
-      const outcome = await fetchHydrated(found.sessionId, token, fetchImpl);
+      const outcome = await fetchHydrated(found.sessionId, sendMessage);
       if (cancelled) return;
       if (outcome.kind === 'ok') {
         setSession(outcome.summary);
@@ -499,7 +482,7 @@ export function useSessionForCurrentTab(
     return () => {
       cancelled = true;
     };
-  }, [opts.tabId, opts.agentId, opts.signedIn, opts.accessToken, opts.fetchImpl, nonce]);
+  }, [opts.tabId, opts.agentId, opts.signedIn, opts.sendMessage, nonce]);
 
   return {
     status,
