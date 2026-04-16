@@ -449,6 +449,22 @@ function SidepanelBody(): React.ReactElement {
             company: genericIntent.company,
           }}
           tabUrl={tabUrl}
+          boundSession={
+            showBoundPanel && binding.session !== null
+              ? {
+                  companyName: binding.session.companyName,
+                  jobTitle: binding.session.jobTitle,
+                  urlKey:
+                    binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
+                      ? binding.binding.urlKey
+                      : null,
+                  title:
+                    binding.session.jobTitle ??
+                    binding.session.companyName ??
+                    `Session ${binding.session.sessionId.slice(0, 8)}`,
+                }
+              : null
+          }
         >
           <div className="flex flex-1 flex-col overflow-y-auto">
             {showBoundPanel && binding.session !== null ? (

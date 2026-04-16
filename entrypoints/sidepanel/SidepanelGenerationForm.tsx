@@ -57,11 +57,28 @@ export interface GenericIntentSeed {
   readonly company: string | null;
 }
 
+/**
+ * When the sidepanel is showing a bound session (most-recent OR URL-
+ * bound), the form below locks its target fields (company / jobTitle /
+ * companyWebsite) to that session's metadata. The user can submit to
+ * run a fresh generation with the SAME target, or click "Start fresh"
+ * to unlock the fields and repoint at a new target from the current
+ * tab. This is the "lock website per session" + "visual hint when
+ * target differs" pattern discussed with the user.
+ */
+export interface BoundSessionSeed {
+  readonly companyName: string | null;
+  readonly jobTitle: string | null;
+  readonly urlKey: string | null;
+  readonly title: string;
+}
+
 export interface SidepanelGenerationFormBase {
   readonly activeAgentId: AgentId;
   readonly intent: DetectedIntent | null;
   readonly genericIntent: GenericIntentSeed | null;
   readonly tabUrl: string | null;
+  readonly boundSession?: BoundSessionSeed | null;
 }
 
 interface Defaults {
@@ -75,11 +92,37 @@ function deriveDefaults(
   intent: DetectedIntent | null,
   genericIntent: GenericIntentSeed | null,
   tabUrl: string | null,
+  boundSession: BoundSessionSeed | null | undefined,
+  locked: boolean,
 ): Defaults {
-  // Prefer adapter-matched values, fall back to generic scan. This is the
-  // fix for the "company / job title aren't being autofilled" report:
-  // on pages where only the jsonld / readability scan matches, the
-  // adapter intent is null but generic carries both fields.
+  // When locked, the bound session's metadata wins -- the form is
+  // pinned to that target and `Start fresh` is the only way to repoint.
+  if (locked && boundSession) {
+    const lockedCompany = boundSession.companyName ?? '';
+    const lockedTitle = boundSession.jobTitle ?? '';
+    let lockedWebsite = '';
+    if (boundSession.urlKey !== null && boundSession.urlKey.length > 0) {
+      try {
+        const u = new URL(boundSession.urlKey);
+        lockedWebsite = `${u.protocol}//${u.hostname}`;
+      } catch {
+        lockedWebsite = '';
+      }
+    }
+    // JD stays current-tab / generic-scan sourced so the user can
+    // paste an updated JD without unlocking (cheap edit case).
+    const jd =
+      (typeof genericIntent?.jdText === 'string' && genericIntent.jdText.length > 0
+        ? genericIntent.jdText
+        : undefined) ?? '';
+    return {
+      company: lockedCompany,
+      jobTitle: lockedTitle,
+      companyWebsite: lockedWebsite,
+      jobDescription: jd,
+    };
+  }
+  // Unlocked: prefer adapter-matched values, fall back to generic scan.
   const company =
     (typeof intent?.company === 'string' && intent.company.length > 0
       ? intent.company
@@ -130,6 +173,16 @@ interface FormState {
   readonly isColdOutreach: boolean;
   readonly jobDescriptionRequired: boolean;
   readonly submitDisabled: boolean;
+  /** True when a bound session is pinning the target fields. */
+  readonly locked: boolean;
+  /** Bound session title for the banner ("IoT Intern @ Cosysense"). */
+  readonly boundTitle: string | null;
+  /**
+   * True when the form is locked AND the current tab's URL points at
+   * something different from the bound session's URL. Powers the hint
+   * "You're looking at a different page -- Start fresh to target it".
+   */
+  readonly targetMismatch: boolean;
   readonly setCompany: (v: string) => void;
   readonly setJobTitle: (v: string) => void;
   readonly setCompanyWebsite: (v: string) => void;
@@ -140,6 +193,8 @@ interface FormState {
   readonly setFreshResearch: (v: boolean) => void;
   readonly clearFieldError: (name: string) => void;
   readonly toggleMode: () => void;
+  /** User-initiated unlock: clears lock + resets fields to current tab. */
+  readonly startFresh: () => void;
   readonly onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }
 
@@ -160,6 +215,7 @@ export function SidepanelGenerationFormProvider({
   intent,
   genericIntent,
   tabUrl,
+  boundSession,
   children,
 }: SidepanelGenerationFormBase & {
   readonly children: React.ReactNode;
@@ -167,9 +223,20 @@ export function SidepanelGenerationFormProvider({
   const { start, busy, error } = useGeneration();
   const isJobHunter = activeAgentId === 'job-hunter';
 
+  // Lock defaults to true whenever a bound session is provided. The
+  // user can `Start fresh` to unlock. When they click Start fresh we
+  // also remember the sessionId that triggered the unlock so a later
+  // render with the same boundSession doesn't re-lock.
+  const unlockedSessionIdRef = useRef<string | null>(null);
+  const boundKey = boundSession
+    ? `${boundSession.urlKey ?? ''}|${boundSession.title}`
+    : null;
+  const userUnlocked = boundKey !== null && unlockedSessionIdRef.current === boundKey;
+  const locked = boundSession !== null && boundSession !== undefined && !userUnlocked;
+
   const defaults = useMemo(
-    () => deriveDefaults(intent, genericIntent, tabUrl),
-    [intent, genericIntent, tabUrl],
+    () => deriveDefaults(intent, genericIntent, tabUrl, boundSession ?? null, locked),
+    [intent, genericIntent, tabUrl, boundSession, locked],
   );
   const [mode, setMode] = useState<Mode>('standard');
   const [company, setCompany] = useState<string>(defaults.company);
@@ -241,6 +308,40 @@ export function SidepanelGenerationFormProvider({
       (jobDescriptionRequired && !jobDescription.trim())
     : !companyWebsite.trim();
   const submitDisabled = busy || invalid;
+
+  const boundTitle = boundSession?.title ?? null;
+  // Target mismatch: user is on a page whose URL origin differs from
+  // the bound session's URL. Powers the in-form hint banner so users
+  // realise they're about to re-run for the *locked* target even
+  // though they're actually looking at a different page.
+  const targetMismatch = useMemo(() => {
+    if (!locked || !boundSession || !tabUrl) return false;
+    const sessionUrl = boundSession.urlKey;
+    if (!sessionUrl) return false;
+    try {
+      const tabHost = new URL(tabUrl).hostname.replace(/^www\./, '');
+      const sessionHost = new URL(sessionUrl).hostname.replace(/^www\./, '');
+      return tabHost !== sessionHost;
+    } catch {
+      return false;
+    }
+  }, [locked, boundSession, tabUrl]);
+
+  const startFresh = React.useCallback(() => {
+    if (boundKey !== null) {
+      unlockedSessionIdRef.current = boundKey;
+    }
+    // Reset fields to current tab defaults. Because unlockedSessionIdRef
+    // is a ref, React doesn't know to re-render; flip a state to trigger
+    // it. Easiest trick: reset one input to its unlocked default, which
+    // forces re-render via setState. The useEffect that tracks defaults
+    // re-seeds the rest.
+    setCompany('');
+    setJobTitle('');
+    setCompanyWebsite('');
+    setJobDescription('');
+    setFormErrors({});
+  }, [boundKey]);
 
   const onSubmit = React.useCallback(
     (event: React.FormEvent<HTMLFormElement>): void => {
@@ -335,6 +436,9 @@ export function SidepanelGenerationFormProvider({
     isColdOutreach,
     jobDescriptionRequired,
     submitDisabled,
+    locked,
+    boundTitle,
+    targetMismatch,
     setCompany,
     setJobTitle,
     setCompanyWebsite,
@@ -345,6 +449,7 @@ export function SidepanelGenerationFormProvider({
     setFreshResearch,
     clearFieldError,
     toggleMode,
+    startFresh,
     onSubmit,
   };
   return (
@@ -437,10 +542,60 @@ export function SidepanelGenerationFields(): React.ReactElement {
             {s.isColdOutreach ? 'Cold Outreach' : 'Standard'}
           </span>
         </div>
-        {s.isJobHunter ? (
+        {s.locked ? (
+          <button
+            type="button"
+            data-testid="sidepanel-form-start-fresh"
+            onClick={s.startFresh}
+            disabled={s.busy}
+            className="inline-flex items-center gap-1 rounded-pill border border-zinc-300 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
+          >
+            Start fresh
+          </button>
+        ) : s.isJobHunter ? (
           <ModeToggle mode={s.mode} onToggle={s.toggleMode} disabled={s.busy} />
         ) : null}
       </header>
+
+      {s.locked ? (
+        <div
+          data-testid="sidepanel-form-lock-banner"
+          data-target-mismatch={s.targetMismatch ? 'true' : 'false'}
+          className={`flex items-start gap-2 border-b px-4 py-2 text-[11px] ${
+            s.targetMismatch
+              ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200'
+              : 'border-zinc-100 bg-zinc-50 text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-300'
+          }`}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            aria-hidden="true"
+            className="mt-0.5 shrink-0"
+          >
+            <rect x="3" y="7" width="10" height="7" rx="1" />
+            <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+          </svg>
+          <span className="leading-snug">
+            {s.targetMismatch ? (
+              <>
+                Locked to <strong>{s.boundTitle ?? 'this session'}</strong> but you're
+                on a different page now. Click <em>Start fresh</em> to target the
+                current page instead.
+              </>
+            ) : (
+              <>
+                Target fields locked to <strong>{s.boundTitle ?? 'this session'}</strong>.
+                Click <em>Start fresh</em> to edit them.
+              </>
+            )}
+          </span>
+        </div>
+      ) : null}
 
       <form
         id={FORM_ID}
@@ -464,7 +619,9 @@ export function SidepanelGenerationFields(): React.ReactElement {
                   s.setCompany(e.target.value);
                 }}
                 maxLength={MAX_SHORT}
-                className={INPUT_CLASSES}
+                readOnly={s.locked}
+                aria-readonly={s.locked || undefined}
+                className={`${INPUT_CLASSES} ${s.locked ? 'cursor-not-allowed opacity-75' : ''}`}
                 placeholder="Acme Inc"
               />
               <FieldError message={s.formErrors.companyName} />
@@ -482,7 +639,9 @@ export function SidepanelGenerationFields(): React.ReactElement {
                   s.setJobTitle(e.target.value);
                 }}
                 maxLength={MAX_SHORT}
-                className={INPUT_CLASSES}
+                readOnly={s.locked}
+                aria-readonly={s.locked || undefined}
+                className={`${INPUT_CLASSES} ${s.locked ? 'cursor-not-allowed opacity-75' : ''}`}
                 placeholder="Backend Engineer"
               />
               <FieldError message={s.formErrors.jobTitle} />
@@ -497,7 +656,9 @@ export function SidepanelGenerationFields(): React.ReactElement {
               value={s.company}
               onChange={(e) => s.setCompany(e.target.value)}
               maxLength={MAX_SHORT}
-              className={INPUT_CLASSES}
+              readOnly={s.locked}
+              aria-readonly={s.locked || undefined}
+              className={`${INPUT_CLASSES} ${s.locked ? 'cursor-not-allowed opacity-75' : ''}`}
               placeholder="Acme Inc"
             />
           </label>
@@ -520,7 +681,9 @@ export function SidepanelGenerationFields(): React.ReactElement {
               s.setCompanyWebsite(normalizeUrl(e.target.value));
             }}
             maxLength={2048}
-            className={INPUT_CLASSES}
+            readOnly={s.locked}
+            aria-readonly={s.locked || undefined}
+            className={`${INPUT_CLASSES} ${s.locked ? 'cursor-not-allowed opacity-75' : ''}`}
             placeholder="https://example.com"
           />
           <FieldError message={s.formErrors.companyWebsite} />
