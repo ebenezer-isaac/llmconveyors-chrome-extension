@@ -31,6 +31,7 @@ import { buildAgentUrl } from '@/src/background/agents/agent-registry';
 import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import { accentFor } from './lib/accent';
+import { SidepanelActionPanel } from './SidepanelActionPanel';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -241,11 +242,17 @@ function SidepanelBody(): React.ReactElement {
           accentBorder={accent.border}
         />
       ) : null}
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <GenerationView
           activeAgentType={agentType}
           mode={showBoundPanel ? 'active-only' : 'both'}
         />
+        {authState.signedIn && !showBoundPanel ? (
+          <SidepanelActionPanel
+            signedIn={authState.signedIn}
+            activeAgentId={agent.id}
+          />
+        ) : null}
       </div>
     </div>
   );

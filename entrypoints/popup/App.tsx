@@ -13,7 +13,7 @@
  *   Footer
  */
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAuthState } from './useAuthState';
 import { useIntent } from './useIntent';
 import { useCredits } from './useCredits';
@@ -30,33 +30,7 @@ import { Footer } from './Footer';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 
-function useActiveTabUrl(tabId: number | null): string | null {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (tabId === null) {
-      setUrl(null);
-      return;
-    }
-    const g = globalThis as unknown as {
-      chrome?: {
-        tabs?: {
-          get: (id: number, cb: (tab: { url?: string } | undefined) => void) => void;
-        };
-      };
-    };
-    const tabs = g.chrome?.tabs;
-    if (!tabs || typeof tabs.get !== 'function') {
-      setUrl(null);
-      return;
-    }
-    try {
-      tabs.get(tabId, (tab) => setUrl(tab?.url ?? null));
-    } catch {
-      setUrl(null);
-    }
-  }, [tabId]);
-  return url;
-}
+import { useActiveTabUrl } from './useActiveTabUrl';
 
 function PopupBody(): React.ReactElement {
   const { state: authState, loading: authLoading, error: authError, signIn, signOut } =
