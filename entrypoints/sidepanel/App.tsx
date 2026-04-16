@@ -32,6 +32,7 @@ import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import { accentFor } from './lib/accent';
 import { SidepanelActionPanel } from './SidepanelActionPanel';
+import { ThemeToggle } from './ThemeToggle';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -210,19 +211,22 @@ function SidepanelBody(): React.ReactElement {
       className="flex h-screen w-full flex-col bg-white dark:bg-zinc-900"
     >
       <div
-        className={`flex items-center justify-between border-b px-3 py-2 ${accent.header}`}
+        className={`flex items-center justify-between gap-2 border-b px-3 py-2 ${accent.header}`}
       >
         <span className="text-xs font-medium text-zinc-800 dark:text-zinc-100">
           {agent.label}
         </span>
-        <button
-          type="button"
-          onClick={openDashboard}
-          className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
-          data-testid="sidepanel-open-in-tab"
-        >
-          Open dashboard
-        </button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={openDashboard}
+            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
+            data-testid="sidepanel-open-in-tab"
+          >
+            Open dashboard
+          </button>
+        </div>
       </div>
       {showLoading ? (
         <div
