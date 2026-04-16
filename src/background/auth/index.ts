@@ -65,3 +65,9 @@ export type {
   FetchAuthedDeps,
   FetchAuthedResult,
 } from './fetch-authed';
+
+export { createCookieExchange } from './cookie-exchange';
+export type {
+  CookieExchangeDeps,
+  CookieExchangeResult,
+} from './cookie-exchange';

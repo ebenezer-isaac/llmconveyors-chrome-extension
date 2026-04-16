@@ -87,3 +87,11 @@ export const StoredSessionSchema = z
   .strict();
 
 export type StoredSession = z.infer<typeof StoredSessionSchema>;
+
+/**
+ * AUTH_COOKIE_EXCHANGE: reads the web app's sAccessToken cookie directly
+ * via chrome.cookies.get() and exchanges it for a header-mode session.
+ * No request data needed.
+ */
+export const AuthCookieExchangeRequestSchema = z.object({}).strict();
+export type AuthCookieExchangeRequest = z.infer<typeof AuthCookieExchangeRequestSchema>;

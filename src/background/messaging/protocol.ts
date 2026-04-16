@@ -12,6 +12,7 @@ import type {
   AuthSignInRequest,
   AuthSignOutRequest,
   AuthStatusRequest,
+  AuthCookieExchangeRequest,
   AuthSignInResponse,
   AuthSignOutResponse,
   AuthState,
@@ -73,11 +74,12 @@ import type {
 } from '../agents';
 
 export interface ProtocolMap {
-  // --- Auth (4) ---
+  // --- Auth (5) ---
   AUTH_SIGN_IN: (data: AuthSignInRequest) => AuthSignInResponse;
   AUTH_SIGN_OUT: (data: AuthSignOutRequest) => AuthSignOutResponse;
   AUTH_STATUS: (data: AuthStatusRequest) => AuthState;
   AUTH_STATE_CHANGED: (data: AuthState) => void;
+  AUTH_COOKIE_EXCHANGE: (data: AuthCookieExchangeRequest) => AuthState;
 
   // --- Intent (2) ---
   INTENT_DETECTED: (data: DetectedIntentPayload) => void;
@@ -145,6 +147,7 @@ export const BG_HANDLED_KEYS = [
   'AUTH_SIGN_OUT',
   'AUTH_STATUS',
   'AUTH_STATE_CHANGED',
+  'AUTH_COOKIE_EXCHANGE',
   'INTENT_DETECTED',
   'INTENT_GET',
   'FILL_REQUEST',

@@ -76,6 +76,7 @@ import {
   AuthSignInRequestSchema,
   AuthSignOutRequestSchema,
   AuthStatusRequestSchema,
+  AuthCookieExchangeRequestSchema,
   AuthStateSchema,
   UNAUTHED,
   StoredSessionSchema,
@@ -97,6 +98,7 @@ import { ProfileGetRequestSchema } from './schemas/profile.schema';
 import type { BgHandledKey, ProtocolMap } from './protocol';
 import {
   AuthError,
+  createCookieExchange,
   createSignInOrchestrator,
   DEFAULT_BRIDGE_URL,
   defaultParseAuthFragmentDeps,
@@ -398,6 +400,32 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       });
     }
     return undefined;
+  };
+
+  // ---- AUTH_COOKIE_EXCHANGE ----
+  // Reads the web app's sAccessToken cookie directly via chrome.cookies
+  // and exchanges it for a header-mode session. Returns AuthState.
+  const handleAuthCookieExchange: HandlerFor<'AUTH_COOKIE_EXCHANGE'> = async ({ data }) => {
+    const parsed = AuthCookieExchangeRequestSchema.safeParse(data ?? {});
+    if (!parsed.success) {
+      log.warn('AUTH_COOKIE_EXCHANGE: invalid payload');
+    }
+    const exchange = createCookieExchange({
+      logger: log,
+      fetch: deps.fetch,
+      exchangeEndpoint: deps.endpoints.authExchange,
+      storage: { writeSession: deps.storage.writeSession },
+      broadcast: { sendRuntime: deps.broadcast.sendRuntime },
+    });
+    const result = await exchange();
+    if (result.kind === 'ok') {
+      return { signedIn: true, userId: result.userId } as AuthState;
+    }
+    log.debug('AUTH_COOKIE_EXCHANGE: not successful', {
+      kind: result.kind,
+      reason: 'reason' in result ? result.reason : undefined,
+    });
+    return UNAUTHED;
   };
 
   // ---- INTENT_DETECTED ----
@@ -748,6 +776,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     AUTH_SIGN_OUT: handleAuthSignOut,
     AUTH_STATUS: handleAuthStatus,
     AUTH_STATE_CHANGED: handleAuthStateChanged,
+    AUTH_COOKIE_EXCHANGE: handleAuthCookieExchange,
     INTENT_DETECTED: handleIntentDetected,
     INTENT_GET: handleIntentGet,
     FILL_REQUEST: handleFillRequest,

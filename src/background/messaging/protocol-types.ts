@@ -14,6 +14,7 @@ import type {
   AuthSignOutResponseSchema,
   AuthStateSchema,
   StoredSessionSchema,
+  AuthCookieExchangeRequestSchema,
 } from './schemas/auth.schema';
 import type {
   DetectedIntentSchema,
@@ -83,6 +84,7 @@ export type AuthSignInResponse = z.infer<typeof AuthSignInResponseSchema>;
 export type AuthSignOutResponse = z.infer<typeof AuthSignOutResponseSchema>;
 export type AuthState = z.infer<typeof AuthStateSchema>;
 export type StoredSession = z.infer<typeof StoredSessionSchema>;
+export type AuthCookieExchangeRequest = z.infer<typeof AuthCookieExchangeRequestSchema>;
 
 // Intent
 export type DetectedIntent = z.infer<typeof DetectedIntentSchema>;
