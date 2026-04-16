@@ -55,9 +55,10 @@ export function GetCreditsLink({ agentId }: GetCreditsLinkProps): React.ReactEle
       type="button"
       data-testid="get-credits-link"
       onClick={openSettings}
-      className="mt-1 self-start text-xs font-medium text-zinc-700 underline hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+      className="mt-1 inline-flex items-center gap-1 self-start rounded-pill border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
     >
-      Get credits -&gt;
+      Get credits
+      <span aria-hidden="true">&rarr;</span>
     </button>
   );
 }

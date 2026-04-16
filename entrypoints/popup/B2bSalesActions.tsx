@@ -7,7 +7,9 @@
  *   2. Draft outreach email - enabled when the current URL is a person's
  *      profile page (currently: linkedin.com/in/*).
  *
- * Both disable when credits === 0 and expose a "Get credits" link.
+ * Credits are NOT used to disable the buttons; the backend gates the
+ * request and returns a credit error which surfaces inline. A "Get credits"
+ * chip appears below the panel when the balance is zero.
  */
 
 import React from 'react';
@@ -64,19 +66,12 @@ export function B2bSalesActions({
     tabUrl !== null && (tabUrl.startsWith('http://') || tabUrl.startsWith('https://'));
   const isProfile = isLinkedInProfileUrl(tabUrl);
 
-  let researchDisabledReason: string | undefined;
-  if (outOfCredits) {
-    researchDisabledReason = 'You are out of credits';
-  } else if (!hasTabUrl) {
-    researchDisabledReason = 'Open a company web page first';
-  }
-
-  let outreachDisabledReason: string | undefined;
-  if (outOfCredits) {
-    outreachDisabledReason = 'You are out of credits';
-  } else if (!isProfile) {
-    outreachDisabledReason = 'Open a LinkedIn profile to draft outreach';
-  }
+  const researchDisabledReason: string | undefined = hasTabUrl
+    ? undefined
+    : 'Open a company web page first';
+  const outreachDisabledReason: string | undefined = isProfile
+    ? undefined
+    : 'Open a LinkedIn profile to draft outreach';
 
   const companyWebsite = deriveCompanyWebsite(tabUrl);
   const companyName = deriveCompanyNameFromUrl(tabUrl);
@@ -89,7 +84,7 @@ export function B2bSalesActions({
     >
       <GenerateButton
         agentId="b2b-sales"
-        disabled={outOfCredits || !hasTabUrl}
+        disabled={!hasTabUrl}
         disabledReason={researchDisabledReason}
         primaryLabel="Research company"
         payload={{
@@ -103,7 +98,7 @@ export function B2bSalesActions({
       />
       <GenerateButton
         agentId="b2b-sales"
-        disabled={outOfCredits || !isProfile}
+        disabled={!isProfile}
         disabledReason={outreachDisabledReason}
         primaryLabel="Draft outreach email"
         payload={{

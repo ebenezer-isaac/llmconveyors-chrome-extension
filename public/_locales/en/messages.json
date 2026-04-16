@@ -108,7 +108,7 @@
     "description": "Title of the recent sessions panel."
   },
   "sessionList_viewAll": {
-    "message": "View all ->",
+    "message": "View all",
     "description": "Link to view all sessions in the dashboard."
   },
   "sessionList_empty": {

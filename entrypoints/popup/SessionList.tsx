@@ -204,9 +204,10 @@ export function SessionList({
           type="button"
           data-testid="session-list-dashboard-link"
           onClick={() => openDashboard(activeAgentId)}
-          className="text-xs font-medium text-zinc-700 underline hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+          className="inline-flex items-center gap-1 rounded-pill border border-zinc-300 bg-white px-2.5 py-0.5 text-[11px] font-medium text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700"
         >
           {t('sessionList_viewAll')}
+          <span aria-hidden="true">&rarr;</span>
         </button>
       </div>
       {expanded ? (

@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT
 /**
  * JobHunterActions - action panel rendered when the active agent is
- * 'job-hunter'. Shows three CTAs:
+ * 'job-hunter'. Shows up to three CTAs:
  *   1. Generate CV + Cover Letter (primary) - enabled when a JD is detected
  *      (either adapter-matched or via the generic scan fallback).
- *   2. Fill application - enabled only when intent.pageKind is
- *      'application-form' AND the ATS kind is a known adapter.
- *   3. Highlight keywords - enabled when a JD is visible on the page.
+ *   2. Fill application - rendered only when intent.pageKind is
+ *      'application-form' AND the ATS kind is a known adapter. Hidden on
+ *      plain job pages because Fill depends on a prior generation session.
+ *   3. Highlight keywords - enabled when a JD is visible on the page. No
+ *      credit gate because highlighting runs entirely client-side.
  *
- * All three disable when credits === 0; a "Get credits" link points the user
- * at the web settings page.
+ * Credits are NOT used to disable Generate in the popup. The backend is the
+ * authoritative gate and returns a credit error which is surfaced inline.
+ * The popup only surfaces a "Get credits" chip when the balance is zero.
  */
 
 import React from 'react';
@@ -43,26 +46,12 @@ export function JobHunterActions({
   const jdAvailable = isJobPosting || hasGenericJd;
   const outOfCredits = (credits?.credits ?? 0) <= 0;
 
-  let generateDisabledReason: string | undefined;
-  if (outOfCredits) {
-    generateDisabledReason = 'You are out of credits';
-  } else if (!jdAvailable) {
-    generateDisabledReason = 'Open a job description to generate';
-  }
-
-  let fillDisabledReason: string | undefined;
-  if (outOfCredits) {
-    fillDisabledReason = 'You are out of credits';
-  } else if (!isApplicationForm) {
-    fillDisabledReason = 'Open a supported ATS application form';
-  }
-
-  let highlightDisabledReason: string | undefined;
-  if (outOfCredits) {
-    highlightDisabledReason = 'You are out of credits';
-  } else if (!jdAvailable) {
-    highlightDisabledReason = 'Open a job posting to highlight keywords';
-  }
+  const generateDisabledReason: string | undefined = jdAvailable
+    ? undefined
+    : 'Open a job description to generate';
+  const highlightDisabledReason: string | undefined = jdAvailable
+    ? undefined
+    : 'Open a job posting to highlight keywords';
 
   const generateJdText =
     genericJdText ?? (isJobPosting ? (intent?.jobTitle ?? '') : '') ?? '';
@@ -77,7 +66,7 @@ export function JobHunterActions({
     >
       <GenerateButton
         agentId="job-hunter"
-        disabled={outOfCredits || !jdAvailable}
+        disabled={!jdAvailable}
         disabledReason={generateDisabledReason}
         primaryLabel="Generate CV + Cover Letter"
         payload={{
@@ -89,13 +78,15 @@ export function JobHunterActions({
         tabUrl={tabUrl}
         pageTitle={generateTitle ?? generateCompany ?? null}
       />
-      <FillButton
-        disabled={outOfCredits || !isApplicationForm}
-        disabledReason={fillDisabledReason}
-      />
+      {isApplicationForm ? (
+        <FillButton
+          disabled={false}
+          disabledReason={undefined}
+        />
+      ) : null}
       <HighlightToggle
         tabId={tabId}
-        disabled={outOfCredits || !jdAvailable}
+        disabled={!jdAvailable}
         disabledReason={highlightDisabledReason}
       />
       {outOfCredits ? <GetCreditsLink agentId="job-hunter" /> : null}

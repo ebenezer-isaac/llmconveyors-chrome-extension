@@ -91,13 +91,10 @@ function emptyLabel(agentId: AgentId | null): string {
 }
 
 function genericPageKindLabel(
-  method: string | null,
+  _method: string | null,
   agentId: AgentId | null,
 ): string {
-  const suffix = method ?? 'unknown';
-  return agentId === 'b2b-sales'
-    ? `Company page detected (${suffix})`
-    : `Job detected (${suffix})`;
+  return agentId === 'b2b-sales' ? 'Company page detected' : 'Job detected';
 }
 
 export function computeStatus(

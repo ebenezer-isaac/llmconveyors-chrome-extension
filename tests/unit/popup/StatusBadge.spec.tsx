@@ -74,7 +74,7 @@ describe('computeStatus', () => {
     );
     expect(status.kind).toBe('generic');
     expect(status.vendor).toBe('Generic');
-    expect(status.pageKind).toBe('Job detected (jsonld)');
+    expect(status.pageKind).toBe('Job detected');
     expect(status.method).toBe('jsonld');
   });
 
@@ -86,7 +86,7 @@ describe('computeStatus', () => {
       false,
     );
     expect(status.kind).toBe('generic');
-    expect(status.pageKind).toBe('Company page detected (readability)');
+    expect(status.pageKind).toBe('Company page detected');
   });
 
   it('shows the b2b empty label when nothing is detected', () => {
@@ -143,7 +143,7 @@ describe('StatusBadge rendering', () => {
     expect(query('intent-page-kind')?.textContent).toMatch(/Application form/i);
   });
 
-  it('renders the generic match with Generic vendor and method suffix', async () => {
+  it('renders the generic match with Generic vendor (method hidden from UI)', async () => {
     await renderBadge({
       adapterIntent: null,
       genericJd: { hasJd: true, method: 'jsonld' },
@@ -155,9 +155,8 @@ describe('StatusBadge rendering', () => {
     expect(badge?.getAttribute('data-vendor')).toBe('generic');
     expect(badge?.getAttribute('data-method')).toBe('jsonld');
     expect(query('intent-vendor')?.textContent).toMatch(/Generic/i);
-    expect(query('intent-page-kind')?.textContent).toMatch(
-      /Job detected \(jsonld\)/i,
-    );
+    expect(query('intent-page-kind')?.textContent).toMatch(/^Job detected$/i);
+    expect(query('intent-page-kind')?.textContent).not.toMatch(/jsonld/i);
   });
 
   it('swaps wording for b2b-sales when the generic scan matches', async () => {
@@ -168,8 +167,9 @@ describe('StatusBadge rendering', () => {
       loading: false,
     });
     expect(query('intent-page-kind')?.textContent).toMatch(
-      /Company page detected \(readability\)/i,
+      /^Company page detected$/i,
     );
+    expect(query('intent-page-kind')?.textContent).not.toMatch(/readability/i);
   });
 
   it('shows the "No JD detected" dashed badge when nothing matches', async () => {

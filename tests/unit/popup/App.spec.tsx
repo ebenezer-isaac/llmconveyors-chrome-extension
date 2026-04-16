@@ -157,7 +157,7 @@ describe('Popup App integration', () => {
     expect(query('credits-remaining')).toBeNull();
   });
 
-  it('shows credits + action area with disabled fill when signed in but no intent', async () => {
+  it('shows credits + action area with hidden fill + disabled highlight when signed in but no intent', async () => {
     install(async (msg) => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'u_1' };
@@ -173,14 +173,15 @@ describe('Popup App integration', () => {
     expect(query('action-area')).not.toBeNull();
     const credits = query('credits-remaining');
     expect(credits?.textContent).toMatch(/33 credits/);
-    const fill = query('fill-button') as HTMLButtonElement | null;
+    // Fill is hidden entirely off application-form pages (it requires a
+    // prior generation session to be useful).
+    expect(query('fill-button')).toBeNull();
     const highlight = query('highlight-button') as HTMLButtonElement | null;
-    expect(fill?.disabled).toBe(true);
     expect(highlight?.disabled).toBe(true);
     expect(query('intent-badge')?.getAttribute('data-state')).toBe('none');
   });
 
-  it('enables generate + highlight on a job-posting page; fill stays disabled (no form yet)', async () => {
+  it('enables generate + highlight on a job-posting page; fill is hidden (no application form yet)', async () => {
     install(async (msg) => {
       const env = msg as { key?: string };
       if (env.key === 'AUTH_STATUS') return { signedIn: true, userId: 'u_1' };
@@ -198,11 +199,10 @@ describe('Popup App integration', () => {
     }, [{ id: 3, url: 'https://boards.greenhouse.io/acme/jobs/1' }]);
     await mount();
     await flush();
-    const fill = query('fill-button') as HTMLButtonElement;
     const highlight = query('highlight-button') as HTMLButtonElement;
     const generate = query('generate-button') as HTMLButtonElement;
     expect(generate?.disabled).toBe(false);
-    expect(fill.disabled).toBe(true);
+    expect(query('fill-button')).toBeNull();
     expect(highlight.disabled).toBe(false);
     expect(query('intent-badge')?.getAttribute('data-vendor')).toBe('greenhouse');
   });
