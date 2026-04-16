@@ -404,7 +404,20 @@ export class AutofillController {
     }
 
     try {
-      return adapter.fillField(instruction);
+      const result = await adapter.fillField(instruction);
+      if (result === undefined || result === null) {
+        this.deps.logger.warn('adapter.fillField returned no result', {
+          selector: instruction.selector,
+          fieldType: instruction.fieldType,
+        });
+        return {
+          ok: false,
+          selector: instruction.selector,
+          reason: 'write-failed',
+          error: 'adapter returned no result',
+        };
+      }
+      return result;
     } catch (err: unknown) {
       this.deps.logger.error('adapter.fillField threw', err, {
         selector: instruction.selector,

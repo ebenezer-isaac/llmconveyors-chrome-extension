@@ -37,11 +37,15 @@ export interface ProfileReaderDeps {
  *   - the structuredData blob cannot be shaped into a valid Profile
  */
 export async function readProfile(deps: ProfileReaderDeps): Promise<Profile | null> {
-  let response: MasterResumeGetResponse;
+  let response: MasterResumeGetResponse | undefined;
   try {
     response = await deps.requestMasterResume();
   } catch (err: unknown) {
     deps.logger.error('MASTER_RESUME_GET sendMessage threw', err);
+    return null;
+  }
+  if (!response) {
+    deps.logger.info('MASTER_RESUME_GET returned no response (no bg handler or dropped message)');
     return null;
   }
   if (!response.ok) {
