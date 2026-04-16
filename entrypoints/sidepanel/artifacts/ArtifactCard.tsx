@@ -147,7 +147,15 @@ export function ArtifactCard({
         </div>
       </header>
       {open ? (
-        <div data-testid="artifact-card-body">
+        <div
+          data-testid="artifact-card-body"
+          data-scrollable={artifact.type === 'deep-research' ? 'true' : undefined}
+          className={
+            artifact.type === 'deep-research'
+              ? 'max-h-[400px] overflow-y-auto rounded-card border border-zinc-100 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-800/50'
+              : undefined
+          }
+        >
           <Body artifact={artifact} open={open} />
         </div>
       ) : null}
