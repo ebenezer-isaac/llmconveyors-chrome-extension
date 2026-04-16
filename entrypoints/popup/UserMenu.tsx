@@ -35,9 +35,6 @@ import {
 } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { t } from '@/src/shared/i18n';
-import { formatCredits, getTierLabel } from './useCredits';
-import { useTheme } from './useTheme';
-import type { ThemePreference } from '@/src/shared/theme';
 import { Spinner } from '@/entrypoints/shared/Spinner';
 
 function openExternal(url: string): void {
@@ -90,23 +87,16 @@ export interface UserMenuProps {
   readonly signOutDisabled?: boolean;
 }
 
-const THEME_OPTIONS: ReadonlyArray<{ readonly pref: ThemePreference; readonly key: 'theme_light' | 'theme_dark' | 'theme_system'; readonly testId: string }> = [
-  { pref: 'light', key: 'theme_light', testId: 'user-menu-theme-light' },
-  { pref: 'dark', key: 'theme_dark', testId: 'user-menu-theme-dark' },
-  { pref: 'system', key: 'theme_system', testId: 'user-menu-theme-system' },
-];
-
 export function UserMenu({
   userId,
   profile,
   profileLoading = false,
-  credits,
+  credits: _credits,
   activeAgent,
   onSignOut,
   signOutDisabled = false,
 }: UserMenuProps): React.ReactElement {
   const [open, setOpen] = useState<boolean>(false);
-  const { theme, setTheme } = useTheme();
   const [photoFailed, setPhotoFailed] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -206,15 +196,6 @@ export function UserMenu({
 
   const displaySource = displayName ?? email ?? userId;
   const initials = initialsFor(displaySource);
-  const tierLabel = getTierLabel(
-    credits?.tier ?? 'free',
-    credits?.byoKeyEnabled ?? false,
-  );
-  const creditsCount = credits?.credits ?? 0;
-  const showTopUp = (credits?.tier ?? 'free') === 'free';
-  const topUpHref = `mailto:${clientEnv.contactEmail}?subject=${encodeURIComponent(
-    t('userMenu_topUpSubject'),
-  )}&body=${encodeURIComponent(t('userMenu_topUpBody', [userId]))}`;
 
   const showPhoto =
     photoURL !== null && photoURL.length > 0 && !photoFailed;
@@ -272,66 +253,14 @@ export function UserMenu({
               </p>
             ) : null}
           </div>
-          {credits !== null ? (
-            <div
-              data-testid="user-menu-usage"
-              className="mb-2 rounded-card bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400"
-            >
-              <p className="font-semibold text-zinc-900 dark:text-zinc-100">
-                {t('userMenu_usage')}
-              </p>
-              <p>{t('userMenu_creditsLabel', [formatCredits(creditsCount)])}</p>
-              <p className="text-[11px]">{tierLabel}</p>
-              {showTopUp ? (
-                <p className="mt-1 text-[11px]">
-                  {t('userMenu_topUpPrompt')}{' '}
-                  <a
-                    data-testid="user-menu-topup-link"
-                    href={topUpHref}
-                    className="font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-                  >
-                    {clientEnv.contactEmail}
-                  </a>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          <div
-            data-testid="user-menu-theme"
-            className="mb-2 rounded-card bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-900"
-          >
-            <p className="mb-1.5 font-semibold text-zinc-900 dark:text-zinc-100">
-              {t('theme_label')}
-            </p>
-            <div
-              role="radiogroup"
-              aria-label={t('theme_label')}
-              className="flex gap-1"
-            >
-              {THEME_OPTIONS.map(({ pref, key, testId }) => {
-                const active = theme === pref;
-                return (
-                  <button
-                    key={pref}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    data-testid={testId}
-                    onClick={() => {
-                      void setTheme(pref);
-                    }}
-                    className={
-                      active
-                        ? 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                        : 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
-                    }
-                  >
-                    {t(key)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/*
+            Usage + Theme blocks removed per user feedback ("credits and
+            them appear twice"): the tier pill in SurfaceFooter now
+            carries the tier, and the ThemeToggle button in SurfaceHeader
+            carries the theme cycle. The dropdown is now just identity
+            + navigation so it stops repeating what is already visible
+            on the surface chrome.
+          */}
           {resumeUrl !== null ? (
             <button
               ref={setMenuItemRef}
