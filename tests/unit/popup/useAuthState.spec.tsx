@@ -259,7 +259,6 @@ describe('popup App + useAuthState', () => {
   });
 
   it('updates UI when AUTH_STATE_CHANGED is broadcast after mount', async () => {
-    let broadcastListener: MessageListener | null = null;
     const fake = installFakeChrome(async (msg) => {
       const typed = msg as { key?: string };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
@@ -267,20 +266,20 @@ describe('popup App + useAuthState', () => {
       if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
-    const origAdd = fake.runtime.onMessage.addListener;
-    fake.runtime.onMessage.addListener = (fn: MessageListener) => {
-      // Capture only the useAuthState listener (the one looking at AUTH_STATE_CHANGED).
-      if (broadcastListener === null) broadcastListener = fn;
-      origAdd(fn);
-    };
     await mountApp();
     await flushMicrotasks();
-    expect(broadcastListener).not.toBeNull();
+    // Broadcast through EVERY listener registered on the fake runtime
+    // (post-Surface redesign the app registers multiple: useAuthState,
+    // useTheme, usePriorSession, ...). Each listener filters on its own
+    // key so it's safe to fan out.
+    expect(fake.runtime.onMessage.listeners.length).toBeGreaterThan(0);
     await act(async () => {
-      broadcastListener!({
-        key: 'AUTH_STATE_CHANGED',
-        data: { signedIn: true, userId: 'user_broadcast' },
-      });
+      for (const fn of fake.runtime.onMessage.listeners) {
+        fn({
+          key: 'AUTH_STATE_CHANGED',
+          data: { signedIn: true, userId: 'user_broadcast' },
+        });
+      }
       await Promise.resolve();
     });
     const userId = query('popup-user-id');

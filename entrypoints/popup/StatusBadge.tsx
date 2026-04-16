@@ -32,6 +32,8 @@ export interface StatusBadgeProps {
   readonly genericJd: {
     readonly hasJd: boolean;
     readonly method: string | null;
+    readonly jobTitle?: string | null;
+    readonly company?: string | null;
   };
   readonly agentId: AgentId | null;
   readonly loading: boolean;
@@ -42,6 +44,8 @@ export interface ComputedStatus {
   readonly vendor: string | null;
   readonly pageKind: string | null;
   readonly method: string | null;
+  readonly jobTitle: string | null;
+  readonly company: string | null;
 }
 
 function adapterMatched(intent: DetectedIntent | null): intent is DetectedIntent {
@@ -98,7 +102,12 @@ function genericPageKindLabel(
 
 export function computeStatus(
   adapterIntent: DetectedIntent | null,
-  genericJd: { readonly hasJd: boolean; readonly method: string | null },
+  genericJd: {
+    readonly hasJd: boolean;
+    readonly method: string | null;
+    readonly jobTitle?: string | null;
+    readonly company?: string | null;
+  },
   agentId: AgentId | null,
   loading: boolean,
 ): ComputedStatus {
@@ -108,6 +117,14 @@ export function computeStatus(
       vendor: vendorLabel(adapterIntent.kind),
       pageKind: pageKindLabel(adapterIntent.pageKind, agentId),
       method: null,
+      jobTitle:
+        typeof adapterIntent.jobTitle === 'string' && adapterIntent.jobTitle.length > 0
+          ? adapterIntent.jobTitle
+          : null,
+      company:
+        typeof adapterIntent.company === 'string' && adapterIntent.company.length > 0
+          ? adapterIntent.company
+          : null,
     };
   }
   if (genericJd.hasJd) {
@@ -116,16 +133,33 @@ export function computeStatus(
       vendor: 'Generic',
       pageKind: genericPageKindLabel(genericJd.method, agentId),
       method: genericJd.method,
+      jobTitle:
+        typeof genericJd.jobTitle === 'string' && genericJd.jobTitle.length > 0
+          ? genericJd.jobTitle
+          : null,
+      company:
+        typeof genericJd.company === 'string' && genericJd.company.length > 0
+          ? genericJd.company
+          : null,
     };
   }
   if (loading) {
-    return { kind: 'loading', vendor: null, pageKind: null, method: null };
+    return {
+      kind: 'loading',
+      vendor: null,
+      pageKind: null,
+      method: null,
+      jobTitle: null,
+      company: null,
+    };
   }
   return {
     kind: 'none',
     vendor: null,
     pageKind: emptyLabel(agentId),
     method: null,
+    jobTitle: null,
+    company: null,
   };
 }
 
@@ -142,7 +176,7 @@ export function StatusBadge({
       <div
         data-testid="intent-badge"
         data-state="loading"
-        className="llmc-shimmer mb-3 h-10 rounded-card bg-zinc-100 dark:bg-zinc-800"
+        className="llmc-shimmer h-10 rounded-card bg-zinc-100 dark:bg-zinc-800"
         aria-busy="true"
         aria-label="Detecting page intent"
       />
@@ -155,7 +189,7 @@ export function StatusBadge({
         data-testid="intent-badge"
         data-state="none"
         role="status"
-        className="mb-3 rounded-card border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+        className="rounded-card border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
       >
         {status.pageKind}
       </div>
@@ -173,6 +207,15 @@ export function StatusBadge({
         ? 'company-page'
         : 'job-posting';
 
+  // Assemble a single-line "company - title" extract when either is
+  // present so the user has proof the detection pulled real data, not
+  // just a vague "Job detected (jsonld)" claim.
+  const extracts: readonly string[] = [
+    typeof status.company === 'string' ? status.company : '',
+    typeof status.jobTitle === 'string' ? status.jobTitle : '',
+  ].filter((s) => s.length > 0);
+  const hasExtract = extracts.length > 0;
+
   return (
     <div
       data-testid="intent-badge"
@@ -180,20 +223,39 @@ export function StatusBadge({
       data-vendor={vendorAttr}
       data-page-kind={pageKindAttr}
       data-method={status.method ?? ''}
-      className="mb-3 flex items-center justify-between rounded-card border border-brand-500 bg-brand-50 px-3 py-2 dark:border-brand-500 dark:bg-brand-900"
+      className="flex flex-col gap-1 rounded-card border border-brand-500 bg-brand-50 px-3 py-2 dark:border-brand-500 dark:bg-brand-900"
     >
-      <span
-        data-testid="intent-vendor"
-        className="text-xs font-semibold uppercase tracking-wide text-brand-900 dark:text-brand-50"
-      >
-        {status.vendor}
-      </span>
-      <span
-        data-testid="intent-page-kind"
-        className="rounded-pill bg-white px-2 py-0.5 text-xs font-medium text-brand-900 dark:bg-zinc-900 dark:text-brand-50"
-      >
-        {status.pageKind}
-      </span>
+      <div className="flex items-center justify-between gap-2">
+        <span
+          data-testid="intent-vendor"
+          className="text-[10px] font-semibold uppercase tracking-wide text-brand-900 dark:text-brand-50"
+        >
+          {status.vendor}
+        </span>
+        <span
+          data-testid="intent-page-kind"
+          className="rounded-pill bg-white px-2 py-0.5 text-[10px] font-medium text-brand-900 dark:bg-zinc-900 dark:text-brand-50"
+        >
+          {status.pageKind}
+        </span>
+      </div>
+      {hasExtract ? (
+        <div
+          data-testid="intent-extract"
+          className="flex flex-col gap-0.5 text-xs text-brand-900 dark:text-brand-50"
+        >
+          {status.company !== null ? (
+            <span data-testid="intent-extract-company" className="font-semibold">
+              {status.company}
+            </span>
+          ) : null}
+          {status.jobTitle !== null ? (
+            <span data-testid="intent-extract-title" className="text-brand-900/80 dark:text-brand-50/80">
+              {status.jobTitle}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -19,6 +19,10 @@ import React, { useEffect, useMemo } from 'react';
 import { ErrorBoundary } from '../popup/ErrorBoundary';
 import { useAgentPreference } from '../popup/useAgentPreference';
 import { useAuthState } from '../popup/useAuthState';
+import { useCredits } from '../popup/useCredits';
+import { useProfile } from '../popup/useProfile';
+import { SurfaceHeader } from '@/entrypoints/shared/SurfaceHeader';
+import { SurfaceFooter } from '@/entrypoints/shared/SurfaceFooter';
 import { GenerationView } from './GenerationView';
 import { useTargetTabId } from './useTargetTabId';
 import {
@@ -27,15 +31,12 @@ import {
   type SessionLogEntry,
   type SessionSummary,
 } from './useSessionForCurrentTab';
-import { buildAgentUrl } from '@/src/background/agents/agent-registry';
 import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import { accentFor } from './lib/accent';
 import { SidepanelActionPanel } from './SidepanelActionPanel';
-import { ThemeToggle } from './ThemeToggle';
 import { Spinner } from './Spinner';
 import type { AgentId } from '@/src/background/agents';
-import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 
 type RuntimeMessenger = {
@@ -117,8 +118,10 @@ function BoundSessionPanel(props: {
 }
 
 function SidepanelBody(): React.ReactElement {
-  const { agents, activeAgentId, loading, error } = useAgentPreference();
-  const { state: authState } = useAuthState();
+  const { agents, activeAgentId, setActiveAgent, loading, error } = useAgentPreference();
+  const { state: authState, signOut, loading: authLoading } = useAuthState();
+  const { credits, loading: creditsLoading, error: creditsError } = useCredits();
+  const { profile } = useProfile();
   const { tabId } = useTargetTabId();
 
   const agent = useMemo(
@@ -179,29 +182,15 @@ function SidepanelBody(): React.ReactElement {
     );
   }
 
-  const dashboardUrl =
-    buildAgentUrl(agent, 'dashboard', {
-      rootDomain: clientEnv.rootDomain,
-      locale: clientEnv.defaultLocale,
-    }) ?? `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}`;
-
   const agentType: 'job-hunter' | 'b2b-sales' =
     agent.id === 'b2b-sales' ? 'b2b-sales' : 'job-hunter';
-
-  function openDashboard(): void {
-    const g = globalThis as unknown as {
-      chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
-    };
-    if (g.chrome?.tabs?.create) {
-      g.chrome.tabs.create({ url: dashboardUrl });
-    } else {
-      window.open(dashboardUrl, '_blank', 'noopener');
-    }
-  }
 
   const showBoundPanel = binding.status === 'found' && binding.session !== null;
   const showLoading = binding.status === 'loading';
   const accent = accentFor(agent.id);
+
+  const signedIn = authState.signedIn;
+  const userId = signedIn ? authState.userId : null;
 
   return (
     <div
@@ -209,26 +198,28 @@ function SidepanelBody(): React.ReactElement {
       data-active-agent={agent.id}
       data-accent={agent.id === 'b2b-sales' ? 'purple' : 'emerald'}
       data-binding-status={binding.status}
-      className="flex h-screen w-full flex-col bg-white dark:bg-zinc-900"
+      className="flex h-screen w-full flex-col bg-white font-display dark:bg-zinc-900"
     >
-      <div
-        className={`flex items-center justify-between gap-2 border-b px-3 py-2 ${accent.header}`}
-      >
-        <span className="text-xs font-medium text-zinc-800 dark:text-zinc-100">
-          {agent.label}
-        </span>
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <button
-            type="button"
-            onClick={openDashboard}
-            className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
-            data-testid="sidepanel-open-in-tab"
-          >
-            Open dashboard
-          </button>
-        </div>
-      </div>
+      <SurfaceHeader
+        userId={userId}
+        agents={agents}
+        activeAgentId={activeAgentId}
+        onAgentChange={(id) => {
+          void setActiveAgent(id);
+        }}
+        agentsDisabled={loading}
+        onSignOut={
+          signedIn
+            ? () => {
+                void signOut();
+              }
+            : undefined
+        }
+        signOutDisabled={authLoading}
+        credits={credits}
+        profile={profile}
+        accentHeader={accent.header}
+      />
       {showLoading ? (
         <div
           data-testid="bound-session-loading"
@@ -259,6 +250,12 @@ function SidepanelBody(): React.ReactElement {
           />
         ) : null}
       </div>
+      <SurfaceFooter
+        credits={credits}
+        loading={creditsLoading}
+        error={creditsError}
+        signedIn={signedIn}
+      />
     </div>
   );
 }

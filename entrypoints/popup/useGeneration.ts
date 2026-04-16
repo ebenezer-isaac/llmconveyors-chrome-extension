@@ -102,6 +102,44 @@ export function useGeneration(): UseGenerationResult {
               },
             });
           }
+          // Sidepanel takes ownership of the live stream; close the popup
+          // so the two surfaces don't compete for user attention. The
+          // popup call stack is still inside the Generate click handler,
+          // so Chrome honours sidePanel.open() as a user-gesture action.
+          const g = globalThis as unknown as {
+            chrome?: {
+              sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
+              tabs?: {
+                query: (opts: {
+                  active: boolean;
+                  currentWindow: boolean;
+                }) => Promise<Array<{ id?: number }>>;
+              };
+            };
+            window?: Window;
+          };
+          try {
+            const tabs = g.chrome?.tabs;
+            const sp = g.chrome?.sidePanel;
+            if (tabs && sp) {
+              const list = await tabs.query({
+                active: true,
+                currentWindow: true,
+              });
+              const tabId = list[0]?.id;
+              if (typeof tabId === 'number') {
+                await sp.open({ tabId });
+                try {
+                  g.window?.close();
+                } catch {
+                  // window.close is a no-op in some harnesses
+                }
+              }
+            }
+          } catch {
+            // Popup close / sidepanel open failed; user can still see the
+            // stream in the popup until they close it.
+          }
           return { ok: true, generationId, sessionId };
         }
         const reason = typeof response.reason === 'string' ? response.reason : 'unknown';

@@ -136,6 +136,14 @@ async function selectSessionAndOpenSidepanel(
   if (sp && activeTabId !== undefined) {
     try {
       await sp.open({ tabId: activeTabId });
+      // Close the popup once the sidepanel is the active surface for
+      // this session. Popup + sidepanel competing for focus is a
+      // confusing UX -- they never need to be open together.
+      try {
+        (globalThis as { window?: Window }).window?.close();
+      } catch {
+        // window.close is a no-op in some test contexts; safe to ignore.
+      }
     } catch {
       // User-gesture constraints can throw; the broadcast already fired.
     }

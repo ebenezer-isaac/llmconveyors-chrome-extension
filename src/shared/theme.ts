@@ -99,9 +99,19 @@ export async function writeThemePreference(pref: ThemePreference): Promise<void>
 /**
  * Resolve and apply the preferred theme to document.documentElement.
  *
+ * Tailwind v4 config in each entrypoint's style.css declares the dark
+ * variant via `@custom-variant dark (&:where([data-theme=dark] ...))`,
+ * so the selector the CSS actually matches is the `data-theme` attribute
+ * -- NOT the `.dark` class. An earlier version toggled `classList.dark`
+ * which silently had zero effect in production; the theme toggle
+ * "worked" in that it updated storage but the UI never repainted.
+ *
+ * We now set / unset `data-theme="dark"` so the CSS selector kicks in.
+ *
  * Returns a disposer that removes any matchMedia listener when called.
  * When pref === 'system', subscribes to OS prefers-color-scheme changes.
- * For 'light' / 'dark', sets the class directly; the disposer is a no-op.
+ * For 'light' / 'dark', sets the attribute directly; the disposer is a
+ * no-op.
  *
  * Callers MUST call the previous disposer before calling applyTheme again
  * to avoid accumulating orphaned listeners.
@@ -109,31 +119,32 @@ export async function writeThemePreference(pref: ThemePreference): Promise<void>
 export function applyTheme(pref: ThemePreference): () => void {
   const root = document.documentElement;
 
+  function setDark(on: boolean): void {
+    if (on) {
+      root.setAttribute('data-theme', 'dark');
+      root.classList.add('dark'); // belt + braces for any legacy class selectors
+    } else {
+      root.setAttribute('data-theme', 'light');
+      root.classList.remove('dark');
+    }
+  }
+
   if (pref === 'dark') {
-    root.classList.add('dark');
+    setDark(true);
     return () => undefined;
   }
 
   if (pref === 'light') {
-    root.classList.remove('dark');
+    setDark(false);
     return () => undefined;
   }
 
   // pref === 'system'
   const mq = globalThis.matchMedia('(prefers-color-scheme: dark)');
-
-  function applyFromMq(matches: boolean): void {
-    if (matches) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }
-
-  applyFromMq(mq.matches);
+  setDark(mq.matches);
 
   function onChange(e: MediaQueryListEvent): void {
-    applyFromMq(e.matches);
+    setDark(e.matches);
   }
 
   mq.addEventListener('change', onChange);
