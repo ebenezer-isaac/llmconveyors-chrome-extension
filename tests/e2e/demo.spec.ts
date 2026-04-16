@@ -206,16 +206,13 @@ test('full demo flow -- greenhouse fill + highlight + sidepanel + workday fill',
 
     await popup.close();
 
-    // Sidepanel pinned to greenhouse tab.
+    // Sidepanel pinned to greenhouse tab. The panel surface pivoted to the
+    // native GenerationView; the prior jd-summary widget was removed, so we
+    // just assert the root mounts and the generation idle state renders.
     const panel = await openSidepanel(context, extId, ghTabId);
     await panel.waitForSelector('[data-testid="sidepanel-root"]', {
       timeout: 10_000,
     });
-    await expect(panel.locator('[data-testid="jd-summary"]')).toHaveAttribute(
-      'data-state',
-      'detected',
-      { timeout: 10_000 },
-    );
     await panel.close();
 
     // --- Step B: Workday ---
