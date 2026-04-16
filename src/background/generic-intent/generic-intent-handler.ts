@@ -122,14 +122,54 @@ function scanForGenericIntent(agent: GenericScanAgent): GenericScanResult {
   }
 
   function textViaReadability(doc: Document): string {
-    const article = doc.querySelector('article');
-    const main = doc.querySelector('main');
-    const candidate = article ?? main ?? doc.body;
-    if (!candidate) return '';
-    return (candidate.textContent ?? '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, MAX_TEXT);
+    // Heuristic: try targeted JD containers first (matches what Meta,
+    // Lever, Greenhouse, Ashby, Workday, LinkedIn Jobs use), then fall
+    // back to article/main/body. Score candidates by length and pick
+    // the longest viable match. Meta's `metacareers.com` is a React
+    // SPA where the JD lives inside a div with no semantic tag, so a
+    // naive `main ?? body` scoop only grabbed the footer-adjacent
+    // text, producing 1k-char extractions for 4k-char job posts.
+    const selectors: readonly string[] = [
+      '[data-testid*="job-description" i]',
+      '[data-testid*="jobDescription" i]',
+      '[data-testid*="job-detail" i]',
+      '[class*="jobDescription" i]',
+      '[class*="job-description" i]',
+      '[class*="job_description" i]',
+      '[id*="jobDescription" i]',
+      '[id*="job-description" i]',
+      '[data-automation-id*="jobPostingDescription" i]', // Workday
+      '.posting-requirements', // Lever
+      '.section-wrapper', // Greenhouse / some job boards
+      '[role="main"]',
+      'main article',
+      'main',
+      'article',
+    ];
+    const candidates: string[] = [];
+    for (const sel of selectors) {
+      let el: Element | null = null;
+      try {
+        el = doc.querySelector(sel);
+      } catch {
+        continue; // Invalid selector in some DOMs; skip.
+      }
+      if (!el) continue;
+      const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+      if (text.length >= 300) candidates.push(text);
+    }
+    // Last-resort body scoop so we never return empty when SOMETHING
+    // is on the page.
+    if (candidates.length === 0 && doc.body) {
+      const bodyText = (doc.body.textContent ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (bodyText.length >= 300) candidates.push(bodyText);
+    }
+    if (candidates.length === 0) return '';
+    // Longest match wins (caps at MAX_TEXT to bound response size).
+    candidates.sort((a, b) => b.length - a.length);
+    return candidates[0]!.slice(0, MAX_TEXT);
   }
 
   function hasJobPostingMarkers(doc: Document): boolean {
@@ -198,13 +238,27 @@ function scanForGenericIntent(agent: GenericScanAgent): GenericScanResult {
 
   const url = document.location?.href ?? '';
 
+  // Infuse the source URL into the JD text so the AI's Flash research
+  // loop always has it even when the heuristic extraction missed the
+  // bulk of the post. Without this failsafe, a mis-scraped JD (e.g.
+  // Meta SPA that rendered a 1k-char slice out of a 4k-char post) left
+  // the AI with no way to recover -- the URL was only in a sibling
+  // metadata field the LLM never saw. Pinning it at the top of the
+  // text lets the LLM re-fetch / re-research if needed.
+  const withSourceUrl = (text: string): string => {
+    if (!url) return text;
+    // Avoid double-prefixing if the text already starts with a URL line.
+    if (text.startsWith('Source URL:') || text.startsWith(`${url}`)) return text;
+    return `Source URL: ${url}\n\n${text}`;
+  };
+
   if (agent === 'job-hunter') {
     const objs = findJsonLdObjects(document);
     const jd = extractJobPosting(objs);
     if (jd) {
       const result: GenericScanJdResult = {
         kind: 'job-description',
-        text: jd.description,
+        text: withSourceUrl(jd.description),
         method: 'jsonld',
         ...(jd.title ? { jobTitle: jd.title } : {}),
         ...(jd.company ? { company: jd.company } : {}),
@@ -217,7 +271,7 @@ function scanForGenericIntent(agent: GenericScanAgent): GenericScanResult {
       if (text.length >= 300) {
         const result: GenericScanJdResult = {
           kind: 'job-description',
-          text,
+          text: withSourceUrl(text),
           method: 'readability',
           url,
         };
