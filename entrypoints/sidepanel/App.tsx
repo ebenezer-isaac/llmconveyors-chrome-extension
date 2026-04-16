@@ -34,8 +34,11 @@ import {
 import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import { accentFor } from './lib/accent';
-import { SidepanelActionPanel } from './SidepanelActionPanel';
+import { SidepanelGenerationForm } from './SidepanelGenerationForm';
 import { Spinner } from './Spinner';
+import { useIntent } from '../popup/useIntent';
+import { useGenericIntent } from '../popup/useGenericIntent';
+import { useActiveTabUrl } from '../popup/useActiveTabUrl';
 import type { AgentId } from '@/src/background/agents';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 
@@ -53,18 +56,174 @@ function getRuntime(): RuntimeMessenger | null {
   return g.chrome?.runtime ?? g.browser?.runtime ?? null;
 }
 
+const STATUS_PILL_CLASSES: Record<string, string> = {
+  completed:
+    'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+  failed: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200',
+  cancelled: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  awaiting_input:
+    'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+  active: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  completed: 'Completed',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+  awaiting_input: 'Needs input',
+  active: 'Running',
+};
+
+function StatusPill({ status }: { status: string | null }): React.ReactElement | null {
+  if (status === null) return null;
+  const classes =
+    STATUS_PILL_CLASSES[status] ??
+    'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300';
+  const label = STATUS_LABELS[status] ?? status;
+  return (
+    <span
+      data-testid="bound-session-status"
+      data-status={status}
+      className={`inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${classes}`}
+    >
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-pill bg-current" />
+      {label}
+    </span>
+  );
+}
+
+function BriefcaseIcon(): React.ReactElement {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0 text-zinc-500 dark:text-zinc-400"
+    >
+      <rect x="2" y="5" width="12" height="8" rx="1.5" />
+      <path d="M6 5V3.5h4V5M2 8.5h12" />
+    </svg>
+  );
+}
+
+function BuildingIcon(): React.ReactElement {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0 text-zinc-500 dark:text-zinc-400"
+    >
+      <rect x="3" y="2" width="10" height="12" rx="1" />
+      <path d="M6 5h1M9 5h1M6 8h1M9 8h1M6 11h1M9 11h1" />
+    </svg>
+  );
+}
+
+function WandIcon(): React.ReactElement {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 13 L10 6 M8 4 L12 8 M13 2 L13 4 M15 3 L13 3 M2 7 L4 7 M3 6 L3 8" />
+    </svg>
+  );
+}
+
+type AutofillOutcome =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'pending' }
+  | { readonly kind: 'success'; readonly filled: number; readonly skipped: number; readonly failed: number }
+  | { readonly kind: 'error'; readonly message: string };
+
+async function runAutofill(): Promise<AutofillOutcome> {
+  const g = globalThis as unknown as {
+    chrome?: {
+      tabs?: {
+        query: (opts: { active: boolean; currentWindow: boolean }) => Promise<
+          Array<{ id?: number; url?: string }>
+        >;
+      };
+      runtime?: { sendMessage: (msg: unknown) => Promise<unknown> };
+    };
+  };
+  const tabs = g.chrome?.tabs;
+  const runtime = g.chrome?.runtime;
+  if (!tabs || !runtime) return { kind: 'error', message: 'chrome runtime unavailable' };
+  try {
+    const [tab] = await tabs.query({ active: true, currentWindow: true });
+    if (!tab || typeof tab.id !== 'number' || !tab.url) {
+      return { kind: 'error', message: 'no active tab' };
+    }
+    const raw = (await runtime.sendMessage({
+      key: 'FILL_REQUEST',
+      data: { tabId: tab.id, url: tab.url },
+    })) as {
+      ok?: boolean;
+      filled?: unknown[];
+      skipped?: unknown[];
+      failed?: unknown[];
+      abortReason?: string;
+    } | undefined;
+    if (!raw) return { kind: 'error', message: 'no response' };
+    if (raw.ok === true) {
+      return {
+        kind: 'success',
+        filled: Array.isArray(raw.filled) ? raw.filled.length : 0,
+        skipped: Array.isArray(raw.skipped) ? raw.skipped.length : 0,
+        failed: Array.isArray(raw.failed) ? raw.failed.length : 0,
+      };
+    }
+    return { kind: 'error', message: raw.abortReason ?? 'fill failed' };
+  } catch (err: unknown) {
+    return {
+      kind: 'error',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 function BoundSessionPanel(props: {
   readonly session: SessionSummary;
   readonly logs: readonly SessionLogEntry[];
   readonly artifacts: readonly SessionArtifact[];
-  readonly onStartNew: () => void;
   /** False when this is the fallback "most recent" session (no URL binding). */
   readonly urlBound: boolean;
   readonly accentBorder: string;
+  readonly agentId: AgentId;
 }): React.ReactElement {
-  const { session, logs, artifacts, onStartNew, urlBound, accentBorder } = props;
+  const { session, logs, artifacts, urlBound, accentBorder, agentId } = props;
+  const [autofill, setAutofill] = React.useState<AutofillOutcome>({ kind: 'idle' });
   const title =
     session.jobTitle ?? session.companyName ?? `Session ${session.sessionId.slice(0, 8)}`;
+  const showAutofill = agentId === 'job-hunter';
+
+  async function handleAutofill(): Promise<void> {
+    setAutofill({ kind: 'pending' });
+    const result = await runAutofill();
+    setAutofill(result);
+  }
+
   return (
     <section
       data-testid="bound-session-panel"
@@ -72,30 +231,77 @@ function BoundSessionPanel(props: {
       data-url-bound={urlBound ? 'true' : 'false'}
       className={`flex flex-col gap-3 border-b p-4 ${accentBorder}`}
     >
-      <header className="flex flex-col gap-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {urlBound ? 'Previous session for this page' : 'Most recent session'}
-        </span>
-        <span
-          data-testid="bound-session-title"
-          className="text-sm font-semibold text-zinc-900 dark:text-zinc-50"
-        >
-          {title}
-        </span>
-        {session.companyName !== null && session.jobTitle !== null ? (
-          <span className="text-xs text-zinc-600 dark:text-zinc-300">
-            {session.companyName}
+      <header className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            {urlBound ? 'Previous session for this page' : 'Most recent session'}
           </span>
-        ) : null}
-        {session.status !== null ? (
-          <span
-            data-testid="bound-session-status"
-            className="text-xs text-zinc-500 dark:text-zinc-400"
-          >
-            Status: {session.status}
-          </span>
-        ) : null}
+          <StatusPill status={session.status} />
+        </div>
+        <div className="flex items-start gap-2">
+          <BriefcaseIcon />
+          <div className="flex min-w-0 flex-col">
+            <span
+              data-testid="bound-session-title"
+              className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50"
+            >
+              {title}
+            </span>
+            {session.companyName !== null &&
+            (session.jobTitle ?? null) !== null &&
+            session.companyName !== session.jobTitle ? (
+              <span className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
+                <BuildingIcon />
+                <span className="truncate">{session.companyName}</span>
+              </span>
+            ) : null}
+          </div>
+        </div>
       </header>
+
+      {showAutofill ? (
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            data-testid="bound-session-autofill"
+            onClick={() => {
+              void handleAutofill();
+            }}
+            disabled={autofill.kind === 'pending'}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-card bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+          >
+            {autofill.kind === 'pending' ? (
+              <>
+                <Spinner size="sm" inline />
+                <span>Autofilling...</span>
+              </>
+            ) : (
+              <>
+                <WandIcon />
+                <span>Autofill application</span>
+              </>
+            )}
+          </button>
+          {autofill.kind === 'success' ? (
+            <p
+              data-testid="bound-session-autofill-success"
+              className="rounded-card bg-emerald-50 px-2 py-1 text-[11px] text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+            >
+              Filled {autofill.filled} field{autofill.filled === 1 ? '' : 's'}
+              {autofill.skipped > 0 ? `, skipped ${autofill.skipped}` : ''}
+              {autofill.failed > 0 ? `, failed ${autofill.failed}` : ''}.
+            </p>
+          ) : null}
+          {autofill.kind === 'error' ? (
+            <p
+              data-testid="bound-session-autofill-error"
+              className="rounded-card bg-red-50 px-2 py-1 text-[11px] text-red-800 dark:bg-red-900/40 dark:text-red-100"
+            >
+              {autofill.message}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div data-testid="bound-session-logs">
         <GenerationLogsPanel logs={logs} sessionStatus={session.status} />
@@ -104,15 +310,6 @@ function BoundSessionPanel(props: {
       <div data-testid="bound-session-artifacts">
         <ArtifactsPanel artifacts={artifacts} defaultOpen={true} />
       </div>
-
-      <button
-        type="button"
-        data-testid="bound-session-start-new"
-        onClick={onStartNew}
-        className="rounded-card border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-      >
-        Start new generation
-      </button>
     </section>
   );
 }
@@ -123,6 +320,14 @@ function SidepanelBody(): React.ReactElement {
   const { credits, loading: creditsLoading, error: creditsError } = useCredits();
   const { profile, loading: profileLoading } = useProfile();
   const { tabId } = useTargetTabId();
+  const { intent } = useIntent();
+  const tabUrl = useActiveTabUrl(tabId);
+  const genericIntent = useGenericIntent({
+    enabled: authState.signedIn && activeAgentId !== null,
+    tabId,
+    adapterIntent: intent,
+    agentId: activeAgentId,
+  });
 
   const agent = useMemo(
     () => agents.find((a) => a.id === activeAgentId) ?? agents[0] ?? null,
@@ -229,28 +434,31 @@ function SidepanelBody(): React.ReactElement {
           <Spinner label="Checking for prior session..." />
         </div>
       ) : null}
-      {showBoundPanel && binding.session !== null ? (
-        <BoundSessionPanel
-          session={binding.session}
-          logs={binding.logs}
-          artifacts={binding.artifacts}
-          onStartNew={binding.dismiss}
-          urlBound={binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0}
-          accentBorder={accent.border}
-        />
-      ) : null}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        {showBoundPanel && binding.session !== null ? (
+          <BoundSessionPanel
+            session={binding.session}
+            logs={binding.logs}
+            artifacts={binding.artifacts}
+            urlBound={binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0}
+            accentBorder={accent.border}
+            agentId={agent.id}
+          />
+        ) : null}
         <GenerationView
           activeAgentType={agentType}
           mode={showBoundPanel ? 'active-only' : 'both'}
         />
-        {authState.signedIn && !showBoundPanel ? (
-          <SidepanelActionPanel
-            signedIn={authState.signedIn}
-            activeAgentId={agent.id}
-          />
-        ) : null}
       </div>
+      {signedIn ? (
+        <SidepanelGenerationForm
+          activeAgentId={agent.id}
+          intent={intent}
+          genericJdText={genericIntent.jdText}
+          tabUrl={tabUrl}
+          defaultOpen={!showBoundPanel}
+        />
+      ) : null}
       <SurfaceFooter
         credits={credits}
         loading={creditsLoading}

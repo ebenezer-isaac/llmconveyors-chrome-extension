@@ -241,10 +241,13 @@ describe('Sidepanel App with session binding', () => {
     expect(artifactsPanel).not.toBeNull();
     const cvCard = artifactsPanel?.querySelector('[data-artifact-type="cv"]');
     expect(cvCard).not.toBeNull();
-    expect(query('bound-session-start-new')).not.toBeNull();
+    // Post-redesign the "Start new generation" flow lives in the pinned
+    // bottom form, not on the bound-session panel itself.
+    expect(query('sidepanel-generation-form')).not.toBeNull();
+    expect(query('bound-session-start-new')).toBeNull();
   });
 
-  it('dismisses the bound panel when the user clicks Start new generation', async () => {
+  it('keeps the bound panel visible and renders the pinned generation form at the bottom', async () => {
     const binding = {
       sessionId: 's1',
       generationId: 'g1',
@@ -277,14 +280,12 @@ describe('Sidepanel App with session binding', () => {
     await mount();
     await flush();
     await flush();
-    const btn = query('bound-session-start-new') as HTMLButtonElement | null;
-    expect(btn).not.toBeNull();
-    await act(async () => {
-      btn!.click();
-    });
-    await flush();
-    expect(query('bound-session-panel')).toBeNull();
-    expect(query('generation-view-idle')).not.toBeNull();
+    // Bound panel stays visible alongside the pinned form (rather than
+    // being dismissed by a button click).
+    expect(query('bound-session-panel')).not.toBeNull();
+    const form = query('sidepanel-generation-form');
+    expect(form).not.toBeNull();
+    expect(form?.getAttribute('data-agent')).toBe('job-hunter');
   });
 
   it('treats a 404 from hydrate as not-found (binding points to deleted session)', async () => {
