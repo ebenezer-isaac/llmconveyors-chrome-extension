@@ -41,6 +41,8 @@ type RequiredKeys =
   | 'AGENT_MANIFEST_GET'
   | 'SESSION_LIST'
   | 'SESSION_GET'
+  | 'SESSION_BINDING_PUT'
+  | 'SESSION_BINDING_GET'
   | 'GENERIC_INTENT_DETECT';
 
 type RequiredPresent = RequiredKeys extends keyof ProtocolMap ? true : false;

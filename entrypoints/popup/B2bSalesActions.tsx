@@ -98,6 +98,8 @@ export function B2bSalesActions({
           companyWebsite,
         }}
         testIdSuffix="research"
+        tabUrl={tabUrl}
+        pageTitle={companyName.length > 0 ? companyName : null}
       />
       <GenerateButton
         agentId="b2b-sales"
@@ -109,6 +111,8 @@ export function B2bSalesActions({
           profileUrl: tabUrl ?? '',
         }}
         testIdSuffix="outreach"
+        tabUrl={tabUrl}
+        pageTitle={companyName.length > 0 ? companyName : null}
       />
       {outOfCredits ? <GetCreditsLink /> : null}
     </section>

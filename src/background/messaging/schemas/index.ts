@@ -17,4 +17,5 @@ export * from './generation.schema';
 export * from './credits.schema';
 export * from './profile.schema';
 export * from './session-list.schema';
+export * from './session-binding.schema';
 export * from './generic-intent.schema';

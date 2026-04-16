@@ -23,6 +23,7 @@ import { GetCreditsLink } from './GetCreditsLink';
 export interface JobHunterActionsProps {
   readonly intent: DetectedIntent | null;
   readonly tabId: number | null;
+  readonly tabUrl?: string | null;
   readonly hasGenericJd: boolean;
   readonly genericJdText: string | null;
   readonly credits: ClientCreditsSnapshot | null;
@@ -31,6 +32,7 @@ export interface JobHunterActionsProps {
 export function JobHunterActions({
   intent,
   tabId,
+  tabUrl = null,
   hasGenericJd,
   genericJdText,
   credits,
@@ -84,6 +86,8 @@ export function JobHunterActions({
           companyName: generateCompany,
           jobTitle: generateTitle,
         }}
+        tabUrl={tabUrl}
+        pageTitle={generateTitle ?? generateCompany ?? null}
       />
       <FillButton
         disabled={outOfCredits || !isApplicationForm}

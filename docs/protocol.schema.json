@@ -1632,6 +1632,155 @@
       }
     },
     {
+      "key": "SESSION_BINDING_PUT",
+      "handlerLocation": "background",
+      "broadcastOnly": false,
+      "request": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "agentId": {
+            "type": "string",
+            "enum": [
+              "job-hunter",
+              "b2b-sales"
+            ]
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "generationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "pageTitle": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "url",
+          "agentId",
+          "sessionId",
+          "generationId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "key": "SESSION_BINDING_GET",
+      "handlerLocation": "background",
+      "broadcastOnly": false,
+      "request": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "agentId": {
+            "type": "string",
+            "enum": [
+              "job-hunter",
+              "b2b-sales"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "agentId"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "response": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "generationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "agentId": {
+                "type": "string",
+                "enum": [
+                  "job-hunter",
+                  "b2b-sales"
+                ]
+              },
+              "urlKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "pageTitle": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "updatedAt": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "sessionId",
+              "generationId",
+              "agentId",
+              "urlKey",
+              "pageTitle",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
       "key": "GENERIC_INTENT_DETECT",
       "handlerLocation": "background",
       "broadcastOnly": false,

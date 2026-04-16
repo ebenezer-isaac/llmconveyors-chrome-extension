@@ -323,6 +323,28 @@ export const blueprint: ModuleBlueprint = {
       sourceRef: { file: '../sessions/session-handlers.ts', line: 1 },
     },
     {
+      key: 'SESSION_BINDING_PUT',
+      description:
+        'Bind the current tab URL (canonicalized) + agent to a generation ' +
+        'so the sidepanel auto-loads the session on subsequent visits',
+      handlerLocation: 'background',
+      requestSchemaRef: './schemas/session-binding.schema',
+      responseSchemaRef: './schemas/session-binding.schema',
+      broadcastOnly: false,
+      invariants: [],
+      sourceRef: { file: 'handlers.ts', line: 1 },
+    },
+    {
+      key: 'SESSION_BINDING_GET',
+      description: 'Look up a session binding for a URL + agent combination',
+      handlerLocation: 'background',
+      requestSchemaRef: './schemas/session-binding.schema',
+      responseSchemaRef: './schemas/session-binding.schema',
+      broadcastOnly: false,
+      invariants: [],
+      sourceRef: { file: 'handlers.ts', line: 1 },
+    },
+    {
       key: 'GENERIC_INTENT_DETECT',
       description: 'Run a one-shot scan on the active tab when no adapter matches',
       handlerLocation: 'background',

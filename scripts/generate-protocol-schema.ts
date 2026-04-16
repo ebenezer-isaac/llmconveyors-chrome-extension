@@ -80,6 +80,9 @@ async function loadModules(): Promise<{
   const sessionListUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/session-list.schema.ts'),
   ).href;
+  const sessionBindingUrl = pathToFileURL(
+    resolve(REPO_ROOT, 'src/background/messaging/schemas/session-binding.schema.ts'),
+  ).href;
   const genericIntentUrl = pathToFileURL(
     resolve(REPO_ROOT, 'src/background/messaging/schemas/generic-intent.schema.ts'),
   ).href;
@@ -94,6 +97,7 @@ async function loadModules(): Promise<{
   const credits = (await import(creditsUrl)) as SchemaModule;
   const profile = (await import(profileUrl)) as SchemaModule;
   const sessionList = (await import(sessionListUrl)) as SchemaModule;
+  const sessionBinding = (await import(sessionBindingUrl)) as SchemaModule;
   const genericIntent = (await import(genericIntentUrl)) as SchemaModule;
 
   const pairs: SchemaPair[] = [
@@ -265,6 +269,21 @@ async function loadModules(): Promise<{
       key: 'SESSION_GET',
       requestSchema: sessionList.SessionGetRequestSchema,
       responseSchema: sessionList.SessionGetResultSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    // Session bindings
+    {
+      key: 'SESSION_BINDING_PUT',
+      requestSchema: sessionBinding.SessionBindingPutRequestSchema,
+      responseSchema: sessionBinding.SessionBindingPutResponseSchema,
+      handlerLocation: 'background',
+      broadcastOnly: false,
+    },
+    {
+      key: 'SESSION_BINDING_GET',
+      requestSchema: sessionBinding.SessionBindingGetRequestSchema,
+      responseSchema: sessionBinding.SessionBindingGetResponseSchema,
       handlerLocation: 'background',
       broadcastOnly: false,
     },

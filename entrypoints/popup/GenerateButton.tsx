@@ -23,6 +23,8 @@ export interface GenerateButtonProps {
   readonly primaryLabel: string;
   readonly payload: Record<string, unknown> & { readonly kind: string };
   readonly testIdSuffix?: string;
+  readonly tabUrl?: string | null;
+  readonly pageTitle?: string | null;
 }
 
 async function openSidePanel(): Promise<void> {
@@ -58,6 +60,8 @@ export function GenerateButton({
   primaryLabel,
   payload,
   testIdSuffix,
+  tabUrl,
+  pageTitle,
 }: GenerateButtonProps): React.ReactElement {
   const { start, busy, error } = useGeneration();
   const isDisabled = disabled || busy;
@@ -67,7 +71,7 @@ export function GenerateButton({
       : 'generate-button';
 
   async function handleClick(): Promise<void> {
-    const outcome = await start({ agentId, payload });
+    const outcome = await start({ agentId, payload, tabUrl, pageTitle });
     if (outcome.ok) {
       await openSidePanel();
     }

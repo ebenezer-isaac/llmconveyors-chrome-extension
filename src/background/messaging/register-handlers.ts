@@ -45,6 +45,7 @@ import {
 import {
   createSessionListClient,
   createSessionListCache,
+  createSessionBindingStore,
 } from '../sessions';
 import {
   createAgentClient,
@@ -121,6 +122,11 @@ function buildProductionDeps(): HandlerDeps {
     },
   });
   const sessionListCache = createSessionListCache({
+    storage: chromeStorage,
+    logger: sessionsLogger,
+    now: () => Date.now(),
+  });
+  const sessionBindingStore = createSessionBindingStore({
     storage: chromeStorage,
     logger: sessionsLogger,
     now: () => Date.now(),
@@ -230,6 +236,7 @@ function buildProductionDeps(): HandlerDeps {
     sessions: {
       client: sessionListClient,
       cache: sessionListCache,
+      bindings: sessionBindingStore,
     },
     generation: {
       agentClient,

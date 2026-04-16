@@ -3,7 +3,7 @@
 **Generated file.** Edit source schemas at `src/background/messaging/schemas/**` and run `pnpm generate:protocol-schema`.
 
 Schema version: 1.0.0
-Total keys: 24
+Total keys: 26
 
 ## Key Table
 
@@ -32,6 +32,8 @@ Total keys: 24
 | `PROFILE_GET` | background | no |
 | `SESSION_LIST` | background | no |
 | `SESSION_GET` | background | no |
+| `SESSION_BINDING_PUT` | background | no |
+| `SESSION_BINDING_GET` | background | no |
 | `GENERIC_INTENT_DETECT` | background | no |
 
 ## Request / Response Shapes
@@ -1819,6 +1821,169 @@ Response schema:
         "reason"
       ],
       "additionalProperties": false
+    }
+  ],
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### SESSION_BINDING_PUT
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "agentId": {
+      "type": "string",
+      "enum": [
+        "job-hunter",
+        "b2b-sales"
+      ]
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "generationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "pageTitle": {
+      "type": "string",
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "url",
+    "agentId",
+    "sessionId",
+    "generationId"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+### SESSION_BINDING_GET
+
+Handler: background. Broadcast-only: false.
+
+Request schema:
+```json
+{
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "agentId": {
+      "type": "string",
+      "enum": [
+        "job-hunter",
+        "b2b-sales"
+      ]
+    }
+  },
+  "required": [
+    "url",
+    "agentId"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
+```
+
+Response schema:
+```json
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "generationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "agentId": {
+          "type": "string",
+          "enum": [
+            "job-hunter",
+            "b2b-sales"
+          ]
+        },
+        "urlKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "pageTitle": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updatedAt": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "sessionId",
+        "generationId",
+        "agentId",
+        "urlKey",
+        "pageTitle",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "null"
     }
   ],
   "$schema": "http://json-schema.org/draft-07/schema#"

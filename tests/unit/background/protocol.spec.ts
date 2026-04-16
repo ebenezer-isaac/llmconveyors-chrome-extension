@@ -13,12 +13,12 @@ import {
  * displayName, photoURL) to the popup avatar.
  */
 describe('ProtocolMap key registry', () => {
-  it('BG_HANDLED_KEYS has exactly 28 entries', () => {
-    expect(BG_HANDLED_KEYS).toHaveLength(28);
+  it('BG_HANDLED_KEYS has exactly 30 entries', () => {
+    expect(BG_HANDLED_KEYS).toHaveLength(30);
   });
 
-  it('ALL_PROTOCOL_KEYS has exactly 30 entries', () => {
-    expect(ALL_PROTOCOL_KEYS).toHaveLength(30);
+  it('ALL_PROTOCOL_KEYS has exactly 32 entries', () => {
+    expect(ALL_PROTOCOL_KEYS).toHaveLength(32);
   });
 
   it('ALL_PROTOCOL_KEYS is a superset of BG_HANDLED_KEYS', () => {
@@ -59,6 +59,8 @@ describe('ProtocolMap key registry', () => {
       'AGENT_MANIFEST_GET',
       'SESSION_LIST',
       'SESSION_GET',
+      'SESSION_BINDING_PUT',
+      'SESSION_BINDING_GET',
       'GENERIC_INTENT_DETECT',
     ].sort();
     const actual = [...ALL_PROTOCOL_KEYS].sort();

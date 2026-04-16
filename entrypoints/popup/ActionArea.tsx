@@ -44,6 +44,7 @@ export function ActionArea({
     <JobHunterActions
       intent={intent}
       tabId={tabId}
+      tabUrl={tabUrl}
       hasGenericJd={hasGenericJd}
       genericJdText={genericJdText}
       credits={credits}

@@ -29,6 +29,8 @@ function getRuntime(): RuntimeMessenger | null {
 export interface StartGenerationArgs {
   readonly agentId: AgentId;
   readonly payload: Record<string, unknown>;
+  readonly tabUrl?: string | null;
+  readonly pageTitle?: string | null;
 }
 
 export type StartGenerationOutcome =
@@ -77,6 +79,29 @@ export function useGeneration(): UseGenerationResult {
             key: 'GENERATION_SUBSCRIBE',
             data: { generationId },
           });
+          // Record a per-URL binding so the sidepanel auto-loads this session
+          // on subsequent visits to the same JD / company page. The bg
+          // canonicalizes the url internally; we just forward the raw tab url.
+          if (
+            typeof args.tabUrl === 'string' &&
+            args.tabUrl.length > 0 &&
+            generationId.length > 0 &&
+            sessionId.length > 0
+          ) {
+            void runtime.sendMessage({
+              key: 'SESSION_BINDING_PUT',
+              data: {
+                url: args.tabUrl,
+                agentId: args.agentId,
+                sessionId,
+                generationId,
+                pageTitle:
+                  typeof args.pageTitle === 'string' && args.pageTitle.length > 0
+                    ? args.pageTitle
+                    : undefined,
+              },
+            });
+          }
           return { ok: true, generationId, sessionId };
         }
         const reason = typeof response.reason === 'string' ? response.reason : 'unknown';

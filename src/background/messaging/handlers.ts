@@ -58,6 +58,12 @@ import {
 import { createSessionHandlers } from '../sessions';
 import type { SessionListClientOutcome } from '../sessions';
 import type { CachedSessionList } from '../sessions';
+import type { SessionBindingStore } from '../sessions';
+import { canonicalizeUrl } from '../sessions';
+import {
+  SessionBindingPutRequestSchema,
+  SessionBindingGetRequestSchema,
+} from './schemas/session-binding.schema';
 import type { SessionListItem } from './schemas/session-list.schema';
 import { createGenericIntentHandler } from '../generic-intent';
 import type { GenericScanAgent, GenericScanResult } from '@/src/content/generic-scan';
@@ -165,6 +171,7 @@ export interface SessionHandlerAdapters {
     clear: () => Promise<void>;
     isFresh: (entry: CachedSessionList) => boolean;
   };
+  readonly bindings: SessionBindingStore;
 }
 
 export interface GenerationHandlerAdapters {
@@ -650,6 +657,70 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     logger: log,
   });
 
+  // ---- SESSION_BINDING_PUT ----
+  // Canonicalizes the url internally so callers (popup / sidepanel / content)
+  // do not need a local canonicalizer. Rejects shape-invalid payloads and
+  // returns `{ ok: false }` when the url cannot be canonicalized (chrome://,
+  // file://, malformed).
+  const handleSessionBindingPut: HandlerFor<'SESSION_BINDING_PUT'> = async ({ data }) => {
+    const parsed = SessionBindingPutRequestSchema.safeParse(data);
+    if (!parsed.success) {
+      log.warn('SESSION_BINDING_PUT: invalid payload', {
+        issues: parsed.error.issues.length,
+      });
+      return { ok: false };
+    }
+    const urlKey = canonicalizeUrl(parsed.data.url);
+    if (urlKey === null) return { ok: false };
+    const nowMs = deps.now();
+    try {
+      const existing = await deps.sessions.bindings.get(urlKey, parsed.data.agentId);
+      const createdAt = existing?.createdAt ?? nowMs;
+      await deps.sessions.bindings.put({
+        sessionId: parsed.data.sessionId,
+        generationId: parsed.data.generationId,
+        agentId: parsed.data.agentId,
+        urlKey,
+        pageTitle:
+          typeof parsed.data.pageTitle === 'string' && parsed.data.pageTitle.length > 0
+            ? parsed.data.pageTitle
+            : null,
+        createdAt,
+        updatedAt: nowMs,
+      });
+      return { ok: true };
+    } catch (err: unknown) {
+      log.warn('SESSION_BINDING_PUT: store failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { ok: false };
+    }
+  };
+
+  // ---- SESSION_BINDING_GET ----
+  // Returns the stored binding or null. Canonicalization + TTL eviction run
+  // inside the store. An uncanonicalizable url returns null (not an error):
+  // the sidepanel treats this as "no binding for this tab".
+  const handleSessionBindingGet: HandlerFor<'SESSION_BINDING_GET'> = async ({ data }) => {
+    const parsed = SessionBindingGetRequestSchema.safeParse(data);
+    if (!parsed.success) {
+      log.warn('SESSION_BINDING_GET: invalid payload', {
+        issues: parsed.error.issues.length,
+      });
+      return null;
+    }
+    const urlKey = canonicalizeUrl(parsed.data.url);
+    if (urlKey === null) return null;
+    try {
+      return await deps.sessions.bindings.get(urlKey, parsed.data.agentId);
+    } catch (err: unknown) {
+      log.warn('SESSION_BINDING_GET: store failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  };
+
   const genericIntentHandler = createGenericIntentHandler({
     logger: log,
     scripting: deps.genericIntent.scripting,
@@ -700,6 +771,8 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     AGENT_MANIFEST_GET: agentHandlers.AGENT_MANIFEST_GET,
     SESSION_LIST: sessionHandlers.SESSION_LIST as HandlerFor<'SESSION_LIST'>,
     SESSION_GET: sessionHandlers.SESSION_GET as HandlerFor<'SESSION_GET'>,
+    SESSION_BINDING_PUT: handleSessionBindingPut,
+    SESSION_BINDING_GET: handleSessionBindingGet,
     GENERIC_INTENT_DETECT: genericIntentHandler as HandlerFor<'GENERIC_INTENT_DETECT'>,
   });
 }

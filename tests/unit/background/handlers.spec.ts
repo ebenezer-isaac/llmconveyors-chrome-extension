@@ -94,6 +94,12 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
         clear: vi.fn(async () => undefined),
         isFresh: vi.fn(() => false),
       },
+      bindings: {
+        get: vi.fn(async () => null),
+        put: vi.fn(async () => undefined),
+        evict: vi.fn(async () => undefined),
+        list: vi.fn(async () => []),
+      },
     },
     generation: {
       agentClient: {
@@ -150,6 +156,8 @@ describe('HANDLERS record shape', () => {
         'GENERATION_COMPLETE',
         'SESSION_LIST',
         'SESSION_GET',
+        'SESSION_BINDING_PUT',
+        'SESSION_BINDING_GET',
         'GENERIC_INTENT_DETECT',
       ].sort(),
     );

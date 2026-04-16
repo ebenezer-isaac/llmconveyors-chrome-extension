@@ -48,6 +48,10 @@ import type {
   SessionGetResult,
   GenericIntentDetectRequest,
   GenericIntentDetectResponse,
+  SessionBindingPutRequest,
+  SessionBindingPutResponse,
+  SessionBindingGetRequest,
+  SessionBindingGetResponse,
 } from './protocol-types';
 import type {
   MasterResumeGetRequest,
@@ -120,6 +124,10 @@ export interface ProtocolMap {
   SESSION_LIST: (data: SessionListRequest) => SessionListResult;
   SESSION_GET: (data: SessionGetRequest) => SessionGetResult;
 
+  // --- Session bindings (2) ---
+  SESSION_BINDING_PUT: (data: SessionBindingPutRequest) => SessionBindingPutResponse;
+  SESSION_BINDING_GET: (data: SessionBindingGetRequest) => SessionBindingGetResponse;
+
   // --- Generic intent (1) ---
   GENERIC_INTENT_DETECT: (data: GenericIntentDetectRequest) => GenericIntentDetectResponse;
 }
@@ -157,6 +165,8 @@ export const BG_HANDLED_KEYS = [
   'AGENT_MANIFEST_GET',
   'SESSION_LIST',
   'SESSION_GET',
+  'SESSION_BINDING_PUT',
+  'SESSION_BINDING_GET',
   'GENERIC_INTENT_DETECT',
 ] as const;
 

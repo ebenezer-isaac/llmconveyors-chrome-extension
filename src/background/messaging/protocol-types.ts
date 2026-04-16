@@ -66,6 +66,12 @@ import type {
   GenericIntentDetectRequestSchema,
   GenericIntentDetectResponseSchema,
 } from './schemas/generic-intent.schema';
+import type {
+  SessionBindingPutRequestSchema,
+  SessionBindingPutResponseSchema,
+  SessionBindingGetRequestSchema,
+  SessionBindingGetResponseSchema,
+} from './schemas/session-binding.schema';
 
 // Auth
 export type AuthSignInRequest = z.infer<typeof AuthSignInRequestSchema>;
@@ -131,3 +137,9 @@ export type SessionGetResult = z.infer<typeof SessionGetResultSchema>;
 // Generic intent
 export type GenericIntentDetectRequest = z.infer<typeof GenericIntentDetectRequestSchema>;
 export type GenericIntentDetectResponse = z.infer<typeof GenericIntentDetectResponseSchema>;
+
+// Session bindings
+export type SessionBindingPutRequest = z.infer<typeof SessionBindingPutRequestSchema>;
+export type SessionBindingPutResponse = z.infer<typeof SessionBindingPutResponseSchema>;
+export type SessionBindingGetRequest = z.infer<typeof SessionBindingGetRequestSchema>;
+export type SessionBindingGetResponse = z.infer<typeof SessionBindingGetResponseSchema>;

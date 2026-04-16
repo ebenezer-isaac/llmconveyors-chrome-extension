@@ -114,6 +114,12 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
         clear: vi.fn(async () => undefined),
         isFresh: vi.fn(() => false),
       },
+      bindings: {
+        get: vi.fn(async () => null),
+        put: vi.fn(async () => undefined),
+        evict: vi.fn(async () => undefined),
+        list: vi.fn(async () => []),
+      },
     },
     generation: {
       agentClient: {
