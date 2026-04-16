@@ -467,7 +467,19 @@ function SidepanelBody(): React.ReactElement {
               activeAgentType={agentType}
               mode={showBoundPanel ? 'active-only' : 'both'}
             />
-            <SidepanelGenerationFields />
+            {/*
+              `mt-auto` pushes the form to the bottom of the scroll
+              container. When content above (bound session + logs +
+              artifacts + generation view) is shorter than the viewport
+              the form settles at the bottom instead of sticking just
+              under the last artifact. When content overflows, the user
+              naturally scrolls past everything to reach the form --
+              which is exactly the "only visible when scrolled to the
+              bottom" UX the user asked for.
+            */}
+            <div className="mt-auto">
+              <SidepanelGenerationFields />
+            </div>
           </div>
           <SidepanelGenerationSubmitBar />
         </SidepanelGenerationFormProvider>
