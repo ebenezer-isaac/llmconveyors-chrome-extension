@@ -16,16 +16,13 @@
 
 import { z } from 'zod';
 
-const ArtifactTypeSchema = z.enum([
-  'cv',
-  'cover-letter',
-  'cold-email',
-  'ats-comparison',
-  'deep-research',
-  'other',
-]);
-
-export type ArtifactType = z.infer<typeof ArtifactTypeSchema>;
+export type ArtifactType =
+  | 'cv'
+  | 'cover-letter'
+  | 'cold-email'
+  | 'ats-comparison'
+  | 'deep-research'
+  | 'other';
 
 /**
  * Normalized view of a single artifact for the sidepanel. Every card
