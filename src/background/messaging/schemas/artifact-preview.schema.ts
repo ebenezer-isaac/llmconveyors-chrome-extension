@@ -38,6 +38,20 @@ export interface ArtifactPreview {
   readonly downloadUrl: string | null;
   readonly storageKey: string | null;
   /**
+   * Dedicated storage key for a pre-rendered PDF variant. Only the CV
+   * artifact carries this today (backend sets `pdfStorageKey` alongside
+   * the JSON `storageKey`). The sidepanel's CvArtifactBody fetches the
+   * PDF bytes via ARTIFACT_FETCH_BLOB and renders them in an iframe
+   * when this field is present.
+   */
+  readonly pdfStorageKey: string | null;
+  /**
+   * Session id the artifact belongs to. Required when fetching blob
+   * content via ARTIFACT_FETCH_BLOB because storage keys are scoped
+   * per session on the backend.
+   */
+  readonly sessionId: string | null;
+  /**
    * Suggested filename when the user clicks download. Sanitised by
    * entrypoints/sidepanel/lib/filename.ts to match the web dashboard
    * convention so Meta's "CV-John Smith.pdf" and the extension's
@@ -63,6 +77,7 @@ const RawArtifactShape = z
     mimeType: z.string().optional(),
     downloadUrl: z.string().optional(),
     storageKey: z.string().optional(),
+    pdfStorageKey: z.string().optional(),
     payload: z.record(z.unknown()).optional(),
   })
   .passthrough();
@@ -109,6 +124,7 @@ function labelFor(type: ArtifactType, rawLabel: string | undefined, rawName: str
 export function normalizeArtifactPreview(
   raw: unknown,
   filename: string,
+  sessionId: string | null = null,
 ): ArtifactPreview | null {
   const parsed = RawArtifactShape.safeParse(raw);
   if (!parsed.success) return null;
@@ -121,7 +137,14 @@ export function normalizeArtifactPreview(
     typeof d.downloadUrl === 'string' && d.downloadUrl.length > 0 ? d.downloadUrl : null;
   const storageKey =
     typeof d.storageKey === 'string' && d.storageKey.length > 0 ? d.storageKey : null;
-  if (content === null && downloadUrl === null && storageKey === null) {
+  const pdfStorageKey =
+    typeof d.pdfStorageKey === 'string' && d.pdfStorageKey.length > 0 ? d.pdfStorageKey : null;
+  if (
+    content === null &&
+    downloadUrl === null &&
+    storageKey === null &&
+    pdfStorageKey === null
+  ) {
     // Nothing for the sidepanel to render or download.
     return null;
   }
@@ -132,6 +155,8 @@ export function normalizeArtifactPreview(
     mimeType,
     downloadUrl,
     storageKey,
+    pdfStorageKey,
+    sessionId,
     filename,
     ...(d.payload !== undefined ? { payload: d.payload } : {}),
   };

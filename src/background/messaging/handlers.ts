@@ -71,6 +71,8 @@ import {
 } from './schemas/session-binding.schema';
 import type { SessionListItem } from './schemas/session-list.schema';
 import { createGenericIntentHandler } from '../generic-intent';
+import { createArtifactFetchBlobHandler } from '../sessions/artifact-fetch-handler';
+import { API_BASE_URL } from '../config';
 import type { GenericScanAgent, GenericScanResult } from '../generic-intent';
 import {
   AuthSignInRequestSchema,
@@ -759,6 +761,12 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     scripting: deps.genericIntent.scripting,
   });
 
+  const artifactFetchBlobHandler = createArtifactFetchBlobHandler({
+    fetchAuthed: deps.fetchAuthed,
+    baseUrl: API_BASE_URL,
+    logger: log,
+  });
+
   const masterResumeHandlers = createMasterResumeHandlers({
     client: deps.masterResume.client,
     cache: deps.masterResume.cache,
@@ -809,6 +817,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     SESSION_BINDING_PUT: handleSessionBindingPut,
     SESSION_BINDING_GET: handleSessionBindingGet,
     SESSION_SELECTED: handleSessionSelected,
+    ARTIFACT_FETCH_BLOB: artifactFetchBlobHandler as HandlerFor<'ARTIFACT_FETCH_BLOB'>,
     GENERIC_INTENT_DETECT: genericIntentHandler as HandlerFor<'GENERIC_INTENT_DETECT'>,
   });
 }

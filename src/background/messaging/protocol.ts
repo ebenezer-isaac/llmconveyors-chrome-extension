@@ -149,6 +149,22 @@ export interface ProtocolMap {
     readonly tabUrl?: string;
   }) => void;
 
+  // --- Artifact fetch (1) ---
+  /**
+   * On-demand artifact download for sidepanel inline previews (CV PDF
+   * iframe). The bg proxies GET /api/v1/sessions/:id/download?key=X via
+   * fetchAuthed so the iframe never needs to carry the Bearer token.
+   * For binary artifacts (pdf/png/jpg), the backend returns content as
+   * base64; text artifacts return utf-8. The caller converts base64 to
+   * a blob URL client-side so the iframe can load it.
+   */
+  ARTIFACT_FETCH_BLOB: (data: {
+    readonly sessionId: string;
+    readonly storageKey: string;
+  }) =>
+    | { readonly ok: true; readonly content: string; readonly mimeType: string }
+    | { readonly ok: false; readonly reason: string };
+
   // --- Generic intent (1) ---
   GENERIC_INTENT_DETECT: (data: GenericIntentDetectRequest) => GenericIntentDetectResponse;
 }
@@ -191,6 +207,7 @@ export const BG_HANDLED_KEYS = [
   'SESSION_BINDING_PUT',
   'SESSION_BINDING_GET',
   'SESSION_SELECTED',
+  'ARTIFACT_FETCH_BLOB',
   'GENERIC_INTENT_DETECT',
 ] as const;
 

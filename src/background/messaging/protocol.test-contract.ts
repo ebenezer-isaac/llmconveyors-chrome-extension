@@ -46,6 +46,7 @@ type RequiredKeys =
   | 'SESSION_BINDING_PUT'
   | 'SESSION_BINDING_GET'
   | 'SESSION_SELECTED'
+  | 'ARTIFACT_FETCH_BLOB'
   | 'GENERIC_INTENT_DETECT';
 
 type RequiredPresent = RequiredKeys extends keyof ProtocolMap ? true : false;

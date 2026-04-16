@@ -12,6 +12,8 @@ function baseArtifact(overrides?: Partial<ArtifactPreview>): ArtifactPreview {
     mimeType: 'text/plain',
     downloadUrl: null,
     storageKey: null,
+    pdfStorageKey: null,
+    sessionId: null,
     filename: 'Cover_Letter.txt',
     ...overrides,
   };

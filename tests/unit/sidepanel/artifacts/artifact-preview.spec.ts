@@ -85,4 +85,29 @@ describe('normalizeArtifactPreview', () => {
     );
     expect(out?.payload).toEqual({ before: { score: 10 }, after: { score: 35 } });
   });
+
+  it('captures pdfStorageKey + sessionId so the CV card can fetch its PDF', () => {
+    const out = normalizeArtifactPreview(
+      {
+        type: 'cv',
+        storageKey: 'users/u/sessions/s/cv.json',
+        pdfStorageKey: 'users/u/sessions/s/cv.pdf',
+      },
+      'Resume.pdf',
+      'sess-1',
+    );
+    expect(out?.pdfStorageKey).toBe('users/u/sessions/s/cv.pdf');
+    expect(out?.sessionId).toBe('sess-1');
+  });
+
+  it('accepts a CV artifact with ONLY a pdfStorageKey (no JSON storageKey)', () => {
+    const out = normalizeArtifactPreview(
+      { type: 'cv', pdfStorageKey: 'users/u/sessions/s/cv.pdf' },
+      'Resume.pdf',
+      'sess-1',
+    );
+    expect(out).not.toBeNull();
+    expect(out?.pdfStorageKey).toBe('users/u/sessions/s/cv.pdf');
+    expect(out?.storageKey).toBeNull();
+  });
 });

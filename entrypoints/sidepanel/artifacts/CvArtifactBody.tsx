@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 /**
- * CvArtifactBody -- parses a JSON-Resume-shaped payload and renders a
- * read-only summary (basics, top 3 work entries, top 3 education
- * entries, top skill list). Full editing lives in the dashboard
- * drawer; the sidepanel is preview-only.
+ * CvArtifactBody -- when the CV artifact carries a pre-rendered PDF
+ * (`pdfStorageKey`), fetch the bytes via ARTIFACT_FETCH_BLOB and
+ * display them in an iframe so the user sees the actual compiled CV
+ * the backend produced. Falls back to a parsed JSON-Resume summary
+ * when the PDF is absent.
  *
- * Mirrors the data shape rendered by
- * e:/llmconveyors.com/src/components/chat/artifacts/CVArtifactCard.tsx
- * without the edit / compile pipeline.
+ * iframe uses a blob: URL so it inherits the extension origin (no
+ * cross-origin cookie / bearer needed). The URL is revoked on unmount
+ * and whenever the artifact id changes.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ArtifactPreview } from '@/src/background/messaging/schemas/artifact-preview.schema';
 
 export interface CvArtifactBodyProps {
@@ -49,12 +50,17 @@ function parseResume(raw: string | null): JsonResume | null {
     const parsed = JSON.parse(raw);
     if (parsed !== null && typeof parsed === 'object') return parsed as JsonResume;
   } catch {
-    // Not valid JSON; let the caller fall back to text body.
+    // Not valid JSON; caller falls back to the pdf-only path.
   }
   return null;
 }
 
-function joinLocation(loc: JsonResume['basics'] extends infer T ? (T extends { location?: infer L } ? L : undefined) : undefined): string | null {
+function joinLocation(
+  loc:
+    | { city?: string; region?: string; country?: string }
+    | undefined
+    | null,
+): string | null {
   if (!loc || typeof loc !== 'object') return null;
   const parts = [loc.city, loc.region, loc.country].filter(
     (s): s is string => typeof s === 'string' && s.length > 0,
@@ -62,11 +68,154 @@ function joinLocation(loc: JsonResume['basics'] extends infer T ? (T extends { l
   return parts.length > 0 ? parts.join(', ') : null;
 }
 
+type RuntimeMessenger = {
+  sendMessage: (msg: unknown) => Promise<unknown>;
+};
+
+function getRuntime(): RuntimeMessenger | null {
+  const g = globalThis as unknown as {
+    chrome?: { runtime?: RuntimeMessenger };
+    browser?: { runtime?: RuntimeMessenger };
+  };
+  return g.chrome?.runtime ?? g.browser?.runtime ?? null;
+}
+
+type PdfState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'ready'; url: string }
+  | { kind: 'error'; reason: string };
+
+function base64ToBlobUrl(base64: string, mimeType: string): string {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  const blob = new Blob([bytes], { type: mimeType });
+  return URL.createObjectURL(blob);
+}
+
 export function CvArtifactBody({
   artifact,
   open,
 }: CvArtifactBodyProps): React.ReactElement {
+  const hasPdf =
+    typeof artifact.pdfStorageKey === 'string' &&
+    artifact.pdfStorageKey.length > 0 &&
+    typeof artifact.sessionId === 'string' &&
+    artifact.sessionId.length > 0;
+
+  const [pdfState, setPdfState] = useState<PdfState>({ kind: 'idle' });
+  // Guard against re-fetching when the effect re-runs (e.g. because
+  // parent re-renders and passes a new artifact object with the same
+  // identity). Keyed by `${sessionId}|${pdfStorageKey}` so genuine
+  // artifact switches invalidate the cache.
+  const fetchedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!hasPdf || !open) return;
+    const fetchKey = `${artifact.sessionId}|${artifact.pdfStorageKey}`;
+    if (fetchedKeyRef.current === fetchKey) return;
+    fetchedKeyRef.current = fetchKey;
+
+    let cancelled = false;
+    const runtime = getRuntime();
+    if (runtime === null) {
+      setPdfState({ kind: 'error', reason: 'runtime-unavailable' });
+      return;
+    }
+    setPdfState({ kind: 'loading' });
+    (async () => {
+      try {
+        const raw = await runtime.sendMessage({
+          key: 'ARTIFACT_FETCH_BLOB',
+          data: {
+            sessionId: artifact.sessionId,
+            storageKey: artifact.pdfStorageKey,
+          },
+        });
+        if (cancelled) return;
+        if (!raw || typeof raw !== 'object') {
+          setPdfState({ kind: 'error', reason: 'empty-response' });
+          return;
+        }
+        const env = raw as {
+          ok?: boolean;
+          content?: string;
+          mimeType?: string;
+          reason?: string;
+        };
+        if (env.ok !== true || typeof env.content !== 'string') {
+          setPdfState({
+            kind: 'error',
+            reason: typeof env.reason === 'string' ? env.reason : 'fetch-failed',
+          });
+          return;
+        }
+        const url = base64ToBlobUrl(
+          env.content,
+          typeof env.mimeType === 'string' ? env.mimeType : 'application/pdf',
+        );
+        setPdfState({ kind: 'ready', url });
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setPdfState({
+          kind: 'error',
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasPdf, open, artifact.sessionId, artifact.pdfStorageKey]);
+
+  // Revoke blob URL on unmount / when source key changes.
+  useEffect(() => {
+    if (pdfState.kind !== 'ready') return;
+    const url = pdfState.url;
+    return () => URL.revokeObjectURL(url);
+  }, [pdfState]);
+
   const resume = useMemo(() => parseResume(artifact.content), [artifact.content]);
+
+  // ---- Render ----
+
+  if (hasPdf) {
+    if (pdfState.kind === 'ready') {
+      return (
+        <iframe
+          data-testid="artifact-body-cv-pdf"
+          src={pdfState.url}
+          title={artifact.label}
+          className="h-[540px] w-full rounded-card border border-zinc-200 dark:border-zinc-700"
+        />
+      );
+    }
+    if (pdfState.kind === 'loading') {
+      return (
+        <p
+          data-testid="artifact-body-cv-loading"
+          className="text-xs italic text-zinc-500 dark:text-zinc-400"
+        >
+          Loading PDF preview...
+        </p>
+      );
+    }
+    if (pdfState.kind === 'error') {
+      return (
+        <p
+          data-testid="artifact-body-cv-pdf-error"
+          className="text-xs italic text-red-600 dark:text-red-400"
+        >
+          Could not load PDF preview ({pdfState.reason}). Use Download to save the file.
+        </p>
+      );
+    }
+    // idle: card not yet opened -- render nothing (body is hidden anyway)
+    return <span data-testid="artifact-body-cv-idle" className="hidden" aria-hidden="true" />;
+  }
+
   if (resume === null) {
     return (
       <p

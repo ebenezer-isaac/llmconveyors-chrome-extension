@@ -256,6 +256,7 @@ function normalizeArtifacts(
         ...(downloadUrl !== undefined ? { downloadUrl } : {}),
       },
       filename,
+      sessionId,
     );
     if (normalized !== null) out.push(normalized);
   }
