@@ -114,7 +114,7 @@ export function B2bSalesActions({
         tabUrl={tabUrl}
         pageTitle={companyName.length > 0 ? companyName : null}
       />
-      {outOfCredits ? <GetCreditsLink /> : null}
+      {outOfCredits ? <GetCreditsLink agentId="b2b-sales" /> : null}
     </section>
   );
 }

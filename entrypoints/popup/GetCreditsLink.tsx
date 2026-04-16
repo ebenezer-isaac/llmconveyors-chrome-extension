@@ -1,33 +1,55 @@
 // SPDX-License-Identifier: MIT
 /**
  * GetCreditsLink - small inline link shown below the action panel when
- * credits === 0. Clicking opens the web settings page in a new tab.
+ * credits === 0. Routes to the active agent's dashboard (with a drawer
+ * hint) rather than a hardcoded llmconveyors.com/settings URL, which
+ * 404s after the app split into agent subdomains.
  */
 
 import React from 'react';
 import { createLogger } from '@/src/background/log';
+import { AGENT_REGISTRY, buildAgentUrl } from '@/src/background/agents/agent-registry';
+import type { AgentId } from '@/src/background/agents';
+import { clientEnv } from '@/src/shared/env';
 
 const log = createLogger('popup:get-credits-link');
-const SETTINGS_URL = 'https://llmconveyors.com/settings';
 
-function openSettings(): void {
-  const g = globalThis as unknown as {
-    chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
-  };
-  try {
-    if (g.chrome?.tabs?.create) {
-      g.chrome.tabs.create({ url: SETTINGS_URL });
-      return;
-    }
-    window.open(SETTINGS_URL, '_blank', 'noopener');
-  } catch (err: unknown) {
-    log.warn('failed to open settings', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+export interface GetCreditsLinkProps {
+  readonly agentId: AgentId | null;
 }
 
-export function GetCreditsLink(): React.ReactElement {
+function resolveUrl(agentId: AgentId | null): string {
+  const fallback = `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}`;
+  if (agentId === null) return fallback;
+  const agent = AGENT_REGISTRY[agentId];
+  if (!agent) return fallback;
+  return (
+    buildAgentUrl(agent, 'settings', {
+      rootDomain: clientEnv.rootDomain,
+      locale: clientEnv.defaultLocale,
+    }) ?? fallback
+  );
+}
+
+export function GetCreditsLink({ agentId }: GetCreditsLinkProps): React.ReactElement {
+  function openSettings(): void {
+    const url = resolveUrl(agentId);
+    const g = globalThis as unknown as {
+      chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
+    };
+    try {
+      if (g.chrome?.tabs?.create) {
+        g.chrome.tabs.create({ url });
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
+    } catch (err: unknown) {
+      log.warn('failed to open settings', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return (
     <button
       type="button"

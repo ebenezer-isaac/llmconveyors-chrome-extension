@@ -51,9 +51,16 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = deepFreeze({
       'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8',
     label: 'Job Hunter',
     shortDescription: 'Tailor CVs and cold emails to every role.',
-    settingsPath: '/settings',
+    // Settings + resume live inside the agent dashboard drawer (see
+    // renderSettings in the web app's src/lib/agents/job-hunt/index.tsx).
+    // There are no standalone /settings or /settings/resume routes, so
+    // these paths are empty: every action routes to the dashboard root
+    // and the user opens the drawer from there. Inventing a query-param
+    // deep-link convention here would be a lie until the web app
+    // actually consumes one.
+    settingsPath: '',
     dashboardPath: '',
-    resumePath: '/settings/resume',
+    resumePath: '',
   },
   'b2b-sales': {
     id: 'b2b-sales',
@@ -67,7 +74,7 @@ export const AGENT_REGISTRY: Record<AgentId, AgentRegistryEntry> = deepFreeze({
       'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6',
     label: 'B2B Sales',
     shortDescription: 'Research companies and draft outbound email.',
-    settingsPath: '/settings',
+    settingsPath: '',
     dashboardPath: '',
     resumePath: null,
   },

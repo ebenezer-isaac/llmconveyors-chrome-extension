@@ -98,7 +98,7 @@ export function JobHunterActions({
         disabled={outOfCredits || !jdAvailable}
         disabledReason={highlightDisabledReason}
       />
-      {outOfCredits ? <GetCreditsLink /> : null}
+      {outOfCredits ? <GetCreditsLink agentId="job-hunter" /> : null}
     </section>
   );
 }

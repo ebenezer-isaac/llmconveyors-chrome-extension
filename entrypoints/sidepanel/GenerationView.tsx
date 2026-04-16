@@ -79,8 +79,25 @@ function downloadArtifact(artifact: GenerationArtifact): void {
   }
 }
 
-function openDashboard(generationId: string): void {
-  const url = `https://llmconveyors.com/session/${encodeURIComponent(generationId)}`;
+import { AGENT_REGISTRY, buildAgentUrl } from '@/src/background/agents/agent-registry';
+import type { AgentId } from '@/src/background/agents';
+import { clientEnv } from '@/src/shared/env';
+
+function agentDashboardUrl(agentId: AgentId): string {
+  const agent = AGENT_REGISTRY[agentId];
+  const fallback = `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}`;
+  return (
+    buildAgentUrl(agent, 'dashboard', {
+      rootDomain: clientEnv.rootDomain,
+      locale: clientEnv.defaultLocale,
+    }) ?? fallback
+  );
+}
+
+function openDashboard(_generationId: string, agentId: AgentId): void {
+  // The web app has no per-session deep-link route; dropping the user on
+  // the agent dashboard root lets them find the session in the sidebar.
+  const url = agentDashboardUrl(agentId);
   const g = globalThis as unknown as {
     chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
   };
@@ -252,7 +269,7 @@ export function GenerationView({
             <button
               type="button"
               data-testid="open-in-dashboard"
-              onClick={() => openDashboard(generationId)}
+              onClick={() => openDashboard(generationId, activeAgentType)}
               className="rounded-card bg-brand-500 px-3 py-1 text-xs font-medium text-white hover:bg-brand-600"
             >
               View in dashboard -&gt;
