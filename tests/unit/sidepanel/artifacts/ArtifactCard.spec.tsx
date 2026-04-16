@@ -125,7 +125,7 @@ describe('ArtifactCard', () => {
 
   it('picks the right body for each known type', () => {
     const { rerender } = render(
-      <ArtifactCard artifact={baseArtifact({ type: 'cv', content: '{}' })} />,
+      <ArtifactCard artifact={baseArtifact({ type: 'cv', content: '{}' })} defaultOpen />,
     );
     expect(screen.queryByTestId('artifact-body-cv')).toBeTruthy();
     rerender(
@@ -136,14 +136,29 @@ describe('ArtifactCard', () => {
           content: null,
           downloadUrl: 'https://x/y.json',
         })}
+        defaultOpen
       />,
     );
     expect(screen.queryByTestId('artifact-body-ats')).toBeTruthy();
     rerender(
       <ArtifactCard
         artifact={baseArtifact({ type: 'cold-email', content: 'Subject: Hi\n\nHello' })}
+        defaultOpen
       />,
     );
     expect(screen.queryByTestId('artifact-body-cold-email')).toBeTruthy();
+  });
+
+  it('does not mount the body while the card is collapsed', () => {
+    render(<ArtifactCard artifact={baseArtifact()} />);
+    expect(screen.queryByTestId('artifact-card-body')).toBeNull();
+  });
+
+  it('mounts the body on expand and hides it again on collapse', () => {
+    render(<ArtifactCard artifact={baseArtifact()} />);
+    fireEvent.click(screen.getByTestId('artifact-card-toggle'));
+    expect(screen.getByTestId('artifact-card-body')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('artifact-card-toggle'));
+    expect(screen.queryByTestId('artifact-card-body')).toBeNull();
   });
 });

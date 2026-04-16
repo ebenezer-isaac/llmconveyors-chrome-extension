@@ -110,4 +110,44 @@ describe('normalizeArtifactPreview', () => {
     expect(out?.pdfStorageKey).toBe('users/u/sessions/s/cv.pdf');
     expect(out?.storageKey).toBeNull();
   });
+
+  it('flattens payload.content up to the top-level content field', () => {
+    const out = normalizeArtifactPreview(
+      {
+        type: 'company-research',
+        payload: { content: '# Research report\n\nAcme is...' },
+      },
+      'Research.txt',
+      'sess-1',
+    );
+    expect(out?.type).toBe('deep-research');
+    expect(out?.content).toBe('# Research report\n\nAcme is...');
+  });
+
+  it('maps company-research + person-research into deep-research type', () => {
+    expect(
+      normalizeArtifactPreview(
+        { type: 'company-research', content: 'x' },
+        'f.md',
+      )?.type,
+    ).toBe('deep-research');
+    expect(
+      normalizeArtifactPreview(
+        { type: 'person-research', content: 'x' },
+        'f.md',
+      )?.type,
+    ).toBe('deep-research');
+  });
+
+  it('prefers top-level content over payload.content when both are present', () => {
+    const out = normalizeArtifactPreview(
+      {
+        type: 'cover-letter',
+        content: 'explicit',
+        payload: { content: 'fallback' },
+      },
+      'Cover_Letter.txt',
+    );
+    expect(out?.content).toBe('explicit');
+  });
 });

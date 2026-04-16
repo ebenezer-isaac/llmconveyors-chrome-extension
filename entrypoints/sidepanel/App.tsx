@@ -33,6 +33,7 @@ import { GenerationLogsPanel } from './logs/GenerationLogsPanel';
 import { accentFor } from './lib/accent';
 import { SidepanelActionPanel } from './SidepanelActionPanel';
 import { ThemeToggle } from './ThemeToggle';
+import { Spinner } from './Spinner';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -153,9 +154,9 @@ function SidepanelBody(): React.ReactElement {
     return (
       <div
         data-testid="sidepanel-root"
-        className="flex h-screen w-full items-center justify-center bg-white text-sm text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400"
+        className="flex h-screen w-full items-center justify-center bg-white dark:bg-zinc-900"
       >
-        Loading LLM Conveyors...
+        <Spinner size="lg" label="Loading LLM Conveyors..." />
       </div>
     );
   }
@@ -231,9 +232,9 @@ function SidepanelBody(): React.ReactElement {
       {showLoading ? (
         <div
           data-testid="bound-session-loading"
-          className="flex items-center justify-center border-b border-zinc-200 p-4 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400"
+          className="flex items-center justify-center border-b border-zinc-200 p-4 dark:border-zinc-700"
         >
-          Checking for prior session...
+          <Spinner label="Checking for prior session..." />
         </div>
       ) : null}
       {showBoundPanel && binding.session !== null ? (

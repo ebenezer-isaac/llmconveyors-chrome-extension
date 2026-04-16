@@ -16,7 +16,9 @@ function buildHandler(override?: { fetchAuthed?: ReturnType<typeof vi.fn> }) {
   return {
     fetchAuthed,
     handler: createArtifactFetchBlobHandler({
-      fetchAuthed: fetchAuthed as unknown as (...args: unknown[]) => Promise<unknown>,
+      // Cast to bypass the FetchAuthed branded type in tests; the handler
+      // only touches the outcome tags we stub below.
+      fetchAuthed: fetchAuthed as never,
       baseUrl: 'https://api.example.com',
       logger: silentLogger(),
     }),

@@ -89,7 +89,14 @@ function canonicalType(raw: string | undefined): ArtifactType {
   if (lower === 'cover-letter' || lower === 'cover' || lower === 'letter') return 'cover-letter';
   if (lower === 'cold-email' || lower === 'email' || lower === 'outreach') return 'cold-email';
   if (lower === 'ats' || lower === 'ats-comparison' || lower === 'ats-report') return 'ats-comparison';
-  if (lower === 'research' || lower === 'deep-research' || lower === 'company-research') return 'deep-research';
+  if (
+    lower === 'research' ||
+    lower === 'deep-research' ||
+    lower === 'company-research' ||
+    lower === 'person-research'
+  ) {
+    return 'deep-research';
+  }
   return 'other';
 }
 
@@ -131,7 +138,20 @@ export function normalizeArtifactPreview(
   const d = parsed.data;
   const type = canonicalType(d.type ?? d.kind);
   const label = labelFor(type, d.label, d.name);
-  const content = typeof d.content === 'string' && d.content.length > 0 ? d.content : null;
+  // Backend artifact shapes nest the primary text under payload.content
+  // (e.g. company-research markdown, cover-letter body). Flatten that up
+  // so the sidepanel's TextArtifactBody has something to render without
+  // a lazy fetch when the hydrate response already carried the content.
+  const payloadContent =
+    d.payload !== undefined && typeof d.payload === 'object' && d.payload !== null
+      ? (d.payload as Record<string, unknown>).content
+      : undefined;
+  const content =
+    typeof d.content === 'string' && d.content.length > 0
+      ? d.content
+      : typeof payloadContent === 'string' && payloadContent.length > 0
+      ? payloadContent
+      : null;
   const mimeType = typeof d.mimeType === 'string' && d.mimeType.length > 0 ? d.mimeType : null;
   const downloadUrl =
     typeof d.downloadUrl === 'string' && d.downloadUrl.length > 0 ? d.downloadUrl : null;

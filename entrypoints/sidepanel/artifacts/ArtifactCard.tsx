@@ -146,9 +146,11 @@ export function ArtifactCard({
           ) : null}
         </div>
       </header>
-      <div data-testid="artifact-card-body">
-        <Body artifact={artifact} open={open} />
-      </div>
+      {open ? (
+        <div data-testid="artifact-card-body">
+          <Body artifact={artifact} open={open} />
+        </div>
+      ) : null}
     </section>
   );
 }

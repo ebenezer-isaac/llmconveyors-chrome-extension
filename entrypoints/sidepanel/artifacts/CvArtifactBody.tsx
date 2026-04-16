@@ -13,6 +13,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ArtifactPreview } from '@/src/background/messaging/schemas/artifact-preview.schema';
+import { Spinner } from '../Spinner';
 
 export interface CvArtifactBodyProps {
   readonly artifact: ArtifactPreview;
@@ -194,12 +195,9 @@ export function CvArtifactBody({
     }
     if (pdfState.kind === 'loading') {
       return (
-        <p
-          data-testid="artifact-body-cv-loading"
-          className="text-xs italic text-zinc-500 dark:text-zinc-400"
-        >
-          Loading PDF preview...
-        </p>
+        <div data-testid="artifact-body-cv-loading" className="flex justify-start">
+          <Spinner size="sm" inline label="Loading PDF preview..." />
+        </div>
       );
     }
     if (pdfState.kind === 'error') {
