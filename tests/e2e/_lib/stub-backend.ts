@@ -35,6 +35,35 @@ async function backendHandler(route: Route): Promise<void> {
     });
     return;
   }
+  if (method === 'GET' && url.pathname === '/api/v1/resume/master') {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          userId: 'user_e2e_001',
+          label: 'E2E Test Resume',
+          rawText: 'Jane Doe jane.doe@example.com +1 415 555 0101',
+          structuredData: {
+            basics: {
+              name: 'Jane Doe',
+              email: 'jane.doe@example.com',
+              phone: '+1-415-555-0101',
+            },
+            work: [],
+            education: [],
+            skills: [],
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        requestId: 'e2e-master-resume',
+        timestamp: new Date().toISOString(),
+      }),
+    });
+    return;
+  }
   if (method === 'POST' && url.pathname === '/api/v1/ats/extract-skills') {
     await route.fulfill({
       status: 200,
