@@ -28,6 +28,7 @@ import { CreditsDisplay } from './CreditsDisplay';
 import { SessionList } from './SessionList';
 import { Footer } from './Footer';
 import { ErrorBoundary } from './ErrorBoundary';
+import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 
 function useActiveTabUrl(tabId: number | null): string | null {
   const [url, setUrl] = useState<string | null>(null);
@@ -175,7 +176,9 @@ function PopupBody(): React.ReactElement {
 export default function App(): React.ReactElement {
   return (
     <ErrorBoundary>
-      <PopupBody />
+      <ThemeRoot>
+        <PopupBody />
+      </ThemeRoot>
     </ErrorBoundary>
   );
 }

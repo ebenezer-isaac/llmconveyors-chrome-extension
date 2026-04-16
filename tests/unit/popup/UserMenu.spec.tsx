@@ -4,7 +4,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { UserMenu } from '@/entrypoints/popup/UserMenu';
 import type {
   ClientCreditsSnapshot,
@@ -37,11 +37,62 @@ const CREDITS: ClientCreditsSnapshot = {
   byoKeyEnabled: false,
 };
 
+// ---------------------------------------------------------------------------
+// Storage + matchMedia stubs (needed by useTheme inside UserMenu)
+// ---------------------------------------------------------------------------
+
+type StorageMock = {
+  store: Record<string, unknown>;
+  get: ReturnType<typeof vi.fn>;
+  set: ReturnType<typeof vi.fn>;
+};
+
+function installStorage(initial: Record<string, unknown> = {}): StorageMock {
+  const store: Record<string, unknown> = { ...initial };
+  const mock: StorageMock = {
+    store,
+    get: vi.fn(async (keys: string[]) => {
+      const result: Record<string, unknown> = {};
+      for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(store, key)) {
+          result[key] = store[key];
+        }
+      }
+      return result;
+    }),
+    set: vi.fn(async (items: Record<string, unknown>) => {
+      Object.assign(store, items);
+    }),
+  };
+  const g = globalThis as unknown as {
+    chrome?: { i18n?: unknown; storage?: { local?: StorageMock }; runtime?: unknown };
+  };
+  if (g.chrome === undefined) {
+    (globalThis as unknown as { chrome: unknown }).chrome = {};
+  }
+  (g.chrome as Record<string, unknown>)['storage'] = { local: mock };
+  return mock;
+}
+
+function installMatchMedia(initialMatches = false): void {
+  const mq = {
+    matches: initialMatches,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  };
+  (globalThis as unknown as { matchMedia: () => typeof mq }).matchMedia = vi.fn(
+    () => mq,
+  );
+}
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeEach(() => {
   installI18n();
+  installStorage();
+  installMatchMedia(false);
+  document.documentElement.classList.remove('dark');
   container = document.createElement('div');
   document.body.appendChild(container);
 });
@@ -53,6 +104,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   root = null;
+  vi.restoreAllMocks();
 });
 
 async function render(
@@ -185,5 +237,122 @@ describe('UserMenu avatar', () => {
       'alice@example.com',
     );
     expect(query('user-menu-email')).toBeNull();
+  });
+});
+
+describe('UserMenu theme selector', () => {
+  async function openMenu(profile: ClientProfileSnapshot | null = null): Promise<void> {
+    await render(profile);
+    const trigger = query('user-menu-trigger') as HTMLButtonElement;
+    await act(async () => {
+      trigger.click();
+      await Promise.resolve();
+    });
+  }
+
+  async function flush(): Promise<void> {
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('renders the theme container with data-testid user-menu-theme', async () => {
+    await openMenu();
+    expect(query('user-menu-theme')).not.toBeNull();
+  });
+
+  it('renders all three theme buttons', async () => {
+    await openMenu();
+    expect(query('user-menu-theme-light')).not.toBeNull();
+    expect(query('user-menu-theme-dark')).not.toBeNull();
+    expect(query('user-menu-theme-system')).not.toBeNull();
+  });
+
+  it('theme buttons have role=radio inside a radiogroup', async () => {
+    await openMenu();
+    const container_el = query('user-menu-theme');
+    const radiogroup = container_el?.querySelector('[role="radiogroup"]');
+    expect(radiogroup).not.toBeNull();
+    const radios = radiogroup?.querySelectorAll('[role="radio"]');
+    expect(radios?.length).toBe(3);
+  });
+
+  it('system button is aria-checked=true by default (initial pref is system)', async () => {
+    await openMenu();
+    await flush();
+    const systemBtn = query('user-menu-theme-system') as HTMLButtonElement | null;
+    expect(systemBtn?.getAttribute('aria-checked')).toBe('true');
+    expect(query('user-menu-theme-light')?.getAttribute('aria-checked')).toBe('false');
+    expect(query('user-menu-theme-dark')?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('clicking dark button calls setTheme with dark and marks it aria-checked', async () => {
+    const mock = installStorage();
+    await openMenu();
+    await flush();
+
+    const darkBtn = query('user-menu-theme-dark') as HTMLButtonElement;
+    await act(async () => {
+      darkBtn.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(mock.store['llmc.theme']).toBe('dark');
+    expect(query('user-menu-theme-dark')?.getAttribute('aria-checked')).toBe('true');
+    expect(query('user-menu-theme-system')?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('clicking light button removes dark class', async () => {
+    document.documentElement.classList.add('dark');
+    installStorage({ 'llmc.theme': 'dark' });
+    await openMenu();
+    await flush();
+
+    const lightBtn = query('user-menu-theme-light') as HTMLButtonElement;
+    await act(async () => {
+      lightBtn.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(query('user-menu-theme-light')?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('clicking system button writes system to storage', async () => {
+    const mock = installStorage({ 'llmc.theme': 'dark' });
+    await openMenu();
+    await flush();
+
+    const systemBtn = query('user-menu-theme-system') as HTMLButtonElement;
+    await act(async () => {
+      systemBtn.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mock.store['llmc.theme']).toBe('system');
+    expect(query('user-menu-theme-system')?.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('menu does not close when a theme button is clicked', async () => {
+    await openMenu();
+    await flush();
+
+    const darkBtn = query('user-menu-theme-dark') as HTMLButtonElement;
+    await act(async () => {
+      darkBtn.click();
+      await Promise.resolve();
+    });
+
+    // Popover should still be open
+    expect(query('user-menu-popover')).not.toBeNull();
   });
 });

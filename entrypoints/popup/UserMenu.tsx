@@ -36,6 +36,8 @@ import {
 import { clientEnv } from '@/src/shared/env';
 import { t } from '@/src/shared/i18n';
 import { formatCredits, getTierLabel } from './useCredits';
+import { useTheme } from './useTheme';
+import type { ThemePreference } from '@/src/shared/theme';
 
 function openExternal(url: string): void {
   const g = globalThis as unknown as {
@@ -86,6 +88,12 @@ export interface UserMenuProps {
   readonly signOutDisabled?: boolean;
 }
 
+const THEME_OPTIONS: ReadonlyArray<{ readonly pref: ThemePreference; readonly key: 'theme_light' | 'theme_dark' | 'theme_system'; readonly testId: string }> = [
+  { pref: 'light', key: 'theme_light', testId: 'user-menu-theme-light' },
+  { pref: 'dark', key: 'theme_dark', testId: 'user-menu-theme-dark' },
+  { pref: 'system', key: 'theme_system', testId: 'user-menu-theme-system' },
+];
+
 export function UserMenu({
   userId,
   profile,
@@ -95,6 +103,7 @@ export function UserMenu({
   signOutDisabled = false,
 }: UserMenuProps): React.ReactElement {
   const [open, setOpen] = useState<boolean>(false);
+  const { theme, setTheme } = useTheme();
   const [photoFailed, setPhotoFailed] = useState<boolean>(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -280,6 +289,42 @@ export function UserMenu({
               ) : null}
             </div>
           ) : null}
+          <div
+            data-testid="user-menu-theme"
+            className="mb-2 rounded-card bg-zinc-50 px-3 py-2 text-xs dark:bg-zinc-900"
+          >
+            <p className="mb-1.5 font-semibold text-zinc-900 dark:text-zinc-100">
+              {t('theme_label')}
+            </p>
+            <div
+              role="radiogroup"
+              aria-label={t('theme_label')}
+              className="flex gap-1"
+            >
+              {THEME_OPTIONS.map(({ pref, key, testId }) => {
+                const active = theme === pref;
+                return (
+                  <button
+                    key={pref}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    data-testid={testId}
+                    onClick={() => {
+                      void setTheme(pref);
+                    }}
+                    className={
+                      active
+                        ? 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium bg-brand-50 text-brand-900 dark:bg-brand-900/30 dark:text-brand-100'
+                        : 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
+                    }
+                  >
+                    {t(key)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {resumeUrl !== null ? (
             <button
               ref={setMenuItemRef}

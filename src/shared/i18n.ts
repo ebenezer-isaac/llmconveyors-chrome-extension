@@ -50,7 +50,11 @@ export type MessageKey =
   | 'sessionList_loading'
   | 'agentSwitcher_label'
   | 'signIn_buttonLabel'
-  | 'sessionList_errorPrefix';
+  | 'sessionList_errorPrefix'
+  | 'theme_label'
+  | 'theme_light'
+  | 'theme_dark'
+  | 'theme_system';
 
 // ---------------------------------------------------------------------------
 // Internal chrome accessor (safe across test / non-extension runtimes)

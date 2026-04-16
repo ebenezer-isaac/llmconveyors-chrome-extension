@@ -11,6 +11,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useAgentPreference } from '../popup/useAgentPreference';
+import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 
 const ROOT_DOMAIN = 'llmconveyors.com';
 
@@ -20,7 +21,7 @@ function buildSettingsUrl(subdomain: string | null): string {
     : `https://${ROOT_DOMAIN}/en/settings`;
 }
 
-export default function App(): React.ReactElement {
+function OptionsBody(): React.ReactElement {
   const { agents, activeAgentId, loading } = useAgentPreference();
 
   const settingsUrl = useMemo(() => {
@@ -53,5 +54,13 @@ export default function App(): React.ReactElement {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function App(): React.ReactElement {
+  return (
+    <ThemeRoot>
+      <OptionsBody />
+    </ThemeRoot>
   );
 }

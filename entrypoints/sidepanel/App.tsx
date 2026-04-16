@@ -13,6 +13,7 @@ import { useAgentPreference } from '../popup/useAgentPreference';
 import { GenerationView } from './GenerationView';
 import { buildAgentUrl } from '@/src/background/agents/agent-registry';
 import { clientEnv } from '@/src/shared/env';
+import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 
 type RuntimeMessenger = {
   onMessage: {
@@ -125,7 +126,9 @@ function SidepanelBody(): React.ReactElement {
 export default function App(): React.ReactElement {
   return (
     <ErrorBoundary>
-      <SidepanelBody />
+      <ThemeRoot>
+        <SidepanelBody />
+      </ThemeRoot>
     </ErrorBoundary>
   );
 }

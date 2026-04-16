@@ -130,5 +130,21 @@
   "sessionList_errorPrefix": {
     "message": "Error loading sessions.",
     "description": "Prefix shown when the session list fails to load."
+  },
+  "theme_label": {
+    "message": "Theme",
+    "description": "Section heading for the theme selector in the user menu."
+  },
+  "theme_light": {
+    "message": "Light",
+    "description": "Light theme option in the theme selector."
+  },
+  "theme_dark": {
+    "message": "Dark",
+    "description": "Dark theme option in the theme selector."
+  },
+  "theme_system": {
+    "message": "System",
+    "description": "System theme option that follows the OS preference."
   }
 }
