@@ -28,7 +28,7 @@ import {
   type SessionSummary,
 } from './useSessionForCurrentTab';
 import { buildAgentUrl } from '@/src/background/agents/agent-registry';
-import { downloadUrl } from './lib/download';
+import { ArtifactsPanel } from './artifacts/ArtifactsPanel';
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
@@ -99,45 +99,9 @@ function BoundSessionPanel(props: {
         ) : null}
       </header>
 
-      {artifacts.length > 0 ? (
-        <div
-          data-testid="bound-session-artifacts"
-          className="flex flex-col gap-1"
-        >
-          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
-            Artifacts
-          </span>
-          <ul className="flex flex-col gap-1">
-            {artifacts.map((artifact, idx) => (
-              <li
-                key={`${artifact.type}-${idx}`}
-                data-testid={`bound-artifact-${artifact.type}`}
-                className="flex items-center justify-between gap-2 rounded-card border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-700"
-              >
-                <span className="truncate text-zinc-800 dark:text-zinc-100">
-                  {artifact.label}
-                </span>
-                {artifact.downloadUrl !== null ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void downloadUrl(
-                        artifact.downloadUrl!,
-                        `${artifact.type}.txt`,
-                      );
-                    }}
-                    className="text-brand-600 hover:underline dark:text-brand-400"
-                  >
-                    Download
-                  </button>
-                ) : (
-                  <span className="text-zinc-400 dark:text-zinc-500">unavailable</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <div data-testid="bound-session-artifacts">
+        <ArtifactsPanel artifacts={artifacts} defaultOpen={true} />
+      </div>
 
       {logs.length > 0 ? (
         <div

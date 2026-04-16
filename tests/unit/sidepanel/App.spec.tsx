@@ -235,7 +235,12 @@ describe('Sidepanel App with session binding', () => {
     await flush();
     expect(query('bound-session-panel')).not.toBeNull();
     expect(query('bound-session-title')?.textContent).toContain('Senior Engineer');
-    expect(query('bound-artifact-cv')).not.toBeNull();
+    // The old `bound-artifact-cv` list item was replaced by an
+    // ArtifactCard whose data-artifact-type attribute carries the type.
+    const artifactsPanel = query('bound-session-artifacts');
+    expect(artifactsPanel).not.toBeNull();
+    const cvCard = artifactsPanel?.querySelector('[data-artifact-type="cv"]');
+    expect(cvCard).not.toBeNull();
     expect(query('bound-session-start-new')).not.toBeNull();
   });
 

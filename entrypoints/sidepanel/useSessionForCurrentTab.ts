@@ -31,6 +31,15 @@ import {
   clearSelectedSession,
 } from '@/src/background/sessions/session-selection';
 import {
+  normalizeArtifactPreview,
+  type ArtifactPreview,
+} from '@/src/background/messaging/schemas/artifact-preview.schema';
+import {
+  buildArtifactFilename,
+  defaultFilenameForType,
+  type NamingMetadata,
+} from './lib/filename';
+import {
   SessionHydrateGetResponseSchema,
   type SessionHydrateGetResponse,
   type HydratePayload,
@@ -89,12 +98,12 @@ async function resolveActiveTabUrl(tabId: number | null): Promise<string | null>
   return null;
 }
 
-export type SessionArtifact = Readonly<{
-  type: string;
-  label: string;
-  storageKey: string | null;
-  downloadUrl: string | null;
-}>;
+/**
+ * Legacy alias kept so existing consumers (popup, tests) keep compiling
+ * during the sidepanel redesign. New consumers should import
+ * ArtifactPreview from the schema file directly.
+ */
+export type SessionArtifact = ArtifactPreview;
 
 export type SessionLogEntry = Readonly<{
   phase: string | null;
@@ -124,7 +133,7 @@ export interface UseSessionForCurrentTabResult {
   readonly binding: SessionBindingEntry | null;
   readonly session: SessionSummary | null;
   readonly logs: readonly SessionLogEntry[];
-  readonly artifacts: readonly SessionArtifact[];
+  readonly artifacts: readonly ArtifactPreview[];
   readonly error: string | null;
   readonly dismiss: () => void;
   readonly refresh: () => void;
@@ -209,41 +218,62 @@ function normalizeLogs(
 function normalizeArtifacts(
   artifactsRaw: readonly unknown[],
   sessionId: string,
-): readonly SessionArtifact[] {
-  const ArtifactShape = z
-    .object({
-      type: z.string(),
-      storageKey: z.string().optional(),
-      label: z.string().optional(),
-      name: z.string().optional(),
-    })
-    .passthrough();
-  const out: SessionArtifact[] = [];
+  summary: SessionSummary,
+): readonly ArtifactPreview[] {
+  const namingMeta: NamingMetadata = {
+    ...(summary.companyName !== null ? { companyName: summary.companyName } : {}),
+    ...(summary.jobTitle !== null ? { jobTitle: summary.jobTitle } : {}),
+  };
+  const out: ArtifactPreview[] = [];
   for (const raw of artifactsRaw) {
-    const parsed = ArtifactShape.safeParse(raw);
-    if (!parsed.success) continue;
+    if (!raw || typeof raw !== 'object') continue;
+    const r = raw as Record<string, unknown>;
     const storageKey =
-      typeof parsed.data.storageKey === 'string' && parsed.data.storageKey.length > 0
-        ? parsed.data.storageKey
-        : null;
-    const label =
-      (typeof parsed.data.label === 'string' && parsed.data.label.length > 0
-        ? parsed.data.label
-        : typeof parsed.data.name === 'string' && parsed.data.name.length > 0
-        ? parsed.data.name
-        : parsed.data.type) ?? 'artifact';
+      typeof r.storageKey === 'string' && r.storageKey.length > 0 ? r.storageKey : undefined;
+    // Derive a download URL if the backend gave us a storage key but no
+    // signed URL. Same pattern the web dashboard's TextArtifactCard uses.
     const downloadUrl =
-      storageKey !== null
+      typeof r.downloadUrl === 'string' && r.downloadUrl.length > 0
+        ? r.downloadUrl
+        : storageKey !== undefined
         ? `${clientEnv.apiBaseUrl}/api/v1/sessions/${encodeURIComponent(sessionId)}/download?key=${encodeURIComponent(storageKey)}`
-        : null;
-    out.push({
-      type: parsed.data.type,
-      label,
-      storageKey,
-      downloadUrl,
-    });
+        : undefined;
+
+    // Build a filename up-front so the card does not need the session
+    // naming metadata at render time.
+    const preliminaryType =
+      typeof r.type === 'string' ? r.type : typeof r.kind === 'string' ? r.kind : 'other';
+    const canonical = canonicalTypeForFilename(preliminaryType);
+    const { suffix, ext } = defaultFilenameForType(
+      canonical,
+      typeof r.mimeType === 'string' ? r.mimeType : null,
+    );
+    const filename = buildArtifactFilename(namingMeta, suffix, ext);
+
+    const normalized = normalizeArtifactPreview(
+      {
+        ...r,
+        ...(downloadUrl !== undefined ? { downloadUrl } : {}),
+      },
+      filename,
+    );
+    if (normalized !== null) out.push(normalized);
   }
   return out;
+}
+
+function canonicalTypeForFilename(raw: string): string {
+  const lower = raw.toLowerCase().replace(/_/g, '-');
+  if (lower === 'cv' || lower === 'resume') return 'cv';
+  if (lower === 'cover-letter' || lower === 'cover' || lower === 'letter') return 'cover-letter';
+  if (lower === 'cold-email' || lower === 'email' || lower === 'outreach') return 'cold-email';
+  if (lower === 'ats' || lower === 'ats-comparison' || lower === 'ats-report') {
+    return 'ats-comparison';
+  }
+  if (lower === 'research' || lower === 'deep-research' || lower === 'company-research') {
+    return 'deep-research';
+  }
+  return 'other';
 }
 
 function extractSummary(sessionDoc: HydrateSessionDoc): SessionSummary {
@@ -333,7 +363,7 @@ type FetchHydratedOutcome =
       readonly kind: 'ok';
       readonly summary: SessionSummary;
       readonly logs: readonly SessionLogEntry[];
-      readonly artifacts: readonly SessionArtifact[];
+      readonly artifacts: readonly ArtifactPreview[];
     }
   | { readonly kind: 'not-found' }
   | { readonly kind: 'signed-out' }
@@ -376,15 +406,17 @@ function translateHydrateResponse(
     return { kind: 'error', error: response.reason };
   }
   const payload: HydratePayload = response.payload;
-  const summary = extractSummary(payload.session);
+  const summary: SessionSummary = {
+    ...extractSummary(payload.session),
+    sessionId: extractSummary(payload.session).sessionId.length > 0
+      ? extractSummary(payload.session).sessionId
+      : sessionId,
+  };
   return {
     kind: 'ok',
-    summary: {
-      ...summary,
-      sessionId: summary.sessionId.length > 0 ? summary.sessionId : sessionId,
-    },
+    summary,
     logs: normalizeLogs(payload.generationLogs ?? [], ''),
-    artifacts: normalizeArtifacts(payload.artifacts ?? [], sessionId),
+    artifacts: normalizeArtifacts(payload.artifacts ?? [], sessionId, summary),
   };
 }
 
@@ -401,7 +433,7 @@ export function useSessionForCurrentTab(
   const [binding, setBinding] = useState<SessionBindingEntry | null>(null);
   const [session, setSession] = useState<SessionSummary | null>(null);
   const [logs, setLogs] = useState<readonly SessionLogEntry[]>([]);
-  const [artifacts, setArtifacts] = useState<readonly SessionArtifact[]>([]);
+  const [artifacts, setArtifacts] = useState<readonly ArtifactPreview[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState<number>(0);
   const dismissedRef = useRef<string | null>(null);
