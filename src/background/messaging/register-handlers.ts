@@ -75,75 +75,64 @@ import {
   launchWebAuthFlow,
   type FetchAuthed,
 } from '../auth';
-import { SessionManager } from '../session/session-manager';
+import type { SessionManager } from '../session/session-manager';
 import { getSessionManager } from '../session/session-manager';
 
 const logger = createLogger(LOG_SCOPES.handlers);
 
-const REFRESH_ENDPOINT = `${API_BASE_URL}/api/v1/auth/session/refresh`;
-
 function resolveSessionManager(): SessionManager {
   const existing = getSessionManager();
-  if (existing !== null) return existing;
-  // Fallback for test harnesses that import register-handlers without
-  // calling initSessionManager first. Production wiring in
-  // entrypoints/background.ts always initialises before this path runs.
-  return new SessionManager({
-    readSession,
-    writeSession,
-    clearSession,
-    fetch: globalThis.fetch.bind(globalThis),
-    now: () => Date.now(),
-    logger: createLogger(LOG_SCOPES.session),
-    refreshEndpoint: REFRESH_ENDPOINT,
-  });
-}
-
-function buildSilentSignIn(logCtx: ReturnType<typeof createLogger>): () => Promise<boolean> {
-  return async function silentSignIn(): Promise<boolean> {
-    const orchestrator = createSignInOrchestrator({
-      webAuthFlow: defaultWebAuthFlowDeps,
-      storage: {
-        writeSession,
-        readSession,
-      },
-      broadcast: {
-        sendRuntime: async (msg) => {
-          try {
-            await browser.runtime.sendMessage(msg);
-          } catch (err: unknown) {
-            logCtx.debug('silent-signin broadcast: no listener', {
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-        },
-      },
-      parseDeps: defaultParseAuthFragmentDeps,
-      logger: logCtx,
-      now: () => Date.now(),
-      bridgeUrl: DEFAULT_BRIDGE_URL,
-      launch: launchWebAuthFlow,
-    });
-    try {
-      const state = await orchestrator({ interactive: false });
-      return state.signedIn === true;
-    } catch (err: unknown) {
-      logCtx.debug('silent-signin: failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return false;
-    }
-  };
+  if (existing === null) {
+    throw new Error(
+      'SessionManager not initialised; call initSessionManager() before registerHandlers()',
+    );
+  }
+  return existing;
 }
 
 function buildProductionDeps(): HandlerDeps {
   const fetchFn = globalThis.fetch.bind(globalThis);
   const sessionManager = resolveSessionManager();
   const silentSignInLogger = createLogger('bg.auth.silent');
+  // Hoisted orchestrator: one instance shared by every silent-signin call.
+  // The orchestrator's module-level mutex (see sign-in-orchestrator.ts)
+  // already coalesces concurrent invocations, so a fresh per-call instance
+  // would only churn allocations.
+  const silentOrchestrator = createSignInOrchestrator({
+    webAuthFlow: defaultWebAuthFlowDeps,
+    storage: { writeSession, readSession },
+    broadcast: {
+      sendRuntime: async (msg) => {
+        try {
+          await browser.runtime.sendMessage(msg);
+        } catch (err: unknown) {
+          silentSignInLogger.debug('silent-signin broadcast: no listener', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      },
+    },
+    parseDeps: defaultParseAuthFragmentDeps,
+    logger: silentSignInLogger,
+    now: () => Date.now(),
+    bridgeUrl: DEFAULT_BRIDGE_URL,
+    launch: launchWebAuthFlow,
+  });
+  const silentSignIn = async (): Promise<boolean> => {
+    try {
+      const state = await silentOrchestrator({ interactive: false });
+      return state.signedIn === true;
+    } catch (err: unknown) {
+      silentSignInLogger.debug('silent-signin: failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  };
   const fetchAuthed: FetchAuthed = createFetchAuthed({
     sessionManager,
     fetch: fetchFn,
-    silentSignIn: buildSilentSignIn(silentSignInLogger),
+    silentSignIn,
     logger: createLogger('bg.fetchAuthed'),
     now: () => Date.now(),
   });
@@ -225,6 +214,7 @@ function buildProductionDeps(): HandlerDeps {
         });
       }
     },
+    onAuthLost: silentSignIn,
   });
 
   const scriptingApi = {

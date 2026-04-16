@@ -2,6 +2,9 @@
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 import { createFakeChrome, seedStorage, readStorage } from './_lib/fake-chrome';
 import { createMockBackend, type MockBackend } from './_lib/mock-backend';
+import { initSessionManager, __resetSessionManager } from '@/src/background/session/session-manager';
+import { readSession, writeSession, clearSession } from '@/src/background/storage/session-storage';
+import { createLogger } from '@/src/background/log';
 
 /**
  * Protocol round-trip integration tests against the real handlers.
@@ -21,7 +24,21 @@ interface RegisterHandlersModule {
   readonly __resetRegistration: () => void;
 }
 
+function ensureSessionManager(): void {
+  __resetSessionManager();
+  initSessionManager({
+    readSession,
+    writeSession,
+    clearSession,
+    fetch: globalThis.fetch.bind(globalThis),
+    now: () => Date.now(),
+    logger: createLogger('test.session'),
+    refreshEndpoint: `${BACKEND_URL}/api/v1/auth/session/refresh`,
+  });
+}
+
 async function freshRegister(): Promise<void> {
+  ensureSessionManager();
   const mod = (await import(REGISTER_HANDLERS_MODULE)) as RegisterHandlersModule;
   mod.__resetRegistration();
   mod.registerHandlers({

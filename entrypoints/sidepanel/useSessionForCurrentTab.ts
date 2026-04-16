@@ -112,6 +112,7 @@ export type SessionLookupStatus =
   | 'loading'
   | 'found'
   | 'not-found'
+  | 'bg-unreachable'
   | 'error';
 
 export interface UseSessionForCurrentTabResult {
@@ -295,10 +296,7 @@ async function fetchBinding(
   return parsed.data;
 }
 
-async function fetchHydrated(
-  sessionId: string,
-  sendMessage: (msg: unknown) => Promise<unknown>,
-): Promise<
+type FetchHydratedOutcome =
   | {
       readonly kind: 'ok';
       readonly summary: SessionSummary;
@@ -307,8 +305,13 @@ async function fetchHydrated(
     }
   | { readonly kind: 'not-found' }
   | { readonly kind: 'signed-out' }
-  | { readonly kind: 'error'; readonly error: string }
-> {
+  | { readonly kind: 'bg-unreachable' }
+  | { readonly kind: 'error'; readonly error: string };
+
+async function fetchHydrated(
+  sessionId: string,
+  sendMessage: (msg: unknown) => Promise<unknown>,
+): Promise<FetchHydratedOutcome> {
   let raw: unknown;
   try {
     raw = await sendMessage({
@@ -318,6 +321,14 @@ async function fetchHydrated(
   } catch (err: unknown) {
     return { kind: 'error', error: err instanceof Error ? err.message : String(err) };
   }
+  // The MV3 service worker can be asleep when the sidepanel mounts; the
+  // first sendMessage then resolves with `undefined` (no listener responded
+  // before the channel closed) or `null` from the polyfill. Surface this as
+  // a distinct outcome so the caller can retry once instead of treating it
+  // as a permanent shape mismatch.
+  if (raw === null || raw === undefined) {
+    return { kind: 'bg-unreachable' };
+  }
   const parsed = SessionHydrateGetResponseSchema.safeParse(raw);
   if (!parsed.success) return { kind: 'error', error: 'shape-mismatch' };
   return translateHydrateResponse(parsed.data, sessionId);
@@ -326,16 +337,7 @@ async function fetchHydrated(
 function translateHydrateResponse(
   response: SessionHydrateGetResponse,
   sessionId: string,
-):
-  | {
-      readonly kind: 'ok';
-      readonly summary: SessionSummary;
-      readonly logs: readonly SessionLogEntry[];
-      readonly artifacts: readonly SessionArtifact[];
-    }
-  | { readonly kind: 'not-found' }
-  | { readonly kind: 'signed-out' }
-  | { readonly kind: 'error'; readonly error: string } {
+): FetchHydratedOutcome {
   if (!response.ok) {
     if (response.reason === 'not-found') return { kind: 'not-found' };
     if (response.reason === 'signed-out') return { kind: 'signed-out' };
@@ -449,8 +451,18 @@ export function useSessionForCurrentTab(
         return;
       }
       setBinding(found);
-      const outcome = await fetchHydrated(found.sessionId, sendMessage);
+      let outcome = await fetchHydrated(found.sessionId, sendMessage);
       if (cancelled) return;
+      if (outcome.kind === 'bg-unreachable') {
+        // Service worker likely asleep on first message after sidepanel
+        // mount. Wait for the runtime to wake (it now has our pending
+        // listener registration) and retry exactly once before surfacing
+        // the unreachable state to the UI.
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        if (cancelled) return;
+        outcome = await fetchHydrated(found.sessionId, sendMessage);
+        if (cancelled) return;
+      }
       if (outcome.kind === 'ok') {
         setSession(outcome.summary);
         setLogs(outcome.logs);
@@ -473,6 +485,11 @@ export function useSessionForCurrentTab(
         setSession(null);
         setLogs([]);
         setArtifacts([]);
+        return;
+      }
+      if (outcome.kind === 'bg-unreachable') {
+        setStatus('bg-unreachable');
+        setError('background unreachable');
         return;
       }
       setStatus('error');

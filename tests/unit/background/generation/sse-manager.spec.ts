@@ -142,4 +142,99 @@ describe('createSseManager', () => {
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toBe('signed-out');
   });
+
+  it('on 401 handshake -> silent signin success -> retry handshake -> active', async () => {
+    const seen: Array<{ key: string; data: unknown }> = [];
+    const broadcast = async (msg: { key: string; data: unknown }): Promise<void> => {
+      seen.push(msg);
+    };
+    const body = makeSseResponseBody([
+      'data: {"generationId":"g5","sessionId":"s5","phase":"x","status":"running"}\n\n',
+    ]);
+    let call = 0;
+    const fetchFn = vi.fn(async () => {
+      call += 1;
+      if (call === 1) {
+        return { ok: false, status: 401, body: null } as unknown as Response;
+      }
+      return { ok: true, status: 200, body } as unknown as Response;
+    });
+    const NEW_SESSION = { ...VALID_SESSION, accessToken: 'tok-2' };
+    let sessionIdx = 0;
+    const sessions = [VALID_SESSION, NEW_SESSION];
+    const sm = {
+      getSession: vi.fn(async () => sessions[Math.min(sessionIdx++, 1)]!),
+    } as unknown as SessionManager;
+    const onAuthLost = vi.fn(async () => true);
+    const m = createSseManager({
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      logger: logger(),
+      buildUrl: (id) => `https://x/${id}`,
+      sessionManager: sm,
+      broadcast,
+      onAuthLost,
+    });
+    const r = await m.subscribe({ generationId: 'g5' });
+    expect(r).toEqual({ ok: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onAuthLost).toHaveBeenCalledTimes(1);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    // The retry handshake must use the refreshed token.
+    const [, retryInit] = fetchFn.mock.calls[1] as unknown as [string, RequestInit];
+    const headers = retryInit.headers as Record<string, string>;
+    expect(headers.authorization).toBe('Bearer tok-2');
+    // No AUTH_STATE_CHANGED on success.
+    expect(seen.find((s) => s.key === 'AUTH_STATE_CHANGED')).toBeUndefined();
+    // GENERATION_UPDATE eventually broadcast.
+    expect(seen.find((s) => s.key === 'GENERATION_UPDATE')).toBeDefined();
+  });
+
+  it('on 401 handshake -> silent signin failure -> AUTH_STATE_CHANGED { signedIn: false }', async () => {
+    const seen: Array<{ key: string; data: unknown }> = [];
+    const broadcast = async (msg: { key: string; data: unknown }): Promise<void> => {
+      seen.push(msg);
+    };
+    const fetchFn = vi.fn(
+      async () => ({ ok: false, status: 401, body: null }) as unknown as Response,
+    );
+    const onAuthLost = vi.fn(async () => false);
+    const m = createSseManager({
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      logger: logger(),
+      buildUrl: (id) => `https://x/${id}`,
+      sessionManager: fakeSessionManager(VALID_SESSION),
+      broadcast,
+      onAuthLost,
+    });
+    await m.subscribe({ generationId: 'g6' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onAuthLost).toHaveBeenCalledTimes(1);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const auth = seen.find((s) => s.key === 'AUTH_STATE_CHANGED');
+    expect(auth).toBeDefined();
+    expect(auth?.data).toEqual({ signedIn: false });
+    expect(m.isSubscribed('g6')).toBe(false);
+  });
+
+  it('on 401 handshake when no onAuthLost is configured -> AUTH_STATE_CHANGED', async () => {
+    const seen: Array<{ key: string; data: unknown }> = [];
+    const broadcast = async (msg: { key: string; data: unknown }): Promise<void> => {
+      seen.push(msg);
+    };
+    const fetchFn = vi.fn(
+      async () => ({ ok: false, status: 401, body: null }) as unknown as Response,
+    );
+    const m = createSseManager({
+      fetch: fetchFn as unknown as typeof globalThis.fetch,
+      logger: logger(),
+      buildUrl: (id) => `https://x/${id}`,
+      sessionManager: fakeSessionManager(VALID_SESSION),
+      broadcast,
+    });
+    await m.subscribe({ generationId: 'g7' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(seen.find((s) => s.key === 'AUTH_STATE_CHANGED')?.data).toEqual({
+      signedIn: false,
+    });
+  });
 });

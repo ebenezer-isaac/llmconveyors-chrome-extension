@@ -24,6 +24,9 @@ import { __resetJdCacheForTest } from '@/src/content/highlight/jd-cache';
 import type { Logger } from '@/src/background/log';
 import type { PageIntent } from 'ats-autofill-engine';
 import type { KeywordsExtractResponse } from '@/src/background/messaging/protocol-types';
+import { initSessionManager, __resetSessionManager } from '@/src/background/session/session-manager';
+import { readSession, writeSession, clearSession } from '@/src/background/storage/session-storage';
+import { createLogger } from '@/src/background/log';
 
 const BACKEND_URL = 'https://api.llmconveyors.local';
 const REGISTER_HANDLERS_MODULE =
@@ -34,7 +37,21 @@ interface RegisterHandlersModule {
   readonly __resetRegistration: () => void;
 }
 
+function ensureSessionManager(): void {
+  __resetSessionManager();
+  initSessionManager({
+    readSession,
+    writeSession,
+    clearSession,
+    fetch: globalThis.fetch.bind(globalThis),
+    now: () => Date.now(),
+    logger: createLogger('test.session'),
+    refreshEndpoint: `${BACKEND_URL}/api/v1/auth/session/refresh`,
+  });
+}
+
 async function freshRegister(): Promise<void> {
+  ensureSessionManager();
   const mod = (await import(REGISTER_HANDLERS_MODULE)) as RegisterHandlersModule;
   mod.__resetRegistration();
   mod.registerHandlers({

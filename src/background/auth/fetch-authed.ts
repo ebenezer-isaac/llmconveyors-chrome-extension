@@ -54,6 +54,20 @@ export type FetchAuthedResult =
   | { readonly kind: 'unauthenticated' }
   | { readonly kind: 'network-error'; readonly error: Error };
 
+/**
+ * Authenticated fetch.
+ *
+ * Body constraints: `init.body` MUST be idempotent because the helper may
+ * consume it twice (initial request + silent-retry). Permitted shapes:
+ *   - `string`
+ *   - `Uint8Array` / `ArrayBuffer` view
+ *   - `URLSearchParams`
+ *   - `null` / `undefined`
+ *
+ * `ReadableStream`, single-read `Blob`, and `FormData` are NOT supported:
+ * the second consumption would either throw or transmit an empty body.
+ * Passing a `ReadableStream` triggers a synchronous throw.
+ */
 export type FetchAuthed = (
   url: string,
   init?: RequestInit,
@@ -96,35 +110,73 @@ function toError(err: unknown): Error {
   return new Error(typeof err === 'string' ? err : 'unknown error');
 }
 
+function isReadableStream(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  const ctor = (value as { constructor?: { name?: string } }).constructor;
+  if (ctor?.name === 'ReadableStream') return true;
+  // Cross-realm safety: also duck-type the standard ReadableStream surface.
+  const candidate = value as { getReader?: unknown; tee?: unknown };
+  return typeof candidate.getReader === 'function' && typeof candidate.tee === 'function';
+}
+
 export function createFetchAuthed(deps: FetchAuthedDeps): FetchAuthed {
   const cooldownMs = deps.silentRetryCooldownMs ?? DEFAULT_SILENT_RETRY_COOLDOWN_MS;
-  const lastSilentAttempt = new Map<string, number>();
+  // Per-URL dedup: concurrent 401s on the same URL share a single
+  // silent-signin promise, so all callers either succeed or fail together.
+  const inflightSilent = new Map<string, Promise<boolean>>();
+  // Per-URL cooldown: only set after a FAILED silent-signin, to bound the
+  // retry rate when the bridge persistently hands back tokens the backend
+  // rejects. Successful silent-signins do not extend the cooldown.
+  const lastFailedSilent = new Map<string, number>();
 
   async function attemptSilentRetry(url: string): Promise<boolean> {
+    const existing = inflightSilent.get(url);
+    if (existing !== undefined) {
+      deps.logger.debug('fetchAuthed: joining in-flight silent-signin', { url });
+      return existing;
+    }
+    const lastFail = lastFailedSilent.get(url);
     const now = deps.now();
-    const last = lastSilentAttempt.get(url);
-    if (last !== undefined && now - last < cooldownMs) {
+    if (lastFail !== undefined && now - lastFail < cooldownMs) {
       deps.logger.debug('fetchAuthed: silent-retry on cooldown', {
         url,
-        sinceMs: now - last,
+        sinceMs: now - lastFail,
       });
       return false;
     }
-    lastSilentAttempt.set(url, now);
+    const promise = (async (): Promise<boolean> => {
+      try {
+        return await deps.silentSignIn();
+      } catch (err: unknown) {
+        deps.logger.debug('fetchAuthed: silent sign-in threw', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return false;
+      }
+    })();
+    inflightSilent.set(url, promise);
+    let outcome: boolean;
     try {
-      return await deps.silentSignIn();
-    } catch (err: unknown) {
-      deps.logger.debug('fetchAuthed: silent sign-in threw', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return false;
+      outcome = await promise;
+    } finally {
+      inflightSilent.delete(url);
     }
+    if (!outcome) {
+      lastFailedSilent.set(url, deps.now());
+    }
+    return outcome;
   }
 
   return async function fetchAuthed(
     url: string,
     init?: RequestInit,
   ): Promise<FetchAuthedResult> {
+    if (init?.body !== undefined && init.body !== null && isReadableStream(init.body)) {
+      throw new Error(
+        'fetchAuthed: ReadableStream bodies are not supported because retry consumes the body twice',
+      );
+    }
+
     const session = await deps.sessionManager.getSession();
     if (session === null) {
       return { kind: 'unauthenticated' };
@@ -140,6 +192,15 @@ export function createFetchAuthed(deps: FetchAuthedDeps): FetchAuthed {
 
     if (response.status !== 401 && response.status !== 403) {
       return { kind: 'ok', response };
+    }
+
+    // Free the socket holding the original 401/403 body before we issue
+    // the retry. Without this, a burst of 401s under high concurrency can
+    // exhaust the connection pool while the unread bodies linger.
+    try {
+      void response.body?.cancel();
+    } catch {
+      // body may already be locked or absent
     }
 
     deps.logger.debug('fetchAuthed: 401/403, attempting silent retry', {

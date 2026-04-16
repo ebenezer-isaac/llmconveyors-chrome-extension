@@ -297,7 +297,7 @@ describe('createFetchAuthed - headers merge', () => {
 });
 
 describe('createFetchAuthed - silent retry cooldown', () => {
-  it('second 401 within cooldown window does not call silentSignIn again', async () => {
+  it('second 401 within cooldown window does not call silentSignIn again (cooldown only after FAILURE)', async () => {
     const response401 = new Response('', { status: 401 });
     const fetchFn = vi.fn(async () => response401);
     const silentSignIn = vi.fn(async () => false);
@@ -318,6 +318,49 @@ describe('createFetchAuthed - silent retry cooldown', () => {
     expect(silentSignIn).toHaveBeenCalledTimes(1);
     current += 6_000;
     await fetchAuthed('https://api/test');
+    expect(silentSignIn).toHaveBeenCalledTimes(2);
+  });
+
+  it('successful silent-signin does NOT install a cooldown', async () => {
+    // Before fix: success set lastSilentAttempt, blocking a legitimate
+    // future retry. After fix: only failures install cooldown.
+    // Sim: stored token becomes "stale" again between successive calls
+    // (e.g. backend rotates secrets). Each call begins with SESSION_A
+    // (stale -> 401), silent-signin resolves true, retry uses SESSION_B
+    // (fresh -> 200). Then the next call begins with SESSION_A again to
+    // simulate a fresh staleness event.
+    let stale = true;
+    const sm = {
+      getSession: vi.fn(async () => (stale ? SESSION_A : SESSION_B)),
+    } as unknown as SessionManager;
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      return headers.authorization === `Bearer ${SESSION_A.accessToken}`
+        ? new Response('', { status: 401 })
+        : new Response('ok', { status: 200 });
+    });
+    const silentSignIn = vi.fn(async () => {
+      stale = false;
+      return true;
+    });
+    let now = 1_000_000;
+    const fetchAuthed = createFetchAuthed(
+      buildDeps({
+        sessionManager: sm,
+        fetch: fetchFn as unknown as typeof fetch,
+        silentSignIn,
+        now: () => now,
+        silentRetryCooldownMs: 10_000,
+      }),
+    );
+    const r1 = await fetchAuthed('https://api/test');
+    expect(r1.kind).toBe('ok');
+    expect(silentSignIn).toHaveBeenCalledTimes(1);
+    // Reset to "stale" to force a second silent-signin path.
+    stale = true;
+    now += 100;
+    const r2 = await fetchAuthed('https://api/test');
+    expect(r2.kind).toBe('ok');
     expect(silentSignIn).toHaveBeenCalledTimes(2);
   });
 
@@ -353,5 +396,135 @@ describe('createFetchAuthed - silent retry cooldown', () => {
     await fetchAuthed('https://api/a');
     await fetchAuthed('https://api/b');
     expect(silentSignIn).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('createFetchAuthed - concurrent silent-signin dedup', () => {
+  it('three concurrent 401s on the same URL share one silent-signin invocation', async () => {
+    // SessionManager that flips to SESSION_B only AFTER silent-signin resolves.
+    let signedInB = false;
+    const sm = {
+      getSession: vi.fn(async () => (signedInB ? SESSION_B : SESSION_A)),
+    } as unknown as SessionManager;
+    const fetchFn = vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      // Stale token -> 401, fresh token -> 200.
+      return headers.authorization === `Bearer ${SESSION_A.accessToken}`
+        ? new Response('', { status: 401 })
+        : new Response('ok', { status: 200 });
+    });
+    let resolveSignin: (v: boolean) => void = () => {};
+    const silentSignIn = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveSignin = resolve;
+        }),
+    );
+    const fetchAuthed = createFetchAuthed(
+      buildDeps({
+        sessionManager: sm,
+        fetch: fetchFn as unknown as typeof fetch,
+        silentSignIn,
+      }),
+    );
+    const p1 = fetchAuthed('https://api/test');
+    const p2 = fetchAuthed('https://api/test');
+    const p3 = fetchAuthed('https://api/test');
+    // Allow the three initial fetches and the silent-signin scheduling.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(silentSignIn).toHaveBeenCalledTimes(1);
+    signedInB = true;
+    resolveSignin(true);
+    const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+    expect(r1.kind).toBe('ok');
+    expect(r2.kind).toBe('ok');
+    expect(r3.kind).toBe('ok');
+    // Still only one silent-signin invocation total.
+    expect(silentSignIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('after a failed silent-signin, the cooldown blocks subsequent retries (same URL)', async () => {
+    const fetchFn = vi.fn(async () => new Response('', { status: 401 }));
+    const silentSignIn = vi.fn(async () => false);
+    let now = 1_000;
+    const fetchAuthed = createFetchAuthed(
+      buildDeps({
+        sessionManager: fakeSessionManager([SESSION_A]),
+        fetch: fetchFn as unknown as typeof fetch,
+        silentSignIn,
+        now: () => now,
+        silentRetryCooldownMs: 10_000,
+      }),
+    );
+    const r1 = await fetchAuthed('https://api/test');
+    expect(r1.kind).toBe('unauthenticated');
+    expect(silentSignIn).toHaveBeenCalledTimes(1);
+    now += 1_000;
+    const r2 = await fetchAuthed('https://api/test');
+    expect(r2.kind).toBe('unauthenticated');
+    // Still 1 - cooldown blocked the retry.
+    expect(silentSignIn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createFetchAuthed - body cancel on 401', () => {
+  it('cancels the original 401 response body before retrying', async () => {
+    const cancelSpy = vi.fn(async () => undefined);
+    const body401 = new ReadableStream<Uint8Array>({
+      pull(controller): void {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.close();
+      },
+      cancel: cancelSpy,
+    });
+    const response401 = new Response(body401, { status: 401 });
+    const response200 = new Response('ok', { status: 200 });
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(response401)
+      .mockResolvedValueOnce(response200);
+    const fetchAuthed = createFetchAuthed(
+      buildDeps({
+        sessionManager: fakeSessionManager([SESSION_A, SESSION_B]),
+        fetch: fetchFn as unknown as typeof fetch,
+        silentSignIn: vi.fn(async () => true),
+      }),
+    );
+    const r = await fetchAuthed('https://api/test');
+    expect(r.kind).toBe('ok');
+    // Allow microtask queue to flush - cancel is fire-and-forget
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('createFetchAuthed - body shape constraint', () => {
+  it('throws synchronously when init.body is a ReadableStream', async () => {
+    const fetchFn = vi.fn(async () => new Response('ok', { status: 200 }));
+    const fetchAuthed = createFetchAuthed(
+      buildDeps({ fetch: fetchFn as unknown as typeof fetch }),
+    );
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller): void {
+        controller.close();
+      },
+    });
+    await expect(
+      fetchAuthed('https://api/test', { method: 'POST', body: stream }),
+    ).rejects.toThrow(/ReadableStream bodies are not supported/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('accepts a string body (happy path proves the throw is ReadableStream-specific)', async () => {
+    const fetchFn = vi.fn(async () => new Response('ok', { status: 200 }));
+    const fetchAuthed = createFetchAuthed(
+      buildDeps({ fetch: fetchFn as unknown as typeof fetch }),
+    );
+    const r = await fetchAuthed('https://api/test', {
+      method: 'POST',
+      body: '{"k":"v"}',
+    });
+    expect(r.kind).toBe('ok');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
   });
 });

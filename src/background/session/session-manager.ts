@@ -9,7 +9,10 @@
 
 import type { StoredSession } from '../messaging/schemas/auth.schema';
 import type { Logger } from '../log';
-import { SessionExpiredError } from '../messaging/errors';
+import {
+  SessionExpiredError,
+  SessionRefreshNetworkError,
+} from '../messaging/errors';
 import { PROACTIVE_REFRESH_WINDOW_MS } from '../config';
 
 export interface SessionManagerDeps {
@@ -46,14 +49,27 @@ export class SessionManager {
     return existing;
   }
 
-  /** Single-flight refresh. Concurrent callers share the same in-flight promise. */
+  /**
+   * Single-flight refresh. Concurrent callers share the same in-flight
+   * promise. Stored session is cleared ONLY when the failure is a server
+   * rejection or a malformed body (the refresh token is no longer valid).
+   * A transport-level failure (network blip, offline, TLS) leaves the
+   * stored session intact so the next attempt can succeed without forcing
+   * an interactive re-sign-in.
+   */
   refreshOnce(): Promise<StoredSession> {
     if (this.inflight !== null) {
       this.deps.logger.debug('session: refresh dedup - joining in-flight');
       return this.inflight;
     }
     this.inflight = this.doRefresh()
-      .catch(async (err) => {
+      .catch(async (err: unknown) => {
+        if (err instanceof SessionRefreshNetworkError) {
+          this.deps.logger.warn('session: refresh network failure - keeping stored session', {
+            error: err.message,
+          });
+          throw err;
+        }
         try {
           await this.deps.clearSession();
         } catch (clearErr) {
@@ -72,7 +88,7 @@ export class SessionManager {
   private async doRefresh(): Promise<StoredSession> {
     const existing = await this.deps.readSession();
     if (existing === null) {
-      throw new SessionExpiredError('no session in storage');
+      throw new SessionExpiredError('no session in storage', 'missing');
     }
     this.deps.logger.info('session: starting refresh', { userId: existing.userId });
 
@@ -80,54 +96,62 @@ export class SessionManager {
     try {
       res = await this.deps.fetch(this.deps.refreshEndpoint, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${existing.refreshToken}`,
-        },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ refreshToken: existing.refreshToken }),
       });
     } catch (networkErr) {
       const msg = networkErr instanceof Error ? networkErr.message : 'unknown';
       this.deps.logger.error('session: refresh network error', networkErr);
-      throw new SessionExpiredError(`network error: ${msg}`);
+      throw new SessionRefreshNetworkError(msg);
     }
 
     if (res.status === 401 || res.status === 403) {
       this.deps.logger.warn('session: refresh rejected', { status: res.status });
-      throw new SessionExpiredError(`server rejected (${res.status})`);
+      throw new SessionExpiredError(`server rejected (${res.status})`, 'rejected');
     }
     if (!res.ok) {
-      throw new SessionExpiredError(`refresh failed: ${res.status}`);
+      throw new SessionExpiredError(`refresh failed: ${res.status}`, 'rejected');
     }
 
     let body: unknown;
     try {
       body = await res.json();
     } catch {
-      throw new SessionExpiredError('refresh response is not JSON');
+      throw new SessionExpiredError('refresh response is not JSON', 'malformed');
     }
 
     if (typeof body !== 'object' || body === null) {
-      throw new SessionExpiredError('refresh response is not an object');
+      throw new SessionExpiredError('refresh response is not an object', 'malformed');
     }
     const obj = body as Record<string, unknown>;
-    const accessToken = typeof obj.accessToken === 'string' ? obj.accessToken : null;
+    // Backend's global ResponseTransformInterceptor wraps every response in
+    // { success, data, requestId, timestamp }. Mirror the same envelope
+    // tolerance the A4 bridge page uses (extractTokens helper) so the
+    // extension reads the right shape whether the body is enveloped or raw.
+    const source: Record<string, unknown> =
+      obj.data !== null && typeof obj.data === 'object' && !Array.isArray(obj.data)
+        ? (obj.data as Record<string, unknown>)
+        : obj;
+
+    const accessToken = typeof source.accessToken === 'string' ? source.accessToken : null;
     const refreshToken =
-      typeof obj.refreshToken === 'string' && obj.refreshToken.length > 0
-        ? obj.refreshToken
+      typeof source.refreshToken === 'string' && source.refreshToken.length > 0
+        ? source.refreshToken
         : existing.refreshToken;
     const expiresAt =
-      typeof obj.expiresAt === 'number' && Number.isFinite(obj.expiresAt) && obj.expiresAt > 0
-        ? obj.expiresAt
+      typeof source.expiresAt === 'number' && Number.isFinite(source.expiresAt) && source.expiresAt > 0
+        ? source.expiresAt
         : null;
     const userId =
-      typeof obj.userId === 'string' && obj.userId.length > 0 ? obj.userId : existing.userId;
+      typeof source.userId === 'string' && source.userId.length > 0
+        ? source.userId
+        : existing.userId;
 
     if (accessToken === null || accessToken.length === 0) {
-      throw new SessionExpiredError('refresh missing accessToken');
+      throw new SessionExpiredError('refresh missing accessToken', 'malformed');
     }
     if (expiresAt === null) {
-      throw new SessionExpiredError('refresh missing or invalid expiresAt');
+      throw new SessionExpiredError('refresh missing or invalid expiresAt', 'malformed');
     }
 
     const next: StoredSession = { accessToken, refreshToken, expiresAt, userId };

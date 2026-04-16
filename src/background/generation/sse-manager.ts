@@ -14,8 +14,11 @@
  * Authentication: SSE is a long-lived streaming connection so it does not
  * go through `fetchAuthed`'s 401-then-retry path. It consults the
  * SessionManager for a refreshed access token before opening the stream.
- * A 401 during the initial handshake terminates the subscription; the
- * popup re-subscribes after the next sign-in.
+ * On a 401/403 during the initial handshake, the manager invokes the
+ * injected `onAuthLost` callback exactly once, which is expected to attempt
+ * a silent sign-in and return whether a fresh session is now available.
+ * On success the handshake is re-pumped with the new token; on failure the
+ * manager broadcasts AUTH_STATE_CHANGED so the UI flips to signed-out.
  */
 
 import type { Logger } from '../log';
@@ -40,6 +43,14 @@ export interface SseManagerDeps {
   readonly buildUrl: (generationId: string) => string;
   readonly sessionManager: SessionManager;
   readonly broadcast: Broadcaster;
+  /**
+   * Optional auth-recovery hook. Invoked when the SSE handshake returns
+   * 401/403. Implementations should attempt a silent sign-in and resolve
+   * `true` if a new session is now stored, `false` otherwise. When omitted
+   * (or when it returns false), the manager broadcasts
+   * AUTH_STATE_CHANGED { signedIn: false } and abandons the subscription.
+   */
+  readonly onAuthLost?: () => Promise<boolean>;
 }
 
 interface ActiveSubscription {
@@ -87,14 +98,26 @@ export function createSseManager(deps: SseManagerDeps): {
 } {
   const active = new Map<string, ActiveSubscription>();
 
-  async function pump(
+  async function notifyAuthLost(): Promise<void> {
+    try {
+      await deps.broadcast({
+        key: 'AUTH_STATE_CHANGED',
+        data: { signedIn: false },
+      });
+    } catch (err: unknown) {
+      deps.logger.debug('sse: auth-lost broadcast failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  async function attemptHandshake(
     generationId: string,
     token: string,
     controller: AbortController,
-  ): Promise<void> {
-    let res: Response;
+  ): Promise<Response | null> {
     try {
-      res = await deps.fetch(deps.buildUrl(generationId), {
+      return await deps.fetch(deps.buildUrl(generationId), {
         method: 'GET',
         headers: {
           accept: 'text/event-stream',
@@ -107,8 +130,62 @@ export function createSseManager(deps: SseManagerDeps): {
         error: err instanceof Error ? err.message : String(err),
         generationId,
       });
+      return null;
+    }
+  }
+
+  async function pump(
+    generationId: string,
+    initialToken: string,
+    controller: AbortController,
+  ): Promise<void> {
+    let res = await attemptHandshake(generationId, initialToken, controller);
+    if (res === null) {
       active.delete(generationId);
       return;
+    }
+    if (res.status === 401 || res.status === 403) {
+      // Free the unread 401 body before issuing recovery work.
+      try {
+        void res.body?.cancel();
+      } catch {
+        // already cancelled
+      }
+      deps.logger.warn('sse: handshake auth rejected', {
+        status: res.status,
+        generationId,
+      });
+      const recovered = deps.onAuthLost !== undefined ? await deps.onAuthLost() : false;
+      if (!recovered) {
+        await notifyAuthLost();
+        active.delete(generationId);
+        return;
+      }
+      const refreshed = await deps.sessionManager.getSession();
+      if (refreshed === null) {
+        await notifyAuthLost();
+        active.delete(generationId);
+        return;
+      }
+      res = await attemptHandshake(generationId, refreshed.accessToken, controller);
+      if (res === null) {
+        active.delete(generationId);
+        return;
+      }
+      if (res.status === 401 || res.status === 403) {
+        try {
+          void res.body?.cancel();
+        } catch {
+          // already cancelled
+        }
+        deps.logger.warn('sse: handshake auth rejected after retry', {
+          status: res.status,
+          generationId,
+        });
+        await notifyAuthLost();
+        active.delete(generationId);
+        return;
+      }
     }
     if (!res.ok || res.body === null) {
       deps.logger.warn('sse: non-ok response', {
