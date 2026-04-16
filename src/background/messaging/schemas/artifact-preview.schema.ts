@@ -100,7 +100,12 @@ function canonicalType(raw: string | undefined): ArtifactType {
   return 'other';
 }
 
-function labelFor(type: ArtifactType, rawLabel: string | undefined, rawName: string | undefined): string {
+function labelFor(
+  type: ArtifactType,
+  rawLabel: string | undefined,
+  rawName: string | undefined,
+  rawKind: string | undefined,
+): string {
   if (typeof rawLabel === 'string' && rawLabel.trim().length > 0) return rawLabel.trim();
   if (typeof rawName === 'string' && rawName.trim().length > 0) return rawName.trim();
   switch (type) {
@@ -112,8 +117,17 @@ function labelFor(type: ArtifactType, rawLabel: string | undefined, rawName: str
       return 'Cold Email';
     case 'ats-comparison':
       return 'ATS Comparison';
-    case 'deep-research':
-      return 'Company Research';
+    case 'deep-research': {
+      // Both person-research and company-research collapse to the
+      // 'deep-research' render type (they share the same body layout),
+      // but their LABEL must stay distinct so users can tell the two
+      // apart in the Artifacts list -- otherwise both look like
+      // 'Company Research'.
+      const k = (rawKind ?? '').toLowerCase().replace(/_/g, '-');
+      if (k === 'person-research') return 'Person Research';
+      if (k === 'company-research') return 'Company Research';
+      return 'Research';
+    }
     default:
       return 'Artifact';
   }
@@ -137,7 +151,7 @@ export function normalizeArtifactPreview(
   if (!parsed.success) return null;
   const d = parsed.data;
   const type = canonicalType(d.type ?? d.kind);
-  const label = labelFor(type, d.label, d.name);
+  const label = labelFor(type, d.label, d.name, d.type ?? d.kind);
   // Backend artifact shapes nest the primary text under payload.content
   // (e.g. company-research markdown, cover-letter body). Flatten that up
   // so the sidepanel's TextArtifactBody has something to render without
