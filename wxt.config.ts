@@ -2,16 +2,11 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 
-/**
- * Dev-only host_permissions. Included only when WXT is building in dev mode
- * (NODE_ENV !== 'production'); production packages exclude localhost URLs so
- * the extension cannot be tricked into talking to a local attacker API if a
- * developer leaves a rogue service running.
- */
-const DEV_HOST_PERMISSIONS: readonly string[] =
-  process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5174/*'];
-
 export default defineConfig({
+  // Dev-only host_permissions are added via the `dev` field below; production
+  // packages exclude localhost URLs so the extension cannot be tricked into
+  // talking to a local attacker API if a developer leaves a rogue service
+  // running.
   srcDir: '.',
   outDir: '.output',
   modules: ['@wxt-dev/module-react'],
@@ -40,7 +35,6 @@ export default defineConfig({
       'https://api.llmconveyors.com/*',
       'https://*.llmconveyors.com/*',
       'https://llmconveyors.com/*',
-      ...DEV_HOST_PERMISSIONS,
     ],
     content_security_policy: {
       // Lock the extension runtime: no remote scripts, no eval, no inline.
