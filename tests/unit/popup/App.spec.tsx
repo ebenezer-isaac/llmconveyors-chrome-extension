@@ -154,7 +154,9 @@ describe('Popup App integration', () => {
     expect(query('sign-in-button')).not.toBeNull();
     expect(query('signed-out-panel')).not.toBeNull();
     expect(query('action-area')).toBeNull();
-    expect(query('credits-remaining')).toBeNull();
+    // Tier pill replaces the old credits-remaining text; both are
+    // hidden when signed out.
+    expect(query('tier-pill')).toBeNull();
   });
 
   it('shows credits + action area with hidden fill + disabled highlight when signed in but no intent', async () => {
@@ -171,8 +173,13 @@ describe('Popup App integration', () => {
     await flush();
     expect(query('signed-out-panel')).toBeNull();
     expect(query('action-area')).not.toBeNull();
-    const credits = query('credits-remaining');
-    expect(credits?.textContent).toMatch(/33 credits/);
+    // Footer now shows a tier pill (BYO Key / Free) instead of the
+    // 'N credits remaining' text. Credits count lives in the user
+    // menu dropdown to avoid the dup that shipped in the previous
+    // design.
+    const pill = query('tier-pill');
+    expect(pill).not.toBeNull();
+    expect(pill?.getAttribute('data-tier')).toBe('byo');
     // Fill is hidden entirely off application-form pages (it requires a
     // prior generation session to be useful).
     expect(query('fill-button')).toBeNull();
