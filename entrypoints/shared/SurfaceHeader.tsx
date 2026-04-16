@@ -30,6 +30,8 @@ export interface SurfaceHeaderProps {
   readonly signOutDisabled?: boolean;
   readonly credits?: ClientCreditsSnapshot | null;
   readonly profile?: ClientProfileSnapshot | null;
+  /** True while the profile snapshot is being fetched. */
+  readonly profileLoading?: boolean;
   /**
    * Accent classes pulled from lib/accent.ts (sidepanel) or the neutral
    * bundle (popup). Applied to the header background so the surface
@@ -48,13 +50,14 @@ export function SurfaceHeader({
   signOutDisabled = false,
   credits = null,
   profile = null,
+  profileLoading = false,
   accentHeader,
 }: SurfaceHeaderProps): React.ReactElement {
   const activeAgent =
     agents.find((entry) => entry.id === activeAgentId) ?? null;
 
   const baseClass =
-    'flex items-center justify-between gap-2 border-b border-zinc-200 px-3 py-2 dark:border-zinc-700';
+    'flex items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-900';
   const className =
     accentHeader !== undefined && accentHeader.length > 0
       ? `${baseClass} ${accentHeader}`
@@ -87,6 +90,7 @@ export function SurfaceHeader({
             <UserMenu
               userId={userId}
               profile={profile}
+              profileLoading={profileLoading}
               credits={credits}
               activeAgent={activeAgent}
               onSignOut={onSignOut}

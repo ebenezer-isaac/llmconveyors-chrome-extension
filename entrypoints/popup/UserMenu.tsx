@@ -38,6 +38,7 @@ import { t } from '@/src/shared/i18n';
 import { formatCredits, getTierLabel } from './useCredits';
 import { useTheme } from './useTheme';
 import type { ThemePreference } from '@/src/shared/theme';
+import { Spinner } from '@/entrypoints/shared/Spinner';
 
 function openExternal(url: string): void {
   const g = globalThis as unknown as {
@@ -82,6 +83,7 @@ function resolveAgentUrl(
 export interface UserMenuProps {
   readonly userId: string;
   readonly profile: ClientProfileSnapshot | null;
+  readonly profileLoading?: boolean;
   readonly credits: ClientCreditsSnapshot | null;
   readonly activeAgent: AgentRegistryEntry | null;
   readonly onSignOut: () => void;
@@ -97,6 +99,7 @@ const THEME_OPTIONS: ReadonlyArray<{ readonly pref: ThemePreference; readonly ke
 export function UserMenu({
   userId,
   profile,
+  profileLoading = false,
   credits,
   activeAgent,
   onSignOut,
@@ -215,6 +218,7 @@ export function UserMenu({
 
   const showPhoto =
     photoURL !== null && photoURL.length > 0 && !photoFailed;
+  const showSpinner = profileLoading && profile === null;
 
   return (
     <div className="relative" ref={menuRef} data-testid="user-menu">
@@ -224,11 +228,14 @@ export function UserMenu({
         data-testid="user-menu-trigger"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-busy={showSpinner ? true : undefined}
         onClick={toggleMenu}
         title={displaySource}
-        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-zinc-300 bg-zinc-100 text-xs font-semibold text-zinc-700 transition hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:border-zinc-500"
+        className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-zinc-100 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600"
       >
-        {showPhoto ? (
+        {showSpinner ? (
+          <Spinner size="sm" inline />
+        ) : showPhoto ? (
           <img
             data-testid="user-menu-photo"
             src={photoURL ?? ''}
@@ -281,7 +288,7 @@ export function UserMenu({
                   <a
                     data-testid="user-menu-topup-link"
                     href={topUpHref}
-                    className="font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700 dark:text-brand-400"
+                    className="font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                   >
                     {clientEnv.contactEmail}
                   </a>
@@ -315,7 +322,7 @@ export function UserMenu({
                     }}
                     className={
                       active
-                        ? 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium bg-brand-50 text-brand-900 dark:bg-brand-900/30 dark:text-brand-100'
+                        ? 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                         : 'flex-1 rounded px-2 py-1 text-center text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700'
                     }
                   >

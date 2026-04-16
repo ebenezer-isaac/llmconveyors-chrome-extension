@@ -43,7 +43,7 @@ function levelColor(level: string | null): string {
       return 'bg-zinc-400';
     case 'info':
     default:
-      return 'bg-brand-500';
+      return 'bg-blue-500';
   }
 }
 

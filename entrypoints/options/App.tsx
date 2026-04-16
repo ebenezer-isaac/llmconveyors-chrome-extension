@@ -45,7 +45,7 @@ function OptionsBody(): React.ReactElement {
           If the page does not load,{' '}
           <a
             href={settingsUrl}
-            className="text-brand-500 underline"
+            className="text-zinc-700 underline dark:text-zinc-300"
             target="_top"
           >
             click here

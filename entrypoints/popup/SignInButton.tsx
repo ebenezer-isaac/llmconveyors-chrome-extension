@@ -14,7 +14,7 @@ export function SignInButton({ onClick, disabled = false }: SignInButtonProps): 
       data-testid="sign-in-button"
       onClick={onClick}
       disabled={disabled}
-      className="mt-3 w-full rounded-card bg-brand-500 py-2 text-sm font-medium text-white hover:bg-brand-900 disabled:cursor-not-allowed disabled:opacity-60"
+      className="mt-3 w-full rounded-card bg-zinc-900 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
     >
       {t('signIn_buttonLabel')}
     </button>

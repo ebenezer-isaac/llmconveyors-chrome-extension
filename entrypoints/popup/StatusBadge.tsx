@@ -223,18 +223,18 @@ export function StatusBadge({
       data-vendor={vendorAttr}
       data-page-kind={pageKindAttr}
       data-method={status.method ?? ''}
-      className="flex flex-col gap-1 rounded-card border border-brand-500 bg-brand-50 px-3 py-2 dark:border-brand-500 dark:bg-brand-900"
+      className="flex flex-col gap-1 rounded-card border border-emerald-500 bg-emerald-50 px-3 py-2 dark:border-emerald-400 dark:bg-emerald-900/30"
     >
       <div className="flex items-center justify-between gap-2">
         <span
           data-testid="intent-vendor"
-          className="text-[10px] font-semibold uppercase tracking-wide text-brand-900 dark:text-brand-50"
+          className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200"
         >
           {status.vendor}
         </span>
         <span
           data-testid="intent-page-kind"
-          className="rounded-pill bg-white px-2 py-0.5 text-[10px] font-medium text-brand-900 dark:bg-zinc-900 dark:text-brand-50"
+          className="rounded-pill bg-white px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-zinc-900 dark:text-emerald-200"
         >
           {status.pageKind}
         </span>
@@ -242,7 +242,7 @@ export function StatusBadge({
       {hasExtract ? (
         <div
           data-testid="intent-extract"
-          className="flex flex-col gap-0.5 text-xs text-brand-900 dark:text-brand-50"
+          className="flex flex-col gap-0.5 text-xs text-zinc-800 dark:text-zinc-100"
         >
           {status.company !== null ? (
             <span data-testid="intent-extract-company" className="font-semibold">
@@ -250,7 +250,7 @@ export function StatusBadge({
             </span>
           ) : null}
           {status.jobTitle !== null ? (
-            <span data-testid="intent-extract-title" className="text-brand-900/80 dark:text-brand-50/80">
+            <span data-testid="intent-extract-title" className="text-zinc-600 dark:text-zinc-300">
               {status.jobTitle}
             </span>
           ) : null}

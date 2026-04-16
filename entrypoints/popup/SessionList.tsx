@@ -59,7 +59,7 @@ function statusClasses(status: SessionListItem['status']): string {
       return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100';
     case 'active':
     default:
-      return 'bg-brand-100 text-brand-900 dark:bg-brand-900 dark:text-brand-50';
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200';
   }
 }
 
@@ -204,7 +204,7 @@ export function SessionList({
           type="button"
           data-testid="session-list-dashboard-link"
           onClick={() => openDashboard(activeAgentId)}
-          className="text-xs font-medium text-brand-600 underline hover:text-brand-700 dark:text-brand-400"
+          className="text-xs font-medium text-zinc-700 underline hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
         >
           {t('sessionList_viewAll')}
         </button>

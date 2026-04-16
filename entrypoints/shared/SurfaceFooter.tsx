@@ -14,6 +14,7 @@ import React from 'react';
 import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 import { getTierLabel, formatCredits } from '@/entrypoints/popup/useCredits';
 import { t } from '@/src/shared/i18n';
+import { Spinner } from './Spinner';
 
 export interface SurfaceFooterProps {
   readonly credits: ClientCreditsSnapshot | null;
@@ -56,8 +57,10 @@ function CreditsChip({
         data-testid="credits-remaining"
         data-state="loading"
         aria-busy="true"
-        className="llmc-shimmer inline-block h-4 w-20 rounded-pill bg-zinc-100 dark:bg-zinc-800"
-      />
+        className="inline-flex items-center"
+      >
+        <Spinner size="sm" inline />
+      </span>
     );
   }
 
@@ -90,10 +93,6 @@ function CreditsChip({
       className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-700 dark:text-zinc-200"
       title={tierLabel}
     >
-      <span
-        aria-hidden="true"
-        className="inline-block h-1.5 w-1.5 rounded-pill bg-brand-500"
-      />
       <span>{t('credits_remaining', [displayCredits])}</span>
     </span>
   );
@@ -115,7 +114,7 @@ export function SurfaceFooter({
     <footer
       data-testid="popup-footer"
       data-surface="footer"
-      className="mt-auto flex shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[10px] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+      className="mt-auto flex shrink-0 items-center justify-between border-t border-zinc-200 bg-white px-3 py-1.5 text-[10px] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400"
     >
       <span className="inline-flex items-center gap-1">
         <span data-testid="popup-version">v{version}</span>
@@ -126,7 +125,7 @@ export function SurfaceFooter({
               type="button"
               data-testid="surface-footer-get-credits"
               onClick={onGetCredits}
-              className="text-brand-600 hover:underline dark:text-brand-400"
+              className="text-zinc-700 hover:underline dark:text-zinc-300"
             >
               Get credits
             </button>

@@ -68,7 +68,7 @@ function statusColor(status: GenerationUpdateBroadcast['status']): string {
       return 'bg-amber-500';
     case 'running':
     default:
-      return 'bg-brand-500';
+      return 'bg-blue-500';
   }
 }
 
@@ -278,7 +278,7 @@ export function GenerationView({
               type="button"
               data-testid="open-in-dashboard"
               onClick={() => openDashboard(generationId, activeAgentType)}
-              className="rounded-card bg-brand-500 px-3 py-1 text-xs font-medium text-white hover:bg-brand-600"
+              className="rounded-card bg-zinc-900 px-3 py-1 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
             >
               View in dashboard -&gt;
             </button>

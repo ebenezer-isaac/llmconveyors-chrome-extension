@@ -121,7 +121,7 @@ function SidepanelBody(): React.ReactElement {
   const { agents, activeAgentId, setActiveAgent, loading, error } = useAgentPreference();
   const { state: authState, signOut, loading: authLoading } = useAuthState();
   const { credits, loading: creditsLoading, error: creditsError } = useCredits();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const { tabId } = useTargetTabId();
 
   const agent = useMemo(
@@ -218,6 +218,7 @@ function SidepanelBody(): React.ReactElement {
         signOutDisabled={authLoading}
         credits={credits}
         profile={profile}
+        profileLoading={profileLoading}
         accentHeader={accent.header}
       />
       {showLoading ? (

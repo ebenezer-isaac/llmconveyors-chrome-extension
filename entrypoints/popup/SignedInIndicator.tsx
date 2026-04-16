@@ -16,7 +16,7 @@ export function SignedInIndicator({
     <div className="mt-3 space-y-3">
       <div
         data-testid="signed-in-indicator"
-        className="rounded-card border border-brand-500 bg-brand-50 px-3 py-2 text-sm text-brand-900 dark:border-brand-500 dark:bg-brand-900 dark:text-brand-50"
+        className="rounded-card border border-emerald-500 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-400 dark:bg-emerald-900/30 dark:text-emerald-100"
       >
         Signed in as <span className="font-medium">{userId}</span>
       </div>

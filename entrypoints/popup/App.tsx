@@ -36,7 +36,7 @@ function PopupBody(): React.ReactElement {
     useAuthState();
   const { intent, tabId, loading: intentLoading } = useIntent();
   const { credits, loading: creditsLoading, error: creditsError } = useCredits();
-  const { profile } = useProfile();
+  const { profile, loading: profileLoading } = useProfile();
   const {
     agents,
     activeAgentId,
@@ -78,6 +78,7 @@ function PopupBody(): React.ReactElement {
         signOutDisabled={authLoading}
         credits={credits}
         profile={profile}
+        profileLoading={profileLoading}
       />
 
       <div className="flex flex-1 flex-col gap-3 p-3">
