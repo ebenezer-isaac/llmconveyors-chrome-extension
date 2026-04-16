@@ -436,9 +436,3 @@ export function __resetRegistration(): void {
   registered = false;
   handlersSingleton = null;
 }
-
-// Side-effect register on module import. Integration tests rely on this so a
-// plain `await import(REGISTER_HANDLERS_MODULE)` wires the listener against
-// the fake runtime with no additional step. The entrypoint calls
-// `registerHandlers()` explicitly and the flag makes that call idempotent.
-registerHandlers();
