@@ -10,9 +10,23 @@ import { useSessionList } from './useSessionList';
 import type { SessionListItem } from '@/src/background/messaging/schemas/session-list.schema';
 import { clientEnv } from '@/src/shared/env';
 import { t } from '@/src/shared/i18n';
+import { AGENT_REGISTRY, buildAgentUrl } from '@/src/background/agents/agent-registry';
+import type { AgentId } from '@/src/background/agents';
 
-function dashboardUrl(): string {
-  return `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}/dashboard`;
+function dashboardUrl(agentId: AgentId | null): string {
+  // Scope "View all" to the agent-specific dashboard so the link lands
+  // on the right surface (job-hunt.llmconveyors.com / b2b-sales....)
+  // instead of the legacy /dashboard route that 404s.
+  const fallback = `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}`;
+  if (agentId === null) return fallback;
+  const agent = AGENT_REGISTRY[agentId];
+  if (!agent) return fallback;
+  return (
+    buildAgentUrl(agent, 'dashboard', {
+      rootDomain: clientEnv.rootDomain,
+      locale: clientEnv.defaultLocale,
+    }) ?? fallback
+  );
 }
 
 function statusLabel(status: SessionListItem['status']): string {
@@ -111,8 +125,8 @@ function openSessionInSidePanel(sessionId: string): void {
   }
 }
 
-function openDashboard(): void {
-  const url = dashboardUrl();
+function openDashboard(agentId: AgentId | null): void {
+  const url = dashboardUrl(agentId);
   const g = globalThis as unknown as {
     chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
   };
@@ -157,7 +171,7 @@ export function SessionList({
         <button
           type="button"
           data-testid="session-list-dashboard-link"
-          onClick={openDashboard}
+          onClick={() => openDashboard(activeAgentId)}
           className="text-xs font-medium text-brand-600 underline hover:text-brand-700 dark:text-brand-400"
         >
           {t('sessionList_viewAll')}
