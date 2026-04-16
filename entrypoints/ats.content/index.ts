@@ -28,7 +28,6 @@ export default defineContentScript({
     'https://*.greenhouse.io/*',
     'https://jobs.lever.co/*',
     'https://*.myworkdayjobs.com/*',
-    'http://localhost:5174/*',
   ],
   runAt: 'document_idle',
   world: 'ISOLATED',
