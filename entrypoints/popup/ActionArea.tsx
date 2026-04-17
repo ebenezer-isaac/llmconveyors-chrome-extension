@@ -25,6 +25,7 @@ export interface ActionAreaProps {
   readonly genericCompany: string | null;
   readonly genericJobTitle: string | null;
   readonly credits: ClientCreditsSnapshot | null;
+  readonly boundSessionTitle?: string | null;
 }
 
 export function ActionArea({
@@ -38,6 +39,7 @@ export function ActionArea({
   genericCompany,
   genericJobTitle,
   credits,
+  boundSessionTitle = null,
 }: ActionAreaProps): React.ReactElement | null {
   if (!signedIn) return null;
   if (activeAgentId === 'b2b-sales') {
@@ -54,6 +56,7 @@ export function ActionArea({
       genericCompany={genericCompany}
       genericJobTitle={genericJobTitle}
       credits={credits}
+      boundSessionTitle={boundSessionTitle}
     />
   );
 }

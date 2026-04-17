@@ -13,7 +13,7 @@
  *   Footer
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAuthState } from './useAuthState';
 import { useIntent } from './useIntent';
 import { useCredits } from './useCredits';
@@ -55,24 +55,26 @@ function PopupBody(): React.ReactElement {
     agentId: activeAgentId,
   });
 
-  // Auto-open sidepanel when a URL-bound session exists for this page.
-  // The popup opening is itself a user gesture, so sidePanel.open() works.
-  const autoOpenedRef = useRef(false);
+  // Check if a URL-bound session exists for this page.
+  const [boundSessionTitle, setBoundSessionTitle] = useState<string | null>(null);
+  const boundCheckRef = useRef(false);
   useEffect(() => {
-    if (!signedIn || activeAgentId === null || tabUrl === null || autoOpenedRef.current) return;
+    if (!signedIn || activeAgentId === null || tabUrl === null || boundCheckRef.current) return;
     if (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) return;
     const runtime = (globalThis as unknown as {
       chrome?: { runtime?: { sendMessage: (m: unknown) => Promise<unknown> } };
     }).chrome?.runtime;
     if (!runtime) return;
-    autoOpenedRef.current = true;
+    boundCheckRef.current = true;
     void (async () => {
       const binding = await runtime.sendMessage({
         key: 'SESSION_BINDING_GET',
         data: { url: tabUrl, agentId: activeAgentId },
       });
       if (binding !== null && typeof binding === 'object') {
-        // Bound session exists for this page -- open sidepanel automatically
+        const b = binding as { pageTitle?: string; sessionId?: string };
+        setBoundSessionTitle(b.pageTitle ?? b.sessionId?.slice(0, 8) ?? 'Session');
+        // Auto-open sidepanel to show bound session artifacts
         const g = globalThis as unknown as {
           chrome?: {
             sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
@@ -149,6 +151,7 @@ function PopupBody(): React.ReactElement {
             genericCompany={genericIntent.company}
             genericJobTitle={genericIntent.jobTitle}
             credits={credits}
+            boundSessionTitle={boundSessionTitle}
           />
         ) : (
           <section

@@ -32,6 +32,35 @@ export interface JobHunterActionsProps {
   readonly genericCompany: string | null;
   readonly genericJobTitle: string | null;
   readonly credits: ClientCreditsSnapshot | null;
+  /** Non-null when a URL-bound session already exists for this page. */
+  readonly boundSessionTitle?: string | null;
+}
+
+/** Open the sidepanel on the active tab (best-effort). */
+function openSidepanel(): void {
+  const g = globalThis as unknown as {
+    chrome?: {
+      sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
+      tabs?: {
+        query: (opts: { active: boolean; currentWindow: boolean }) => Promise<Array<{ id?: number }>>;
+      };
+    };
+  };
+  void (async () => {
+    try {
+      const tabs = g.chrome?.tabs;
+      const sp = g.chrome?.sidePanel;
+      if (tabs && sp) {
+        const list = await tabs.query({ active: true, currentWindow: true });
+        const tid = list[0]?.id;
+        if (typeof tid === 'number') {
+          await sp.open({ tabId: tid });
+        }
+      }
+    } catch {
+      // best-effort
+    }
+  })();
 }
 
 export function JobHunterActions({
@@ -43,6 +72,7 @@ export function JobHunterActions({
   genericCompany,
   genericJobTitle,
   credits,
+  boundSessionTitle = null,
 }: JobHunterActionsProps): React.ReactElement {
   const isJobPosting = intent?.pageKind === 'job-posting' && intent.kind !== 'unknown';
   const isApplicationForm =
@@ -80,21 +110,49 @@ export function JobHunterActions({
       data-agent="job-hunter"
       className="flex flex-col gap-2 rounded-card border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
     >
-      <GenerateButton
-        agentId="job-hunter"
-        disabled={!jdAvailable}
-        disabledReason={generateDisabledReason}
-        primaryLabel="Generate CV + Cover Letter"
-        payload={{
-          kind: 'job-hunter',
-          jobDescription: generateJdText,
-          companyName: generateCompany,
-          jobTitle: generateTitle,
-          companyWebsite,
-        }}
-        tabUrl={tabUrl}
-        pageTitle={generateTitle ?? generateCompany ?? null}
-      />
+      {boundSessionTitle !== null ? (
+        <>
+          <button
+            type="button"
+            data-testid="view-results-btn"
+            onClick={openSidepanel}
+            className="w-full rounded-card bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 dark:bg-emerald-700 dark:hover:bg-emerald-600"
+          >
+            View Results
+          </button>
+          <GenerateButton
+            agentId="job-hunter"
+            disabled={!jdAvailable}
+            disabledReason={generateDisabledReason}
+            primaryLabel="Regenerate"
+            payload={{
+              kind: 'job-hunter',
+              jobDescription: generateJdText,
+              companyName: generateCompany,
+              jobTitle: generateTitle,
+              companyWebsite,
+            }}
+            tabUrl={tabUrl}
+            pageTitle={generateTitle ?? generateCompany ?? null}
+          />
+        </>
+      ) : (
+        <GenerateButton
+          agentId="job-hunter"
+          disabled={!jdAvailable}
+          disabledReason={generateDisabledReason}
+          primaryLabel="Generate CV + Cover Letter"
+          payload={{
+            kind: 'job-hunter',
+            jobDescription: generateJdText,
+            companyName: generateCompany,
+            jobTitle: generateTitle,
+            companyWebsite,
+          }}
+          tabUrl={tabUrl}
+          pageTitle={generateTitle ?? generateCompany ?? null}
+        />
+      )}
       {isApplicationForm ? (
         <FillButton
           disabled={false}
