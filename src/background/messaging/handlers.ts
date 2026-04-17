@@ -590,12 +590,39 @@ export function createHandlers(deps: HandlerDeps): Handlers {
         files: ['content-scripts/ats.js'],
       });
       // Give the content script time to initialize and register listeners.
-      await new Promise((r) => setTimeout(r, 500));
+      // Increased from 500ms to 1000ms to account for frame transitions after signin.
+      await new Promise((r) => setTimeout(r, 1000));
     } catch (err) {
-      log.warn('HIGHLIGHT_APPLY: scripting.executeScript failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return { ok: false, reason: 'api-error' };
+      const errMessage = err instanceof Error ? err.message : String(err);
+      // Detect frame-removal errors (frame was destroyed/reloaded during injection).
+      // These are recoverable if we retry, so don't fail immediately.
+      const isFrameRemovalError = errMessage.includes('Frame with ID') || 
+                                  errMessage.includes('Inspected target page');
+      if (isFrameRemovalError) {
+        log.info('HIGHLIGHT_APPLY: frame removed during injection, will retry once', { 
+          tabId,
+          error: errMessage,
+        });
+        // Wait a bit longer for the frame to stabilize, then try injection again.
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            files: ['content-scripts/ats.js'],
+          });
+          await new Promise((r) => setTimeout(r, 500));
+        } catch (retryErr) {
+          log.warn('HIGHLIGHT_APPLY: injection retry failed', {
+            error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+          });
+          return { ok: false, reason: 'api-error' };
+        }
+      } else {
+        log.warn('HIGHLIGHT_APPLY: scripting.executeScript failed', {
+          error: errMessage,
+        });
+        return { ok: false, reason: 'api-error' };
+      }
     }
 
     // Retry after injection.
