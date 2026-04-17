@@ -14,7 +14,7 @@
 
 import React from 'react';
 import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
-import { getTierLabel } from '@/entrypoints/popup/useCredits';
+import { getTierLabel, formatCredits } from '@/entrypoints/popup/useCredits';
 import { Spinner } from './Spinner';
 
 export interface SurfaceFooterProps {
@@ -80,23 +80,35 @@ function TierPill({
     ? 'border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/30 dark:text-purple-200'
     : 'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200';
 
+  const rawCredits = credits?.credits ?? 0;
+  const safeCredits =
+    Number.isFinite(rawCredits) && rawCredits > 0 ? Math.floor(rawCredits) : 0;
+
   return (
     <span
       data-testid="tier-pill"
       data-state="ready"
       data-tier={isByo ? 'byo' : 'free'}
-      className={`inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${classes}`}
-      title={label}
+      data-balance={String(safeCredits)}
+      className="inline-flex items-center gap-1.5 text-[10px]"
     >
       <span
-        aria-hidden="true"
-        className={`inline-block h-1.5 w-1.5 rounded-pill ${
-          isByo
-            ? 'bg-purple-500 dark:bg-purple-300'
-            : 'bg-zinc-400 dark:bg-zinc-500'
-        }`}
-      />
-      {label}
+        className={`inline-flex items-center gap-1 rounded-pill border px-2 py-0.5 font-semibold uppercase tracking-wide ${classes}`}
+        title={label}
+      >
+        <span
+          aria-hidden="true"
+          className={`inline-block h-1.5 w-1.5 rounded-pill ${
+            isByo
+              ? 'bg-purple-500 dark:bg-purple-300'
+              : 'bg-zinc-400 dark:bg-zinc-500'
+          }`}
+        />
+        {label}
+      </span>
+      <span className="font-medium text-zinc-600 dark:text-zinc-300">
+        {formatCredits(safeCredits)} credits
+      </span>
     </span>
   );
 }
