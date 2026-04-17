@@ -571,17 +571,23 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
     const tabId = parsed.data.tabId;
     const message = { key: 'HIGHLIGHT_APPLY' as const, data: parsed.data };
+    log.info('HIGHLIGHT_APPLY: received popup request', { tabId });
 
     // First attempt: forward to the content script already loaded on ATS pages.
     try {
       const resp = await deps.broadcast.sendToTab(tabId, message);
       if (resp && typeof resp === 'object') {
+        log.info('HIGHLIGHT_APPLY: tab forward succeeded without injection', { tabId });
         return resp as Awaited<ReturnType<HandlerFor<'HIGHLIGHT_APPLY'>>>;
       }
-    } catch {
+      log.warn('HIGHLIGHT_APPLY: tab forward returned non-object, injecting', { tabId });
+    } catch (err) {
       // Content script not loaded on this tab (non-ATS page).
       // Inject programmatically via chrome.scripting (requires activeTab).
-      log.info('HIGHLIGHT_APPLY: content script not loaded, injecting', { tabId });
+      log.info('HIGHLIGHT_APPLY: tab forward failed, injecting content script', {
+        tabId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     try {
@@ -592,14 +598,16 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       // Give the content script time to initialize and register listeners.
       // Increased from 500ms to 1000ms to account for frame transitions after signin.
       await new Promise((r) => setTimeout(r, 1000));
+      log.info('HIGHLIGHT_APPLY: content script injection succeeded', { tabId });
     } catch (err) {
       const errMessage = err instanceof Error ? err.message : String(err);
       // Detect frame-removal errors (frame was destroyed/reloaded during injection).
       // These are recoverable if we retry, so don't fail immediately.
-      const isFrameRemovalError = errMessage.includes('Frame with ID') || 
-                                  errMessage.includes('Inspected target page');
+      const isFrameRemovalError =
+        errMessage.includes('Frame with ID') ||
+        errMessage.includes('Inspected target page');
       if (isFrameRemovalError) {
-        log.info('HIGHLIGHT_APPLY: frame removed during injection, will retry once', { 
+        log.info('HIGHLIGHT_APPLY: frame removed during injection, will retry once', {
           tabId,
           error: errMessage,
         });
@@ -611,14 +619,17 @@ export function createHandlers(deps: HandlerDeps): Handlers {
             files: ['content-scripts/ats.js'],
           });
           await new Promise((r) => setTimeout(r, 500));
+          log.info('HIGHLIGHT_APPLY: content script retry injection succeeded', { tabId });
         } catch (retryErr) {
           log.warn('HIGHLIGHT_APPLY: injection retry failed', {
+            tabId,
             error: retryErr instanceof Error ? retryErr.message : String(retryErr),
           });
           return { ok: false, reason: 'api-error' };
         }
       } else {
         log.warn('HIGHLIGHT_APPLY: scripting.executeScript failed', {
+          tabId,
           error: errMessage,
         });
         return { ok: false, reason: 'api-error' };
@@ -629,11 +640,16 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     try {
       const resp = await deps.broadcast.sendToTab(tabId, message);
       if (!resp || typeof resp !== 'object') {
+        log.warn('HIGHLIGHT_APPLY: post-injection forward returned non-object', {
+          tabId,
+        });
         return { ok: false, reason: 'api-error' };
       }
+      log.info('HIGHLIGHT_APPLY: post-injection forward succeeded', { tabId });
       return resp as Awaited<ReturnType<HandlerFor<'HIGHLIGHT_APPLY'>>>;
     } catch (err) {
       log.warn('HIGHLIGHT_APPLY: forward failed after injection', {
+        tabId,
         error: String(err),
       });
       return { ok: false, reason: 'api-error' };

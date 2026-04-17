@@ -8,26 +8,25 @@
 import React, { useMemo, useState } from 'react';
 import { useSessionList } from './useSessionList';
 import type { SessionListItem } from '@/src/background/messaging/schemas/session-list.schema';
+import { createLogger } from '@/src/background/log';
 import { clientEnv } from '@/src/shared/env';
 import { t } from '@/src/shared/i18n';
-import { AGENT_REGISTRY, buildAgentUrl } from '@/src/background/agents/agent-registry';
+import { AGENT_REGISTRY } from '@/src/background/agents/agent-registry';
 import type { AgentId } from '@/src/background/agents';
 import { writeSelectedSession } from '@/src/background/sessions/session-selection';
 
+const log = createLogger('popup:session-list');
+
 function dashboardUrl(agentId: AgentId | null): string {
-  // Scope "View all" to the agent-specific dashboard so the link lands
-  // on the right surface (job-hunt.llmconveyors.com / b2b-sales....)
-  // instead of the legacy /dashboard route that 404s.
+  // Keep "View all" on the main web origin so the active SuperTokens
+  // session cookie jar is reused. Crossing to subdomains can trigger
+  // auth redirect loops when cookies are host-scoped.
   const fallback = `${clientEnv.webBaseUrl}/${clientEnv.defaultLocale}`;
   if (agentId === null) return fallback;
   const agent = AGENT_REGISTRY[agentId];
   if (!agent) return fallback;
-  return (
-    buildAgentUrl(agent, 'dashboard', {
-      rootDomain: clientEnv.rootDomain,
-      locale: clientEnv.defaultLocale,
-    }) ?? fallback
-  );
+  const route = agent.routePath.startsWith('/') ? agent.routePath : `/${agent.routePath}`;
+  return `${fallback}${route}`;
 }
 
 function statusLabel(status: SessionListItem['status']): string {
@@ -98,6 +97,10 @@ export interface SessionListProps {
 async function selectSessionAndOpenSidepanel(
   item: SessionListItem,
 ): Promise<void> {
+  log.info('SESSION_SELECT: requested', {
+    sessionId: item.sessionId,
+    agentId: item.agentType,
+  });
   const g = globalThis as unknown as {
     chrome?: {
       sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
@@ -131,11 +134,19 @@ async function selectSessionAndOpenSidepanel(
     agentId: item.agentType,
     ...(activeTabUrl !== undefined ? { tabUrl: activeTabUrl } : {}),
   });
+  log.info('SESSION_SELECT: persisted selected session', {
+    sessionId: item.sessionId,
+    tabUrl: activeTabUrl,
+  });
 
   const sp = g.chrome?.sidePanel;
   if (sp && activeTabId !== undefined) {
     try {
       await sp.open({ tabId: activeTabId });
+      log.info('SESSION_SELECT: sidepanel opened', {
+        tabId: activeTabId,
+        sessionId: item.sessionId,
+      });
       // Close the popup once the sidepanel is the active surface for
       // this session. Popup + sidepanel competing for focus is a
       // confusing UX -- they never need to be open together.
@@ -144,12 +155,21 @@ async function selectSessionAndOpenSidepanel(
       } catch {
         // window.close is a no-op in some test contexts; safe to ignore.
       }
-    } catch {
+    } catch (err: unknown) {
+      log.warn('SESSION_SELECT: sidepanel open failed', {
+        sessionId: item.sessionId,
+        tabId: activeTabId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       // User-gesture constraints can throw; the broadcast already fired.
     }
     return;
   }
   const fallbackUrl = dashboardUrl(item.agentType);
+  log.info('SESSION_SELECT: sidepanel unavailable, opening dashboard fallback', {
+    fallbackUrl,
+    sessionId: item.sessionId,
+  });
   if (tabs?.create) {
     tabs.create({ url: fallbackUrl });
   } else {
@@ -159,11 +179,17 @@ async function selectSessionAndOpenSidepanel(
 
 function openDashboard(agentId: AgentId | null): void {
   const url = dashboardUrl(agentId);
+  log.info('SESSION_LIST_VIEW_ALL: opening dashboard', { url, agentId });
   const g = globalThis as unknown as {
     chrome?: { tabs?: { create?: (opts: { url: string }) => void } };
   };
   if (g.chrome?.tabs?.create) {
     g.chrome.tabs.create({ url });
+    try {
+      (globalThis as { window?: Window }).window?.close();
+    } catch {
+      // window.close can be a no-op in some harnesses.
+    }
   } else {
     window.open(url, '_blank', 'noopener');
   }

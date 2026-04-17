@@ -25,11 +25,14 @@ import { ActionArea } from './ActionArea';
 import { StatusBadge } from './StatusBadge';
 import { SessionList } from './SessionList';
 import { ErrorBoundary } from './ErrorBoundary';
+import { createLogger } from '@/src/background/log';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 import { SurfaceHeader } from '@/entrypoints/shared/SurfaceHeader';
 import { SurfaceFooter } from '@/entrypoints/shared/SurfaceFooter';
 
 import { useActiveTabUrl } from './useActiveTabUrl';
+
+const log = createLogger('popup:app');
 
 function PopupBody(): React.ReactElement {
   const { state: authState, loading: authLoading, error: authError, signIn, signOut } =
@@ -51,53 +54,75 @@ function PopupBody(): React.ReactElement {
   const genericIntent = useGenericIntent({
     enabled: signedIn && activeAgentId !== null,
     tabId,
+    tabUrl,
     adapterIntent: intent,
     agentId: activeAgentId,
   });
 
   // Check if a URL-bound session exists for this page.
   const [boundSessionTitle, setBoundSessionTitle] = useState<string | null>(null);
-  const boundCheckRef = useRef(false);
+  const lastBindingLookupRef = useRef<string>('');
   useEffect(() => {
-    if (!signedIn || activeAgentId === null || tabUrl === null || boundCheckRef.current) return;
-    if (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) return;
+    if (!signedIn || activeAgentId === null || tabUrl === null) {
+      setBoundSessionTitle(null);
+      if (!signedIn) {
+        lastBindingLookupRef.current = '';
+      }
+      return;
+    }
+    if (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) {
+      setBoundSessionTitle(null);
+      return;
+    }
+    const lookupKey = `${activeAgentId}:${tabUrl}`;
+    if (lastBindingLookupRef.current === lookupKey) return;
+
     const runtime = (globalThis as unknown as {
       chrome?: { runtime?: { sendMessage: (m: unknown) => Promise<unknown> } };
     }).chrome?.runtime;
-    if (!runtime) return;
-    boundCheckRef.current = true;
+    if (!runtime) {
+      setBoundSessionTitle(null);
+      return;
+    }
+    lastBindingLookupRef.current = lookupKey;
+    let cancelled = false;
     void (async () => {
-      const binding = await runtime.sendMessage({
-        key: 'SESSION_BINDING_GET',
-        data: { url: tabUrl, agentId: activeAgentId },
-      });
-      if (binding !== null && typeof binding === 'object') {
-        const b = binding as { pageTitle?: string; sessionId?: string };
-        setBoundSessionTitle(b.pageTitle ?? b.sessionId?.slice(0, 8) ?? 'Session');
-        // Auto-open sidepanel to show bound session artifacts
-        const g = globalThis as unknown as {
-          chrome?: {
-            sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
-            tabs?: {
-              query: (opts: { active: boolean; currentWindow: boolean }) => Promise<Array<{ id?: number }>>;
-            };
-          };
-        };
-        try {
-          const tabs = g.chrome?.tabs;
-          const sp = g.chrome?.sidePanel;
-          if (tabs && sp) {
-            const list = await tabs.query({ active: true, currentWindow: true });
-            const tid = list[0]?.id;
-            if (typeof tid === 'number') {
-              await sp.open({ tabId: tid });
-            }
-          }
-        } catch {
-          // sidePanel.open may fail if no user gesture context
+      try {
+        const binding = await runtime.sendMessage({
+          key: 'SESSION_BINDING_GET',
+          data: { url: tabUrl, agentId: activeAgentId },
+        });
+        if (cancelled) return;
+
+        if (binding !== null && typeof binding === 'object') {
+          const b = binding as { pageTitle?: string; sessionId?: string };
+          const title = b.pageTitle ?? b.sessionId?.slice(0, 8) ?? 'Session';
+          setBoundSessionTitle(title);
+          log.info('SESSION_BINDING_GET: found bound session for tab', {
+            tabUrl,
+            agentId: activeAgentId,
+            sessionId: b.sessionId,
+          });
+        } else {
+          setBoundSessionTitle(null);
+          log.info('SESSION_BINDING_GET: no bound session for tab', {
+            tabUrl,
+            agentId: activeAgentId,
+          });
         }
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setBoundSessionTitle(null);
+        log.warn('SESSION_BINDING_GET: lookup failed', {
+          error: err instanceof Error ? err.message : String(err),
+          tabUrl,
+          agentId: activeAgentId,
+        });
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [signedIn, activeAgentId, tabUrl]);
 
   return (

@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentId } from '@/src/background/agents';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
+import { createLogger } from '@/src/background/log';
 
 type RuntimeMessenger = { sendMessage: (m: unknown) => Promise<unknown> };
 function getRuntime(): RuntimeMessenger | null {
@@ -24,6 +25,8 @@ function getRuntime(): RuntimeMessenger | null {
   };
   return g.chrome?.runtime ?? g.browser?.runtime ?? null;
 }
+
+const log = createLogger('popup:generic-intent');
 
 export interface UseGenericIntentResult {
   readonly hasJd: boolean;
@@ -36,80 +39,103 @@ export interface UseGenericIntentResult {
   readonly loading: boolean;
 }
 
+const EMPTY_RESULT: UseGenericIntentResult = {
+  hasJd: false,
+  hasCompany: false,
+  jdText: null,
+  method: null,
+  jobTitle: null,
+  company: null,
+  companySignals: [],
+  loading: false,
+};
+
 export function useGenericIntent(args: {
   readonly enabled: boolean;
   readonly tabId: number | null;
+  readonly tabUrl?: string | null;
   readonly adapterIntent: DetectedIntent | null;
   readonly agentId: AgentId | null;
 }): UseGenericIntentResult {
-  const [state, setState] = useState<UseGenericIntentResult>({
-    hasJd: false,
-    hasCompany: false,
-    jdText: null,
-    method: null,
-    jobTitle: null,
-    company: null,
-    companySignals: [],
-    loading: false,
-  });
+  const [state, setState] = useState<UseGenericIntentResult>(EMPTY_RESULT);
   const lastFetchedRef = useRef<string>('');
 
   useEffect(() => {
     if (!args.enabled || args.tabId === null || args.agentId === null) {
+      lastFetchedRef.current = '';
+      setState((prev) => (prev === EMPTY_RESULT ? prev : EMPTY_RESULT));
       return;
     }
+
+    const resolvedUrl =
+      (typeof args.tabUrl === 'string' && args.tabUrl.length > 0
+        ? args.tabUrl
+        : undefined) ??
+      (typeof args.adapterIntent?.url === 'string' && args.adapterIntent.url.length > 0
+        ? args.adapterIntent.url
+        : '');
+
+    const key = `${args.tabId}:${args.agentId}:${resolvedUrl}`;
+
     // If the adapter-based detector already found a match, don't bother.
     const adapterMatched =
       args.adapterIntent !== null && args.adapterIntent.kind !== 'unknown';
     if (adapterMatched) {
+      lastFetchedRef.current = key;
+      setState((prev) => (prev === EMPTY_RESULT ? prev : EMPTY_RESULT));
       return;
     }
-    const key = `${args.tabId}:${args.agentId}`;
     if (lastFetchedRef.current === key) return;
     lastFetchedRef.current = key;
 
     setState((prev) => ({ ...prev, loading: true }));
     const runtime = getRuntime();
     if (runtime === null) {
+      log.warn('GENERIC_INTENT_DETECT: runtime unavailable');
       setState((prev) => ({ ...prev, loading: false }));
       return;
     }
+    let cancelled = false;
+    const applyResult = (next: UseGenericIntentResult): void => {
+      if (cancelled) return;
+      if (lastFetchedRef.current !== key) return;
+      setState(next);
+    };
     const run = async (): Promise<void> => {
       try {
+        log.info('GENERIC_INTENT_DETECT: requesting scan', {
+          tabId: args.tabId ?? undefined,
+          agentId: args.agentId,
+          tabUrl: resolvedUrl || undefined,
+        });
         const raw = await runtime.sendMessage({
           key: 'GENERIC_INTENT_DETECT',
           data: { tabId: args.tabId, agent: args.agentId },
         });
         if (!raw || typeof raw !== 'object') {
-          setState({
-            hasJd: false,
-            hasCompany: false,
-            jdText: null,
-            method: null,
-            jobTitle: null,
-            company: null,
-            companySignals: [],
-            loading: false,
-          });
+          log.warn('GENERIC_INTENT_DETECT: empty/non-object response');
+          applyResult(EMPTY_RESULT);
           return;
         }
         const env = raw as Record<string, unknown>;
         if (env.ok !== true || !env.result || typeof env.result !== 'object') {
-          setState({
-            hasJd: false,
-            hasCompany: false,
-            jdText: null,
-            method: null,
-            jobTitle: null,
-            company: null,
-            companySignals: [],
-            loading: false,
+          log.info('GENERIC_INTENT_DETECT: no-match', {
+            reason: typeof env.reason === 'string' ? env.reason : 'unknown',
           });
+          applyResult(EMPTY_RESULT);
           return;
         }
         const result = env.result as Record<string, unknown>;
         if (result.kind === 'job-description') {
-          setState({
+          const detectedText = typeof result.text === 'string' ? result.text : '';
+          log.info('GENERIC_INTENT_DETECT: detected job description', {
+            method:
+              result.method === 'jsonld' || result.method === 'readability'
+                ? result.method
+                : 'unknown',
+            textLength: detectedText.length,
+          });
+          applyResult({
             hasJd: true,
             hasCompany: false,
             jdText: typeof result.text === 'string' ? result.text : null,
@@ -125,7 +151,10 @@ export function useGenericIntent(args: {
           return;
         }
         if (result.kind === 'company-page') {
-          setState({
+          log.info('GENERIC_INTENT_DETECT: detected company page', {
+            signalCount: Array.isArray(result.signals) ? result.signals.length : 0,
+          });
+          applyResult({
             hasJd: false,
             hasCompany: true,
             jdText: null,
@@ -139,31 +168,17 @@ export function useGenericIntent(args: {
           });
           return;
         }
-        setState({
-          hasJd: false,
-          hasCompany: false,
-          jdText: null,
-          method: null,
-          jobTitle: null,
-          company: null,
-          companySignals: [],
-          loading: false,
-        });
+        applyResult(EMPTY_RESULT);
       } catch {
-        setState({
-          hasJd: false,
-          hasCompany: false,
-          jdText: null,
-          method: null,
-          jobTitle: null,
-          company: null,
-          companySignals: [],
-          loading: false,
-        });
+        log.warn('GENERIC_INTENT_DETECT: request failed');
+        applyResult(EMPTY_RESULT);
       }
     };
     void run();
-  }, [args.enabled, args.tabId, args.agentId, args.adapterIntent]);
+    return () => {
+      cancelled = true;
+    };
+  }, [args.enabled, args.tabId, args.tabUrl, args.agentId, args.adapterIntent]);
 
   return state;
 }

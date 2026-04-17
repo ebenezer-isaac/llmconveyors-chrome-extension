@@ -155,6 +155,32 @@ function deriveDefaults(
   return { company, jobTitle, companyWebsite, jobDescription };
 }
 
+function hasDetectedJobDescription(
+  intent: DetectedIntent | null,
+  genericIntent: GenericIntentSeed | null,
+  tabUrl: string | null,
+): boolean {
+  const adapterDetected =
+    intent !== null &&
+    intent.kind !== 'unknown' &&
+    intent.pageKind === 'job-posting' &&
+    (() => {
+      if (!tabUrl || !intent.url) return true;
+      try {
+        const intentUrl = new URL(intent.url);
+        const currentUrl = new URL(tabUrl);
+        // Ignore hash-only drift; require host+path match to avoid stale intent.
+        return (
+          intentUrl.hostname === currentUrl.hostname &&
+          intentUrl.pathname === currentUrl.pathname
+        );
+      } catch {
+        return intent.url === tabUrl;
+      }
+    })();
+  return adapterDetected || genericIntent?.hasJd === true;
+}
+
 interface FormState {
   readonly activeAgentId: AgentId;
   readonly mode: Mode;
@@ -238,6 +264,10 @@ export function SidepanelGenerationFormProvider({
     () => deriveDefaults(intent, genericIntent, tabUrl, boundSession ?? null, locked),
     [intent, genericIntent, tabUrl, boundSession, locked],
   );
+  const jdDetected = useMemo(
+    () => hasDetectedJobDescription(intent, genericIntent, tabUrl),
+    [intent, genericIntent, tabUrl],
+  );
   const [mode, setMode] = useState<Mode>('standard');
   const [company, setCompany] = useState<string>(defaults.company);
   const [jobTitle, setJobTitle] = useState<string>(defaults.jobTitle);
@@ -263,6 +293,14 @@ export function SidepanelGenerationFormProvider({
     prevDefaultsRef.current = defaults;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaults]);
+
+  const lastDetectedJdRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!isJobHunter) return;
+    if (lastDetectedJdRef.current === jdDetected) return;
+    lastDetectedJdRef.current = jdDetected;
+    setMode(jdDetected ? 'standard' : 'cold_outreach');
+  }, [isJobHunter, jdDetected]);
 
   const isColdOutreach = mode === 'cold_outreach';
   const jobDescriptionRequired = !isColdOutreach;
@@ -532,7 +570,7 @@ export function SidepanelGenerationFields(): React.ReactElement {
       data-testid="sidepanel-generation-form"
       data-agent={s.activeAgentId}
       data-mode={s.mode}
-      className="border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+      className="bg-white dark:bg-zinc-900"
     >
       <header className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
         <div className="flex flex-col">

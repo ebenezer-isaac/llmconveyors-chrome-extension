@@ -1,4 +1,4 @@
-[sw] info: [llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {"keys":34}
+[sw] info: [llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {"keys":36}
 [sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: registered onChanged listener 
 [sw] info: [llmc-ext:bg] INFO service worker booted 
 [sw] info: [llmc-ext:bg] INFO installed 

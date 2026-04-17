@@ -149,9 +149,7 @@ describe('SidepanelGenerationForm adversarial', () => {
           tabUrl={null}
         />,
       );
-      // Flip to cold outreach to surface email field
-      const toggle = screen.getByTestId('sidepanel-form-mode-toggle');
-      fireEvent.click(toggle);
+      // No JD detected -> form auto-switches to cold_outreach mode.
       const email = screen.getByTestId(
         'sidepanel-form-contact-email',
       ) as HTMLInputElement;
@@ -214,8 +212,8 @@ describe('SidepanelGenerationForm adversarial', () => {
           tabUrl={null}
         />,
       );
+      // Starts in cold_outreach mode when no JD is detected.
       const toggle = screen.getByTestId('sidepanel-form-mode-toggle');
-      fireEvent.click(toggle); // -> cold_outreach
       fireEvent.change(screen.getByTestId('sidepanel-form-contact-name'), {
         target: { value: 'Jane' },
       });
@@ -225,7 +223,7 @@ describe('SidepanelGenerationForm adversarial', () => {
       fireEvent.change(screen.getByTestId('sidepanel-form-contact-email'), {
         target: { value: 'jane@example.com' },
       });
-      fireEvent.click(toggle); // -> standard
+      fireEvent.click(toggle); // cold_outreach -> standard
       const jd = screen.getByTestId('sidepanel-form-jd') as HTMLTextAreaElement;
       expect(jd.value).toContain('Additional outreach context');
       expect(jd.value).toContain('Jane');
@@ -243,14 +241,46 @@ describe('SidepanelGenerationForm adversarial', () => {
         />,
       );
       const toggle = screen.getByTestId('sidepanel-form-mode-toggle');
-      fireEvent.click(toggle); // -> cold
-      fireEvent.click(toggle); // -> standard (nothing to fold)
-      fireEvent.click(toggle); // -> cold again
+      fireEvent.click(toggle); // cold_outreach -> standard (nothing to fold)
+      fireEvent.click(toggle); // standard -> cold_outreach again
       // Contact fields are empty again; no duplicate fold
       const name = screen.getByTestId(
         'sidepanel-form-contact-name',
       ) as HTMLInputElement;
       expect(name.value).toBe('');
+    });
+  });
+
+  describe('auto mode switch from JD detection', () => {
+    it('switches from cold_outreach to standard when JD becomes available', () => {
+      const { rerender } = render(
+        <SidepanelGenerationForm
+          activeAgentId="job-hunter"
+          intent={null}
+          genericIntent={null}
+          tabUrl="https://example.com"
+        />,
+      );
+
+      const formSectionBefore = screen.getByTestId('sidepanel-generation-form');
+      expect(formSectionBefore.getAttribute('data-mode')).toBe('cold_outreach');
+
+      rerender(
+        <SidepanelGenerationForm
+          activeAgentId="job-hunter"
+          intent={null}
+          genericIntent={{
+            hasJd: true,
+            jdText: 'JD body',
+            jobTitle: 'Engineer',
+            company: 'Acme',
+          }}
+          tabUrl="https://example.com"
+        />,
+      );
+
+      const formSectionAfter = screen.getByTestId('sidepanel-generation-form');
+      expect(formSectionAfter.getAttribute('data-mode')).toBe('standard');
     });
   });
 

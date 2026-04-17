@@ -18,6 +18,7 @@
 import React from 'react';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
 import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
+import { createLogger } from '@/src/background/log';
 import { FillButton } from './FillButton';
 import { HighlightToggle } from './HighlightToggle';
 import { GenerateButton } from './GenerateButton';
@@ -36,31 +37,45 @@ export interface JobHunterActionsProps {
   readonly boundSessionTitle?: string | null;
 }
 
+const log = createLogger('popup:job-hunter-actions');
+
 /** Open the sidepanel on the active tab (best-effort). */
-function openSidepanel(): void {
+function openSidepanel(tabId: number | null): void {
   const g = globalThis as unknown as {
     chrome?: {
       sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
-      tabs?: {
-        query: (opts: { active: boolean; currentWindow: boolean }) => Promise<Array<{ id?: number }>>;
-      };
     };
   };
-  void (async () => {
-    try {
-      const tabs = g.chrome?.tabs;
-      const sp = g.chrome?.sidePanel;
-      if (tabs && sp) {
-        const list = await tabs.query({ active: true, currentWindow: true });
-        const tid = list[0]?.id;
-        if (typeof tid === 'number') {
-          await sp.open({ tabId: tid });
-        }
-      }
-    } catch {
-      // best-effort
+  log.info('VIEW_RESULTS: click', { tabId: tabId ?? undefined });
+  const sp = g.chrome?.sidePanel;
+  if (!sp) {
+    log.warn('VIEW_RESULTS: sidePanel API unavailable');
+  } else if (typeof tabId === 'number') {
+    // Fire-and-forget to keep the close call inside the click gesture path.
+    void sp
+      .open({ tabId })
+      .then(() => {
+        log.info('VIEW_RESULTS: sidepanel opened', { tabId });
+      })
+      .catch((err: unknown) => {
+        log.warn('VIEW_RESULTS: sidepanel open failed', {
+          error: err instanceof Error ? err.message : String(err),
+          tabId,
+        });
+      });
+  } else {
+    log.warn('VIEW_RESULTS: active tab unavailable');
+  }
+
+  try {
+    if (typeof globalThis.close === 'function') {
+      globalThis.close();
     }
-  })();
+    window.close();
+    log.info('VIEW_RESULTS: popup close requested');
+  } catch {
+    // window.close can be a no-op in some harnesses.
+  }
 }
 
 export function JobHunterActions({
@@ -115,7 +130,7 @@ export function JobHunterActions({
           <button
             type="button"
             data-testid="view-results-btn"
-            onClick={openSidepanel}
+            onClick={() => openSidepanel(tabId)}
             className="w-full rounded-card bg-emerald-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 dark:bg-emerald-700 dark:hover:bg-emerald-600"
           >
             View Results

@@ -213,10 +213,9 @@ function BoundSessionPanel(props: {
   readonly artifacts: readonly SessionArtifact[];
   /** False when this is the fallback "most recent" session (no URL binding). */
   readonly urlBound: boolean;
-  readonly accentBorder: string;
   readonly agentId: AgentId;
 }): React.ReactElement {
-  const { session, logs, artifacts, urlBound, accentBorder, agentId } = props;
+  const { session, logs, artifacts, urlBound, agentId } = props;
   const [autofill, setAutofill] = React.useState<AutofillOutcome>({ kind: 'idle' });
   const title =
     session.jobTitle ?? session.companyName ?? `Session ${session.sessionId.slice(0, 8)}`;
@@ -233,7 +232,7 @@ function BoundSessionPanel(props: {
       data-testid="bound-session-panel"
       data-session-id={session.sessionId}
       data-url-bound={urlBound ? 'true' : 'false'}
-      className={`flex flex-col gap-3 border-b p-4 ${accentBorder}`}
+      className="flex flex-col gap-3 p-4"
     >
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
@@ -329,6 +328,7 @@ function SidepanelBody(): React.ReactElement {
   const genericIntent = useGenericIntent({
     enabled: authState.signedIn && activeAgentId !== null,
     tabId,
+    tabUrl,
     adapterIntent: intent,
     agentId: activeAgentId,
   });
@@ -468,16 +468,15 @@ function SidepanelBody(): React.ReactElement {
         >
           <div className="flex flex-1 flex-col overflow-y-auto">
             {showBoundPanel && binding.session !== null ? (
-              <BoundSessionPanel
-                session={binding.session}
-                logs={binding.logs}
-                artifacts={binding.artifacts}
-                urlBound={
-                  binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
-                }
-                accentBorder={accent.border}
-                agentId={agent.id}
-              />
+                <BoundSessionPanel
+                  session={binding.session}
+                  logs={binding.logs}
+                  artifacts={binding.artifacts}
+                  urlBound={
+                    binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
+                  }
+                  agentId={agent.id}
+                />
             ) : null}
             <GenerationView
               activeAgentType={agentType}
@@ -509,7 +508,6 @@ function SidepanelBody(): React.ReactElement {
               urlBound={
                 binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
               }
-              accentBorder={accent.border}
               agentId={agent.id}
             />
           ) : null}

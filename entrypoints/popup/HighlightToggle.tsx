@@ -83,10 +83,12 @@ export function HighlightToggle({
     if (tabId === null) return;
     const runtime = getRuntime();
     if (runtime === null) {
+      log.warn('HIGHLIGHT_TOGGLE: runtime unavailable');
       setState({ kind: 'error', on: state.on, message: 'runtime unavailable' });
       return;
     }
     const wantOn = !state.on;
+    log.info('HIGHLIGHT_TOGGLE: click', { tabId, wantOn, currentOn: state.on });
     setState({ kind: 'pending', on: state.on });
     try {
       if (wantOn) {
@@ -95,12 +97,20 @@ export function HighlightToggle({
           data: { tabId },
         })) as HighlightApplyResponse | undefined;
         if (!response) {
+          log.warn('HIGHLIGHT_APPLY: empty response', { tabId });
           setState({ kind: 'error', on: state.on, message: 'no response' });
           return;
         }
         if (response.ok) {
+          log.info('HIGHLIGHT_APPLY: success', {
+            tabId,
+            keywordCount: response.keywordCount,
+            rangeCount: response.rangeCount,
+            tookMs: response.tookMs,
+          });
           setState({ kind: 'idle', on: true });
         } else {
+          log.warn('HIGHLIGHT_APPLY: failed', { tabId, reason: response.reason });
           setState({ kind: 'error', on: state.on, message: reasonLabel(response.reason) });
         }
       } else {
@@ -109,12 +119,15 @@ export function HighlightToggle({
           data: { tabId },
         })) as HighlightClearResponse | undefined;
         if (!response) {
+          log.warn('HIGHLIGHT_CLEAR: empty response', { tabId });
           setState({ kind: 'error', on: state.on, message: 'no response' });
           return;
         }
         if (response.ok) {
+          log.info('HIGHLIGHT_CLEAR: success', { tabId, cleared: response.cleared });
           setState({ kind: 'idle', on: false });
         } else {
+          log.warn('HIGHLIGHT_CLEAR: failed', { tabId, reason: response.reason });
           setState({
             kind: 'error',
             on: state.on,

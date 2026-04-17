@@ -121,6 +121,14 @@ export function createApplyHandler(
 
     const rawPageText = captureRawPageText(deps.document);
     const hasRawFallback = rawPageText.length >= 200;
+    log.info('HIGHLIGHT_APPLY: prepared page text', {
+      url,
+      rawPageTextLength: rawPageText.length,
+      hasRawFallback,
+      intentKind: intent.kind,
+      intentPageKind:
+        intent.kind === 'unknown' ? undefined : intent.pageKind,
+    });
 
     let cached = getJdCache(url);
     if (!cached) {
@@ -157,6 +165,11 @@ export function createApplyHandler(
       extractedText.length > 0
         ? extractedText
         : rawPageText.slice(0, LEGACY_TEXT_MAX);
+    log.info('HIGHLIGHT_APPLY: extraction summary', {
+      extractedTextLength: extractedText.length,
+      keywordTextLength: keywordText.length,
+      usingRawFallback: extractedText.length === 0 && keywordText.length > 0,
+    });
 
     if (keywordText.length === 0) {
       log.info('HIGHLIGHT_APPLY: empty JD text');
@@ -178,6 +191,11 @@ export function createApplyHandler(
         topK: TOP_K,
         ...(hasRawFallback ? { rawPageText } : {}),
         ...(hostname ? { hostname } : {}),
+      });
+      log.info('HIGHLIGHT_APPLY: KEYWORDS_EXTRACT completed', {
+        hostname,
+        sentRawPageText: hasRawFallback,
+        textLength: keywordText.length,
       });
     } catch (err: unknown) {
       log.warn('KEYWORDS_EXTRACT rejected', {

@@ -57,6 +57,7 @@ export function SidepanelActionPanel({
   const genericIntent = useGenericIntent({
     enabled: signedIn && activeAgentId !== null,
     tabId,
+    tabUrl,
     adapterIntent: intent,
     agentId: activeAgentId,
   });
