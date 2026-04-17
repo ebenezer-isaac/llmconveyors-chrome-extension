@@ -47,6 +47,17 @@ export interface FetchAuthedDeps {
    * rejects. Defaults to 10_000 ms.
    */
   readonly silentRetryCooldownMs?: number;
+  /**
+   * Called when fetchAuthed determines the user is no longer authenticated
+   * AFTER a silent-retry attempt has failed (i.e. the token is truly dead
+   * and the bridge cookie is also gone or invalid). The callback should
+   * clear the stored session and broadcast AUTH_STATE_CHANGED so the popup
+   * reacts (shows sign-in button, hides auth-gated UI).
+   *
+   * NOT called on the initial "no session stored" path because that is the
+   * expected cold-start state before the user clicks Sign In.
+   */
+  readonly onAuthFailed?: () => void;
 }
 
 export type FetchAuthedResult =
@@ -210,11 +221,13 @@ export function createFetchAuthed(deps: FetchAuthedDeps): FetchAuthed {
 
     const recovered = await attemptSilentRetry(url);
     if (!recovered) {
+      deps.onAuthFailed?.();
       return { kind: 'unauthenticated' };
     }
 
     const refreshed = await deps.sessionManager.getSession();
     if (refreshed === null) {
+      deps.onAuthFailed?.();
       return { kind: 'unauthenticated' };
     }
 
@@ -227,6 +240,7 @@ export function createFetchAuthed(deps: FetchAuthedDeps): FetchAuthed {
     }
 
     if (retryResponse.status === 401 || retryResponse.status === 403) {
+      deps.onAuthFailed?.();
       return { kind: 'unauthenticated' };
     }
     return { kind: 'ok', response: retryResponse };

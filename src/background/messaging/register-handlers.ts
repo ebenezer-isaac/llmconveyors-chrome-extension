@@ -135,6 +135,28 @@ function buildProductionDeps(): HandlerDeps {
     silentSignIn,
     logger: createLogger('bg.fetchAuthed'),
     now: () => Date.now(),
+    // When the token is confirmed dead (silent retry also failed), clear
+    // stored session + broadcast so the popup/sidepanel immediately
+    // flips to the signed-out state. Without this, a stale token leaves
+    // the user in a ghost-signed-in state where every action shows
+    // "signed-out" inline but the header still renders the avatar.
+    onAuthFailed: () => {
+      void (async () => {
+        try {
+          await clearSession();
+        } catch {
+          // best-effort
+        }
+        try {
+          await browser.runtime.sendMessage({
+            key: 'AUTH_STATE_CHANGED',
+            data: { signedIn: false },
+          });
+        } catch {
+          // no listener (popup/sidepanel closed)
+        }
+      })();
+    },
   });
 
   const chromeStorage = {
