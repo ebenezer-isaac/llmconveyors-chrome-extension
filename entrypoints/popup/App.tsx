@@ -13,7 +13,7 @@
  *   Footer
  */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuthState } from './useAuthState';
 import { useIntent } from './useIntent';
 import { useCredits } from './useCredits';
@@ -54,6 +54,49 @@ function PopupBody(): React.ReactElement {
     adapterIntent: intent,
     agentId: activeAgentId,
   });
+
+  // Auto-open sidepanel when a URL-bound session exists for this page.
+  // The popup opening is itself a user gesture, so sidePanel.open() works.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!signedIn || activeAgentId === null || tabUrl === null || autoOpenedRef.current) return;
+    if (!tabUrl.startsWith('http://') && !tabUrl.startsWith('https://')) return;
+    const runtime = (globalThis as unknown as {
+      chrome?: { runtime?: { sendMessage: (m: unknown) => Promise<unknown> } };
+    }).chrome?.runtime;
+    if (!runtime) return;
+    autoOpenedRef.current = true;
+    void (async () => {
+      const binding = await runtime.sendMessage({
+        key: 'SESSION_BINDING_GET',
+        data: { url: tabUrl, agentId: activeAgentId },
+      });
+      if (binding !== null && typeof binding === 'object') {
+        // Bound session exists for this page -- open sidepanel automatically
+        const g = globalThis as unknown as {
+          chrome?: {
+            sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
+            tabs?: {
+              query: (opts: { active: boolean; currentWindow: boolean }) => Promise<Array<{ id?: number }>>;
+            };
+          };
+        };
+        try {
+          const tabs = g.chrome?.tabs;
+          const sp = g.chrome?.sidePanel;
+          if (tabs && sp) {
+            const list = await tabs.query({ active: true, currentWindow: true });
+            const tid = list[0]?.id;
+            if (typeof tid === 'number') {
+              await sp.open({ tabId: tid });
+            }
+          }
+        } catch {
+          // sidePanel.open may fail if no user gesture context
+        }
+      }
+    })();
+  }, [signedIn, activeAgentId, tabUrl]);
 
   return (
     <div
