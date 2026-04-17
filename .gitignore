@@ -35,3 +35,8 @@ tests/e2e/fixture-server/.dist/
 
 # Orig
 .orig
+
+# Local dev artifacts
+*.png
+.mcp.json
+.playwright-mcp/

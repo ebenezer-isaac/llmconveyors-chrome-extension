@@ -54,6 +54,8 @@ export function registerHighlightHandlers(
         text: args.text,
         url: args.url,
         topK: args.topK,
+        ...(args.rawPageText ? { rawPageText: args.rawPageText } : {}),
+        ...(args.hostname ? { hostname: args.hostname } : {}),
       }) as Promise<KeywordsExtractResponse>;
     },
   });

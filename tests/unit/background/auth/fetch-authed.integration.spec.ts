@@ -94,7 +94,7 @@ function buildSessionManagerDeps(
 
 describe('integration: fetchAuthed + SessionManager (envelope tolerance)', () => {
   it('proactive refresh consumes enveloped { success, data: { ... } } body and uses new token', async () => {
-    let nowMs = 1_000_000;
+    const nowMs = 1_000_000;
     // Session expires in 10s (well inside the proactive window).
     const initial: StoredSession = {
       accessToken: 'old-at',

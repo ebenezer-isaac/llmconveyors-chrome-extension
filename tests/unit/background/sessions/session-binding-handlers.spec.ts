@@ -41,6 +41,7 @@ function baseDeps(bindings: HandlerDeps['sessions']['bindings']): HandlerDeps {
       authExchange: 'https://api.test/ex',
       authSignOut: 'https://api.test/out',
       extractSkills: 'https://api.test/sk',
+      extractJd: 'https://api.test/jd',
       settingsProfile: 'https://api.test/p',
       generationStart: 'https://api.test/gs',
       generationCancel: 'https://api.test/gc',

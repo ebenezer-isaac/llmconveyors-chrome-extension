@@ -5,8 +5,10 @@
  * Flow per A9:
  *   1. detectPageIntent(location, document) (read-only guard)
  *   2. If the page is unknown or an application-form, short-circuit.
- *   3. extractJobDescription(document) cached per-URL.
- *   4. sendMessage('KEYWORDS_EXTRACT', { text, url, topK }) to bg (A5).
+ *   3. extractJobDescription(document) cached per-URL; if empty/missing and
+ *      raw DOM text is available, fall back to raw text for extraction.
+ *   4. sendMessage('KEYWORDS_EXTRACT', { text, rawPageText, url, topK }) to
+ *      bg (A5).
  *   5. Zod-guard the response (D21).
  *   6. applyHighlights(document.body, terms) via the engine DOM adapter.
  *   7. Store cleanup + metadata for later HIGHLIGHT_CLEAR.
@@ -53,10 +55,34 @@ export interface ApplyHandlerDeps {
     readonly text: string;
     readonly url: string;
     readonly topK: number;
+    readonly rawPageText?: string;
+    readonly hostname?: string;
   }) => Promise<KeywordsExtractResponse>;
 }
 
+/**
+ * Collect raw visible text from the live DOM for the LLM extraction path.
+ * Clones the document so we can strip nav/aside/footer/script/style without
+ * mutating the page. Returns '' on any failure.
+ */
+function captureRawPageText(doc: Document): string {
+  const MAX = 100_000;
+  try {
+    const clone = doc.cloneNode(true) as Document;
+    clone
+      .querySelectorAll('script, style, noscript, nav, aside, footer, iframe')
+      .forEach((el) => el.remove());
+    const body = clone.body;
+    if (!body) return '';
+    const raw = body.innerText ?? body.textContent ?? '';
+    return raw.replace(/\s+\n/g, '\n').trim().slice(0, MAX);
+  } catch {
+    return '';
+  }
+}
+
 const TOP_K = 30;
+const LEGACY_TEXT_MAX = 50_000;
 
 export function createApplyHandler(
   deps: ApplyHandlerDeps,
@@ -73,11 +99,11 @@ export function createApplyHandler(
       document: deps.document,
     });
 
-    if (intent.kind === 'unknown') {
-      log.info('HIGHLIGHT_APPLY: no intent');
-      return { ok: false, reason: 'no-jd-on-page' };
-    }
-    if ('pageKind' in intent && intent.pageKind === 'application-form') {
+    // Only short-circuit on application-form pages when we positively
+    // identified them (known ATS). Unknown intent is expected for
+    // non-ATS pages like metacareers.com / stripe.com/jobs and we let
+    // extractJobDescription probe for JSON-LD / Readability content.
+    if (intent.kind !== 'unknown' && intent.pageKind === 'application-form') {
       log.info('HIGHLIGHT_APPLY: application-form, not a job posting');
       return { ok: false, reason: 'not-a-job-posting' };
     }
@@ -93,6 +119,9 @@ export function createApplyHandler(
       });
     }
 
+    const rawPageText = captureRawPageText(deps.document);
+    const hasRawFallback = rawPageText.length >= 200;
+
     let cached = getJdCache(url);
     if (!cached) {
       log.debug('JD cache miss, extracting');
@@ -103,32 +132,52 @@ export function createApplyHandler(
         log.warn('extractJobDescription threw', {
           err: err instanceof Error ? err.message : String(err),
         });
-        return { ok: false, reason: 'no-jd-on-page' };
+        if (!hasRawFallback) {
+          return { ok: false, reason: 'no-jd-on-page' };
+        }
+        log.info('HIGHLIGHT_APPLY: extractor failed, using raw-page fallback');
       }
-      if (result === null) {
+      if (result === null && !hasRawFallback) {
         log.info('HIGHLIGHT_APPLY: no JD on page');
         return { ok: false, reason: 'no-jd-on-page' };
       }
-      cached = {
-        text: result.text,
-        structured: result.structured,
-        method: result.method,
-        cachedAt: deps.now(),
-      };
-      setJdCache(url, cached);
+      if (result !== null) {
+        cached = {
+          text: result.text,
+          structured: result.structured,
+          method: result.method,
+          cachedAt: deps.now(),
+        };
+        setJdCache(url, cached);
+      }
     }
 
-    if (cached.text.length === 0) {
+    const extractedText = cached?.text ?? '';
+    const keywordText =
+      extractedText.length > 0
+        ? extractedText
+        : rawPageText.slice(0, LEGACY_TEXT_MAX);
+
+    if (keywordText.length === 0) {
       log.info('HIGHLIGHT_APPLY: empty JD text');
       return { ok: false, reason: 'no-jd-on-page' };
     }
+    const hostname = (() => {
+      try {
+        return new URL(url).hostname;
+      } catch {
+        return undefined;
+      }
+    })();
 
     let bgResponseRaw: unknown;
     try {
       bgResponseRaw = await deps.sendKeywordsExtract({
-        text: cached.text,
+        text: keywordText,
         url,
         topK: TOP_K,
+        ...(hasRawFallback ? { rawPageText } : {}),
+        ...(hostname ? { hostname } : {}),
       });
     } catch (err: unknown) {
       log.warn('KEYWORDS_EXTRACT rejected', {

@@ -270,6 +270,7 @@ export function SidepanelGenerationFormProvider({
   const clearFieldError = React.useCallback((name: string) => {
     setFormErrors((prev) => {
       if (!prev[name]) return prev;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [name]: _removed, ...rest } = prev;
       return rest;
     });
@@ -583,9 +584,9 @@ export function SidepanelGenerationFields(): React.ReactElement {
           <span className="leading-snug">
             {s.targetMismatch ? (
               <>
-                Locked to <strong>{s.boundTitle ?? 'this session'}</strong> but you're
-                on a different page now. Click <em>Start fresh</em> to target the
-                current page instead.
+                Locked to <strong>{s.boundTitle ?? 'this session'}</strong> but
+                you&apos;re on a different page now. Click <em>Start fresh</em> to
+                target the current page instead.
               </>
             ) : (
               <>

@@ -96,6 +96,7 @@ import {
 import {
   KeywordsExtractRequestSchema,
   ExtractSkillsBackendResponseSchema,
+  ExtractJdBackendResponseSchema,
 } from './schemas/keywords.schema';
 import { HighlightStatusRequestSchema } from './schemas/highlight.schema';
 import { GenerationUpdateBroadcastSchema } from './schemas/generation.schema';
@@ -132,6 +133,7 @@ export interface HandlerEndpoints {
   readonly authExchange: string;
   readonly authSignOut: string;
   readonly extractSkills: string;
+  readonly extractJd: string;
   readonly settingsProfile: string;
   readonly generationStart: string;
   readonly generationCancel: string;
@@ -632,11 +634,70 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   };
 
   // ---- KEYWORDS_EXTRACT ----
+  // Plan 106: when the caller includes `rawPageText` (the Chrome extension
+  // primary path), route to POST /ats/extract-jd which runs the LLM
+  // intersection pipeline. On any LLM failure, fall back to the legacy
+  // /ats/extract-skills call with the cleaned JD text. This means the
+  // extension's existing contract (a list of keywords with .term for DOM
+  // highlighting) is preserved unchanged; the quality upgrade is transparent.
   const handleKeywordsExtract: HandlerFor<'KEYWORDS_EXTRACT'> = async ({ data }) => {
     const parsed = KeywordsExtractRequestSchema.safeParse(data);
     if (!parsed.success) {
       return { ok: false, reason: 'empty-text' };
     }
+
+    const useLlmPath =
+      typeof parsed.data.rawPageText === 'string' &&
+      parsed.data.rawPageText.length >= 200;
+
+    if (useLlmPath) {
+      const started = deps.now();
+      const result = await deps.fetchAuthed(deps.endpoints.extractJd, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          pageText: parsed.data.rawPageText,
+          ...(parsed.data.url ? { url: parsed.data.url } : {}),
+          ...(parsed.data.hostname ? { hostname: parsed.data.hostname } : {}),
+        }),
+      });
+      if (result.kind === 'unauthenticated') {
+        return { ok: false, reason: 'signed-out' };
+      }
+      if (result.kind === 'network-error') {
+        log.warn('KEYWORDS_EXTRACT: extract-jd network error -- falling back', {
+          error: result.error.message,
+        });
+        // fall through to legacy path below
+      } else {
+        const res = result.response;
+        if (res.status === 429) return { ok: false, reason: 'rate-limited' };
+        if (res.ok) {
+          let body: unknown;
+          try {
+            body = await res.json();
+          } catch {
+            body = null;
+          }
+          const envelope = ExtractJdBackendResponseSchema.safeParse(body);
+          if (envelope.success) {
+            return {
+              ok: true,
+              keywords: envelope.data.data.skills,
+              tookMs: deps.now() - started,
+            };
+          }
+          log.warn('KEYWORDS_EXTRACT: extract-jd envelope drift -- falling back', {
+            issues: envelope.error.issues.length,
+          });
+        } else {
+          log.info(
+            `KEYWORDS_EXTRACT: extract-jd returned ${res.status} -- falling back`,
+          );
+        }
+      }
+    }
+
     const started = deps.now();
     const result = await deps.fetchAuthed(deps.endpoints.extractSkills, {
       method: 'POST',

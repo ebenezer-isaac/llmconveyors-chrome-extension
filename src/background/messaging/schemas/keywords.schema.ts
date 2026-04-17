@@ -23,6 +23,14 @@ export const KeywordsExtractRequestSchema = z
     text: z.string().min(1).max(50_000),
     url: z.string().url().max(2048),
     topK: z.number().int().min(1).max(100).optional(),
+    /**
+     * Raw DOM text scraped from the visible page. When >= 200 chars, the
+     * background handler routes to POST /ats/extract-jd (LLM intersection
+     * pipeline, Plan 106) instead of the legacy /ats/extract-skills. Falls
+     * back to legacy if the LLM endpoint fails.
+     */
+    rawPageText: z.string().min(1).max(200_000).optional(),
+    hostname: z.string().max(256).optional(),
   })
   .strict();
 
@@ -58,6 +66,44 @@ export const ExtractSkillsBackendResponseSchema = z
       keywords: z.array(ExtractedSkillSchema).max(500),
       missing: z.array(ExtractedSkillSchema).max(500).optional(),
       tookMs: z.number().int().nonnegative(),
+    }),
+    requestId: z.string().optional(),
+    timestamp: z.string().optional(),
+  })
+  .strict();
+
+/**
+ * Backend response envelope for POST /api/v1/ats/extract-jd.
+ * LLM-enriched compound response: structured JD + validated skills.
+ * The extension only consumes `data.skills` (maps to the same ExtractedSkill
+ * shape that the highlighter expects).
+ */
+export const ExtractJdBackendResponseSchema = z
+  .object({
+    success: z.literal(true),
+    data: z.object({
+      jd: z.object({
+        title: z.string().nullable(),
+        company: z.string().nullable(),
+        location: z.string().nullable(),
+        employmentType: z.string(),
+        description: z.string(),
+        requirements: z.string(),
+        responsibilities: z.string(),
+        techStack: z.array(z.string()),
+        yearsExperience: z
+          .object({
+            min: z.number().nullable(),
+            max: z.number().nullable(),
+          })
+          .nullable(),
+      }),
+      skills: z.array(ExtractedSkillSchema).max(500),
+      tookMs: z.number().int().nonnegative(),
+      cacheHit: z.boolean(),
+      modelUsed: z.string(),
+      contentHash: z.string(),
+      taxonomyVersion: z.number(),
     }),
     requestId: z.string().optional(),
     timestamp: z.string().optional(),

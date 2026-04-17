@@ -17,6 +17,7 @@ export const API_BASE_URL: string = clientEnv.apiBaseUrl;
 export const AUTH_EXCHANGE_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/extension-token-exchange';
 export const AUTH_SIGN_OUT_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/sign-out';
 export const EXTRACT_SKILLS_ENDPOINT: string = API_BASE_URL + '/api/v1/ats/extract-skills';
+export const EXTRACT_JD_ENDPOINT: string = API_BASE_URL + '/api/v1/ats/extract-jd';
 export const SETTINGS_PROFILE_ENDPOINT: string = API_BASE_URL + '/api/v1/settings/profile';
 export const GENERATION_START_ENDPOINT: string = API_BASE_URL + '/api/v1/agents/generate';
 export const GENERATION_CANCEL_ENDPOINT: string = API_BASE_URL + '/api/v1/agents/cancel';

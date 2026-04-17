@@ -86,6 +86,7 @@ function buildDeps(over: Partial<HandlerDeps> = {}): HandlerDeps {
       authExchange: 'https://api.test/exchange',
       authSignOut: 'https://api.test/sign-out',
       extractSkills: 'https://api.test/extract',
+      extractJd: 'https://api.test/extract-jd',
       settingsProfile: 'https://api.test/profile',
       generationStart: 'https://api.test/start',
       generationCancel: 'https://api.test/cancel',

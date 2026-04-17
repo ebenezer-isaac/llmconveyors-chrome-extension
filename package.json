@@ -41,7 +41,7 @@
   },
   "dependencies": {
     "@webext-core/messaging": "^2.1.0",
-    "ats-autofill-engine": "file:../ats-autofill-engine/ats-autofill-engine-0.1.0-alpha.2.tgz",
+    "ats-autofill-engine": "0.1.0-alpha.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

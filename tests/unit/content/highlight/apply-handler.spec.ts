@@ -81,6 +81,8 @@ function buildDeps(opts: BuildOptions = {}): {
       readonly text: string;
       readonly url: string;
       readonly topK: number;
+      readonly rawPageText?: string;
+      readonly hostname?: string;
     }) => Promise<KeywordsExtractResponse>
   >;
   readonly applyHighlights: Mock<
@@ -144,6 +146,8 @@ function buildDeps(opts: BuildOptions = {}): {
       readonly text: string;
       readonly url: string;
       readonly topK: number;
+      readonly rawPageText?: string;
+      readonly hostname?: string;
     }) => Promise<KeywordsExtractResponse>
   > = vi.fn(async () => {
     if (opts.keywordsThrows) {
@@ -157,6 +161,8 @@ function buildDeps(opts: BuildOptions = {}): {
       readonly text: string;
       readonly url: string;
       readonly topK: number;
+      readonly rawPageText?: string;
+      readonly hostname?: string;
     }) => Promise<KeywordsExtractResponse>
   >;
 
@@ -205,9 +211,21 @@ describe('createApplyHandler', () => {
     expect(state.keywordCount).toBe(2);
   });
 
-  it('short-circuits to no-jd-on-page for unknown intent', async () => {
+  it('proceeds on unknown intent when JD is extractable (non-ATS page with JSON-LD)', async () => {
+    const { deps, applyHighlights, sendKeywordsExtract } = buildDeps({
+      intent: { kind: 'unknown', url: 'https://x.test/' } as PageIntent,
+    });
+    const handler = createApplyHandler(deps);
+    const res = await handler();
+    expect(res.ok).toBe(true);
+    expect(applyHighlights).toHaveBeenCalledTimes(1);
+    expect(sendKeywordsExtract).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns no-jd-on-page when intent is unknown AND extractor returns null', async () => {
     const { deps, applyHighlights } = buildDeps({
       intent: { kind: 'unknown', url: 'https://x.test/' } as PageIntent,
+      jdResult: null,
     });
     const handler = createApplyHandler(deps);
     const res = await handler();
@@ -235,6 +253,43 @@ describe('createApplyHandler', () => {
     expect(res).toEqual({ ok: false, reason: 'no-jd-on-page' });
   });
 
+  it('falls back to raw page text when extractor returns null and page has enough text', async () => {
+    const rawText = 'Golang RESTful gRPC APIs distributed systems '.repeat(8);
+    const { deps, sendKeywordsExtract, applyHighlights } = buildDeps({
+      jdResult: null,
+      bodyHtml: `<article>${rawText}</article>`,
+    });
+    const handler = createApplyHandler(deps);
+    const res = await handler();
+    expect(res.ok).toBe(true);
+    expect(sendKeywordsExtract).toHaveBeenCalledTimes(1);
+    expect(applyHighlights).toHaveBeenCalledTimes(1);
+    expect(sendKeywordsExtract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('Golang'),
+        rawPageText: expect.stringContaining('distributed systems'),
+        hostname: 'boards.greenhouse.io',
+      }),
+    );
+  });
+
+  it('falls back to raw page text when extracted JD text is empty and page has enough text', async () => {
+    const rawText = 'Backend Golang microservices APIs observability '.repeat(8);
+    const { deps, sendKeywordsExtract } = buildDeps({
+      jdResult: { text: '', method: 'jsonld' },
+      bodyHtml: `<section>${rawText}</section>`,
+    });
+    const handler = createApplyHandler(deps);
+    const res = await handler();
+    expect(res.ok).toBe(true);
+    expect(sendKeywordsExtract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining('microservices'),
+        rawPageText: expect.stringContaining('observability'),
+      }),
+    );
+  });
+
   it('returns no-jd-on-page when extractJobDescription throws', async () => {
     const { deps } = buildDeps({ extractThrows: true });
     const handler = createApplyHandler(deps);
@@ -245,6 +300,7 @@ describe('createApplyHandler', () => {
   it('returns no-jd-on-page when extracted text is empty', async () => {
     const { deps } = buildDeps({
       jdResult: { text: '', method: 'jsonld' },
+      bodyHtml: '', // Empty body, no raw text
     });
     const handler = createApplyHandler(deps);
     const res = await handler();
