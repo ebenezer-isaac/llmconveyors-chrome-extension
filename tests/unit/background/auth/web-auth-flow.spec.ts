@@ -25,7 +25,7 @@ function makeDeps(overrides: Partial<WebAuthFlowDeps> = {}): WebAuthFlowDeps {
 describe('buildSignInUrl', () => {
   it('appends the redirect URI as a query param', () => {
     const url = buildSignInUrl(
-      'https://llmconveyors.com/en/auth/extension-signin',
+      'https://llmconveyors.com/auth/extension-signin',
       'https://ext.chromiumapp.org/',
     );
     const parsed = new URL(url);

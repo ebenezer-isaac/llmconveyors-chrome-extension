@@ -75,6 +75,7 @@ import {
   launchWebAuthFlow,
   type FetchAuthed,
 } from '../auth';
+import { clientEnv } from '../../shared/env';
 import type { SessionManager } from '../session/session-manager';
 import { getSessionManager } from '../session/session-manager';
 
@@ -342,6 +343,7 @@ function buildProductionDeps(): HandlerDeps {
     genericIntent: {
       scripting: scriptingApi as never,
     },
+    webBaseUrl: clientEnv.webBaseUrl,
   };
 }
 

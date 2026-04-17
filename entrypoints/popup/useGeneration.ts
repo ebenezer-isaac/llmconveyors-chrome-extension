@@ -59,13 +59,57 @@ export function useGeneration(): UseGenerationResult {
         setError('Runtime unavailable');
         return { ok: false, reason: 'no-runtime' };
       }
+
+      // Open the sidepanel and close the popup IMMEDIATELY -- before any
+      // awaits -- so the user-gesture context is preserved. Chrome loses
+      // the gesture after async round-trips, causing sidePanel.open() to
+      // silently fail. The sidepanel picks up the generation via the
+      // GENERATION_STARTED broadcast from the background.
+      const g = globalThis as unknown as {
+        chrome?: {
+          sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
+          tabs?: {
+            query: (opts: {
+              active: boolean;
+              currentWindow: boolean;
+            }) => Promise<Array<{ id?: number }>>;
+          };
+        };
+        window?: Window;
+      };
       try {
+        const tabs = g.chrome?.tabs;
+        const sp = g.chrome?.sidePanel;
+        if (tabs && sp) {
+          const list = await tabs.query({
+            active: true,
+            currentWindow: true,
+          });
+          const tabId = list[0]?.id;
+          if (typeof tabId === 'number') {
+            await sp.open({ tabId });
+          }
+        }
+      } catch {
+        // sidePanel.open failed; generation will still run in the background
+      }
+
+      // Fire the generation request. The popup may close before the
+      // response arrives, but the background handles it regardless.
+      try {
+        // Close the popup so the sidepanel has focus. Fire-and-forget
+        // the remaining work since the background owns the generation.
+        try {
+          g.window?.close();
+        } catch {
+          // window.close is a no-op in some harnesses
+        }
+
         const raw = await runtime.sendMessage({
           key: 'GENERATION_START',
           data: { agent: args.agentId, payload: args.payload },
         });
         if (!raw || typeof raw !== 'object') {
-          setError('Empty response');
           return { ok: false, reason: 'empty-response' };
         }
         const response = raw as Record<string, unknown>;
@@ -73,15 +117,11 @@ export function useGeneration(): UseGenerationResult {
           const generationId = String(response.generationId ?? '');
           const sessionId = String(response.sessionId ?? '');
           setLastGenerationId(generationId);
-          // Fire-and-forget subscribe. The side panel also subscribes so we
-          // get at-most-one active stream per generationId.
+          // Fire-and-forget subscribe + session binding.
           void runtime.sendMessage({
             key: 'GENERATION_SUBSCRIBE',
             data: { generationId },
           });
-          // Record a per-URL binding so the sidepanel auto-loads this session
-          // on subsequent visits to the same JD / company page. The bg
-          // canonicalizes the url internally; we just forward the raw tab url.
           if (
             typeof args.tabUrl === 'string' &&
             args.tabUrl.length > 0 &&
@@ -101,44 +141,6 @@ export function useGeneration(): UseGenerationResult {
                     : undefined,
               },
             });
-          }
-          // Sidepanel takes ownership of the live stream; close the popup
-          // so the two surfaces don't compete for user attention. The
-          // popup call stack is still inside the Generate click handler,
-          // so Chrome honours sidePanel.open() as a user-gesture action.
-          const g = globalThis as unknown as {
-            chrome?: {
-              sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
-              tabs?: {
-                query: (opts: {
-                  active: boolean;
-                  currentWindow: boolean;
-                }) => Promise<Array<{ id?: number }>>;
-              };
-            };
-            window?: Window;
-          };
-          try {
-            const tabs = g.chrome?.tabs;
-            const sp = g.chrome?.sidePanel;
-            if (tabs && sp) {
-              const list = await tabs.query({
-                active: true,
-                currentWindow: true,
-              });
-              const tabId = list[0]?.id;
-              if (typeof tabId === 'number') {
-                await sp.open({ tabId });
-                try {
-                  g.window?.close();
-                } catch {
-                  // window.close is a no-op in some harnesses
-                }
-              }
-            }
-          } catch {
-            // Popup close / sidepanel open failed; user can still see the
-            // stream in the popup until they close it.
           }
           return { ok: true, generationId, sessionId };
         }

@@ -47,7 +47,7 @@ const log = createLogger('bg.auth.signin');
  * Default production bridge URL. Overridable via `WXT_BRIDGE_URL` build-time
  * env or the `bridgeUrl` dep field for tests.
  */
-export const DEFAULT_BRIDGE_URL = 'https://llmconveyors.com/en/auth/extension-signin';
+export const DEFAULT_BRIDGE_URL = 'https://llmconveyors.com/auth/extension-signin';
 
 /**
  * StorageFacade is the subset of chrome.storage.local the orchestrator

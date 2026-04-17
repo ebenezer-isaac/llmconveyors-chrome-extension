@@ -91,6 +91,8 @@ export function SidepanelActionPanel({
           activeAgentId={resolvedAgentId}
           hasGenericJd={genericIntent.hasJd}
           genericJdText={genericIntent.jdText}
+          genericCompany={genericIntent.company}
+          genericJobTitle={genericIntent.jobTitle}
           credits={credits}
         />
       ) : null}

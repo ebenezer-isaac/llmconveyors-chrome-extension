@@ -29,6 +29,8 @@ export interface JobHunterActionsProps {
   readonly tabUrl?: string | null;
   readonly hasGenericJd: boolean;
   readonly genericJdText: string | null;
+  readonly genericCompany: string | null;
+  readonly genericJobTitle: string | null;
   readonly credits: ClientCreditsSnapshot | null;
 }
 
@@ -38,6 +40,8 @@ export function JobHunterActions({
   tabUrl = null,
   hasGenericJd,
   genericJdText,
+  genericCompany,
+  genericJobTitle,
   credits,
 }: JobHunterActionsProps): React.ReactElement {
   const isJobPosting = intent?.pageKind === 'job-posting' && intent.kind !== 'unknown';
@@ -55,8 +59,20 @@ export function JobHunterActions({
 
   const generateJdText =
     genericJdText ?? (isJobPosting ? (intent?.jobTitle ?? '') : '') ?? '';
-  const generateCompany = intent?.company ?? undefined;
-  const generateTitle = intent?.jobTitle ?? undefined;
+  // Prefer adapter-detected values, fall back to generic intent scan
+  const generateCompany = intent?.company ?? genericCompany ?? undefined;
+  const generateTitle = intent?.jobTitle ?? genericJobTitle ?? undefined;
+
+  // Derive companyWebsite from the current tab URL (best-effort origin)
+  let companyWebsite: string | undefined;
+  if (typeof tabUrl === 'string' && tabUrl.length > 0) {
+    try {
+      const origin = new URL(tabUrl).origin;
+      if (origin !== 'null') companyWebsite = origin;
+    } catch {
+      // invalid URL; leave undefined
+    }
+  }
 
   return (
     <section
@@ -74,6 +90,7 @@ export function JobHunterActions({
           jobDescription: generateJdText,
           companyName: generateCompany,
           jobTitle: generateTitle,
+          companyWebsite,
         }}
         tabUrl={tabUrl}
         pageTitle={generateTitle ?? generateCompany ?? null}

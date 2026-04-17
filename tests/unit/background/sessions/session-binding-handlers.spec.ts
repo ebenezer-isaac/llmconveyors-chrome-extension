@@ -104,6 +104,7 @@ function baseDeps(bindings: HandlerDeps['sessions']['bindings']): HandlerDeps {
         executeScript: vi.fn(async () => []),
       } as unknown as HandlerDeps['genericIntent']['scripting'],
     },
+    webBaseUrl: 'https://llmconveyors.com',
   };
 }
 

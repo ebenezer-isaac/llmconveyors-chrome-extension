@@ -22,6 +22,8 @@ export interface ActionAreaProps {
   readonly activeAgentId: AgentId | null;
   readonly hasGenericJd: boolean;
   readonly genericJdText: string | null;
+  readonly genericCompany: string | null;
+  readonly genericJobTitle: string | null;
   readonly credits: ClientCreditsSnapshot | null;
 }
 
@@ -33,6 +35,8 @@ export function ActionArea({
   activeAgentId,
   hasGenericJd,
   genericJdText,
+  genericCompany,
+  genericJobTitle,
   credits,
 }: ActionAreaProps): React.ReactElement | null {
   if (!signedIn) return null;
@@ -47,6 +51,8 @@ export function ActionArea({
       tabUrl={tabUrl}
       hasGenericJd={hasGenericJd}
       genericJdText={genericJdText}
+      genericCompany={genericCompany}
+      genericJobTitle={genericJobTitle}
       credits={credits}
     />
   );

@@ -143,6 +143,7 @@ function buildDeps(overrides: Partial<HandlerDeps> = {}): HandlerDeps {
         executeScript: vi.fn(async () => [{ result: { ok: false, reason: 'no-match' } }]),
       },
     },
+    webBaseUrl: 'https://llmconveyors.com',
     ...overrides,
   };
 }

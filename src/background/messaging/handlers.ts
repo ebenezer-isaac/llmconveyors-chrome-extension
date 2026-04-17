@@ -103,13 +103,7 @@ import { CreditsGetRequestSchema } from './schemas/credits.schema';
 import { ProfileGetRequestSchema } from './schemas/profile.schema';
 import type { BgHandledKey, ProtocolMap } from './protocol';
 import {
-  AuthError,
   createCookieExchange,
-  createSignInOrchestrator,
-  DEFAULT_BRIDGE_URL,
-  defaultParseAuthFragmentDeps,
-  defaultWebAuthFlowDeps,
-  launchWebAuthFlow as defaultLaunchWebAuthFlow,
 } from '../auth';
 
 /**
@@ -231,6 +225,8 @@ export interface HandlerDeps {
   readonly sessions: SessionHandlerAdapters;
   readonly generation: GenerationHandlerAdapters;
   readonly genericIntent: GenericIntentHandlerAdapters;
+  /** Web app base URL for tab-based sign-in fallback. */
+  readonly webBaseUrl: string;
 }
 
 /**
@@ -248,14 +244,16 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   const log = deps.logger;
 
   // ---- AUTH_SIGN_IN ----
-  // Two execution paths:
-  //   1. Legacy cookie-jar exchange (integration tests + server-assisted
-  //      path): when `data.cookieJar` is a non-empty string, POST to
-  //      endpoints.authExchange and persist the response.
-  //   2. launchWebAuthFlow orchestrator (interactive popup sign-in): when
-  //      no cookieJar is provided, drive the Chrome identity flow against
-  //      the A4 bridge page, parse the chromiumapp.org fragment, extract
-  //      userId from the JWT, and persist.
+  // Three execution paths (tried in order):
+  //   1. Cookie-jar exchange (E2E tests): when `data.cookieJar` is set.
+  //   2. Cookie exchange: reads the web app's sAccessToken cookie directly
+  //      via chrome.cookies -- works when user is already logged into the
+  //      web app. No popup needed.
+  //   3. Tab-based sign-in: opens the login page in a new browser tab so
+  //      the user can authenticate on the web app. After login, the
+  //      sAccessToken cookie is set and subsequent cookie exchange succeeds.
+  //      Returns a special `{ ok: false, openedTab: true }` so the popup
+  //      can show a "sign in on the website" message.
   const handleAuthSignIn: HandlerFor<'AUTH_SIGN_IN'> = async ({ data }) => {
     const parsed = AuthSignInRequestSchema.safeParse(data ?? {});
     if (!parsed.success) {
@@ -265,8 +263,110 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (typeof jar === 'string' && jar.length > 0) {
       return cookieJarExchange(jar);
     }
-    const interactive = parsed.data.interactive !== false;
-    return webAuthFlowSignIn(interactive);
+
+    // Try cookie exchange first (works if already logged into the web app)
+    log.info('AUTH_SIGN_IN: attempting cookie exchange', {
+      exchangeEndpoint: deps.endpoints.authExchange,
+    });
+    const exchange = createCookieExchange({
+      logger: log,
+      fetch: deps.fetch,
+      exchangeEndpoint: deps.endpoints.authExchange,
+      storage: { writeSession: deps.storage.writeSession },
+      broadcast: { sendRuntime: deps.broadcast.sendRuntime },
+    });
+    const exchangeResult = await exchange();
+    log.info('AUTH_SIGN_IN: cookie exchange result', {
+      kind: exchangeResult.kind,
+      reason: 'reason' in exchangeResult ? exchangeResult.reason : undefined,
+    });
+    if (exchangeResult.kind === 'ok') {
+      return { ok: true, userId: exchangeResult.userId };
+    }
+
+    // Cookie exchange failed -- open a small popup window for login,
+    // then poll for the sAccessToken cookie to appear.
+    const loginUrl = `${deps.webBaseUrl}/login`;
+    log.info('AUTH_SIGN_IN: opening login popup window', { loginUrl });
+
+    let popupWindowId: number | undefined;
+    try {
+      const popup = await chrome.windows.create({
+        url: loginUrl,
+        type: 'popup',
+        width: 460,
+        height: 680,
+        focused: true,
+      });
+      popupWindowId = popup?.id;
+    } catch (err) {
+      log.warn('AUTH_SIGN_IN: failed to open login popup', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return {
+        ok: false,
+        reason: 'Could not open sign-in window. Please try again.',
+      };
+    }
+
+    // Poll for the cookie to appear (max ~2 minutes, every 2s)
+    const MAX_POLLS = 60;
+    const POLL_INTERVAL_MS = 2000;
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+      // Check if the popup window was closed by the user
+      if (typeof popupWindowId === 'number') {
+        try {
+          await chrome.windows.get(popupWindowId);
+        } catch {
+          log.info('AUTH_SIGN_IN: login popup closed by user');
+          return {
+            ok: false,
+            reason: 'Sign-in window was closed. Click Sign In to try again.',
+          };
+        }
+      }
+
+      // Try cookie exchange
+      const retryExchange = createCookieExchange({
+        logger: log,
+        fetch: deps.fetch,
+        exchangeEndpoint: deps.endpoints.authExchange,
+        storage: { writeSession: deps.storage.writeSession },
+        broadcast: { sendRuntime: deps.broadcast.sendRuntime },
+      });
+      const retryResult = await retryExchange();
+      if (retryResult.kind === 'ok') {
+        log.info('AUTH_SIGN_IN: cookie exchange succeeded after login', {
+          userId: retryResult.userId,
+          pollCount: i + 1,
+        });
+        // Auto-close the login popup
+        if (typeof popupWindowId === 'number') {
+          try {
+            await chrome.windows.remove(popupWindowId);
+          } catch {
+            // window may already be closed
+          }
+        }
+        return { ok: true, userId: retryResult.userId };
+      }
+    }
+
+    // Timed out
+    log.warn('AUTH_SIGN_IN: cookie poll timed out');
+    if (typeof popupWindowId === 'number') {
+      try {
+        await chrome.windows.remove(popupWindowId);
+      } catch {
+        // window may already be closed
+      }
+    }
+    return {
+      ok: false,
+      reason: 'Sign-in timed out. Please try again.',
+    };
   };
 
   async function cookieJarExchange(cookieJar: string): Promise<AuthSignInResponse> {
@@ -311,44 +411,6 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     } catch (err) {
       log.error('AUTH_SIGN_IN: cookie-jar exchange failed', err);
       return { ok: false, reason: 'network error' };
-    }
-  }
-
-  async function webAuthFlowSignIn(
-    interactive: boolean,
-  ): Promise<AuthSignInResponse> {
-    const orchestrator = createSignInOrchestrator({
-      webAuthFlow: defaultWebAuthFlowDeps,
-      storage: {
-        writeSession: deps.storage.writeSession,
-        readSession: deps.storage.readSession,
-      },
-      broadcast: {
-        sendRuntime: deps.broadcast.sendRuntime,
-      },
-      parseDeps: defaultParseAuthFragmentDeps,
-      logger: log,
-      now: deps.now,
-      bridgeUrl: DEFAULT_BRIDGE_URL,
-      launch: defaultLaunchWebAuthFlow,
-    });
-    try {
-      const state = await orchestrator({ interactive });
-      if (!state.signedIn) {
-        return { ok: false, reason: 'sign-in returned unauthenticated state' };
-      }
-      return { ok: true, userId: state.userId };
-    } catch (err) {
-      if (err instanceof AuthError) {
-        log.warn('AUTH_SIGN_IN: web-auth-flow failed', {
-          errName: err.name,
-          errMessage: err.message,
-          interactive,
-        });
-        return { ok: false, reason: `${err.name}: ${err.message}` };
-      }
-      log.error('AUTH_SIGN_IN: web-auth-flow unexpected', err);
-      return { ok: false, reason: 'unexpected error during sign-in' };
     }
   }
 
@@ -505,17 +567,46 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (!parsed.success) {
       return { ok: false, reason: 'no-tab' };
     }
+    const tabId = parsed.data.tabId;
+    const message = { key: 'HIGHLIGHT_APPLY' as const, data: parsed.data };
+
+    // First attempt: forward to the content script already loaded on ATS pages.
     try {
-      const resp = await deps.broadcast.sendToTab(parsed.data.tabId, {
-        key: 'HIGHLIGHT_APPLY',
-        data: parsed.data,
+      const resp = await deps.broadcast.sendToTab(tabId, message);
+      if (resp && typeof resp === 'object') {
+        return resp as Awaited<ReturnType<HandlerFor<'HIGHLIGHT_APPLY'>>>;
+      }
+    } catch {
+      // Content script not loaded on this tab (non-ATS page).
+      // Inject programmatically via chrome.scripting (requires activeTab).
+      log.info('HIGHLIGHT_APPLY: content script not loaded, injecting', { tabId });
+    }
+
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content-scripts/ats.js'],
       });
+      // Give the content script time to initialize and register listeners.
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      log.warn('HIGHLIGHT_APPLY: scripting.executeScript failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { ok: false, reason: 'api-error' };
+    }
+
+    // Retry after injection.
+    try {
+      const resp = await deps.broadcast.sendToTab(tabId, message);
       if (!resp || typeof resp !== 'object') {
         return { ok: false, reason: 'api-error' };
       }
       return resp as Awaited<ReturnType<HandlerFor<'HIGHLIGHT_APPLY'>>>;
     } catch (err) {
-      log.warn('HIGHLIGHT_APPLY: forward failed', { error: String(err) });
+      log.warn('HIGHLIGHT_APPLY: forward failed after injection', {
+        error: String(err),
+      });
       return { ok: false, reason: 'api-error' };
     }
   };

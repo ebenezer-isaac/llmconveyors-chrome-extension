@@ -84,6 +84,8 @@ function TierPill({
   const safeCredits =
     Number.isFinite(rawCredits) && rawCredits > 0 ? Math.floor(rawCredits) : 0;
 
+  const mailtoHref = `mailto:info@llmconveyors.com?subject=${encodeURIComponent('Request: Add more credits')}&body=${encodeURIComponent(`Hi,\n\nI'd like to request additional credits for my account.\n\nCurrent balance: ${formatCredits(safeCredits)} credits\nTier: ${label}\n\nThank you.`)}`;
+
   return (
     <span
       data-testid="tier-pill"
@@ -106,9 +108,13 @@ function TierPill({
         />
         {label}
       </span>
-      <span className="font-medium text-zinc-600 dark:text-zinc-300">
+      <a
+        href={mailtoHref}
+        title="Click to request more credits"
+        className="font-medium text-zinc-600 underline decoration-dotted underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+      >
         {formatCredits(safeCredits)} credits
-      </span>
+      </a>
     </span>
   );
 }

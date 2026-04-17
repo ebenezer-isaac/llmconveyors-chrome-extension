@@ -97,7 +97,7 @@ function makeDeps(overrides: Partial<SignInOrchestratorDeps> = {}): SignInOrches
     parseDeps: { now: () => FIXED_NOW },
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
     now: () => FIXED_NOW,
-    bridgeUrl: 'https://llmconveyors.com/en/auth/extension-signin',
+    bridgeUrl: 'https://llmconveyors.com/auth/extension-signin',
     launch: vi.fn().mockResolvedValue(buildRedirect()),
     ...overrides,
   };
