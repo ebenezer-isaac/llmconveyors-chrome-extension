@@ -30,15 +30,12 @@ export default defineConfig({
       'downloads',
     ],
     host_permissions: [
-      'https://*.greenhouse.io/*',
-      'https://jobs.lever.co/*',
-      'https://*.myworkdayjobs.com/*',
-      'https://api.llmconveyors.com/*',
-      'https://*.llmconveyors.com/*',
-      'https://llmconveyors.com/*',
-      // E2E fixture server. Only present when WXT_E2E=true so production
-      // never ships with localhost permissions.
-      ...(process.env.WXT_E2E === 'true' ? ['http://localhost:5174/*'] : []),
+      // Generic JD detection + keyword highlighting need scripting access
+      // on any job-posting site (not just ATS-matched ones). The extension
+      // injects the content script on demand via chrome.scripting.executeScript
+      // when the user clicks Highlight or Generate on a non-ATS page.
+      'https://*/*',
+      'http://localhost:5174/*',
     ],
     content_security_policy: {
       // Lock the extension runtime: no remote scripts, no eval, no inline.
