@@ -109,11 +109,10 @@ export function useSessionList(
         mountedRef.current = false;
       };
     }
-    // On account switch, clear list eagerly to avoid showing stale sessions
-    // for the previous user while the fresh request is in flight.
-    setItems([]);
-    setHasMore(false);
-    void refresh({ force: true });
+    
+    // Check background cache (which is automatically invalidated on generation completion). 
+    // This allows instant rendering without flashing empty states.
+    void refresh({ force: false });
     const runtime = getRuntime();
     const listener = (msg: unknown): void => {
       if (!msg || typeof msg !== 'object') return;

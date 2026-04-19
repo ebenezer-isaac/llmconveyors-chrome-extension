@@ -208,7 +208,7 @@ export function SessionList({
       activeAgentId === null
         ? items
         : items.filter((item) => item.agentType === activeAgentId);
-    return scoped.slice(0, 5);
+    return scoped.slice(0, 3);
   }, [items, activeAgentId]);
 
   if (!enabled) return null;

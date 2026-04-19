@@ -60,51 +60,8 @@ export function useGeneration(): UseGenerationResult {
         return { ok: false, reason: 'no-runtime' };
       }
 
-      // Open the sidepanel and close the popup IMMEDIATELY -- before any
-      // awaits -- so the user-gesture context is preserved. Chrome loses
-      // the gesture after async round-trips, causing sidePanel.open() to
-      // silently fail. The sidepanel picks up the generation via the
-      // GENERATION_STARTED broadcast from the background.
-      const g = globalThis as unknown as {
-        chrome?: {
-          sidePanel?: { open: (opts: { tabId?: number }) => Promise<void> };
-          tabs?: {
-            query: (opts: {
-              active: boolean;
-              currentWindow: boolean;
-            }) => Promise<Array<{ id?: number }>>;
-          };
-        };
-        window?: Window;
-      };
+      // Fire the generation request. The caller (UI layer) handles panel routing.
       try {
-        const tabs = g.chrome?.tabs;
-        const sp = g.chrome?.sidePanel;
-        if (tabs && sp) {
-          const list = await tabs.query({
-            active: true,
-            currentWindow: true,
-          });
-          const tabId = list[0]?.id;
-          if (typeof tabId === 'number') {
-            await sp.open({ tabId });
-          }
-        }
-      } catch {
-        // sidePanel.open failed; generation will still run in the background
-      }
-
-      // Fire the generation request. The popup may close before the
-      // response arrives, but the background handles it regardless.
-      try {
-        // Close the popup so the sidepanel has focus. Fire-and-forget
-        // the remaining work since the background owns the generation.
-        try {
-          g.window?.close();
-        } catch {
-          // window.close is a no-op in some harnesses
-        }
-
         const raw = await runtime.sendMessage({
           key: 'GENERATION_START',
           data: { agent: args.agentId, payload: args.payload },

@@ -71,9 +71,20 @@ export function GenerateButton({
       : 'generate-button';
 
   async function handleClick(): Promise<void> {
+    // Open the side panel first to preserve the user gesture.
+    await openSidePanel();
+    
+    // Start the generation which crosses the async message bus.
     const outcome = await start({ agentId, payload, tabUrl, pageTitle });
+    
     if (outcome.ok) {
-      await openSidePanel();
+      // Only close the popup if we successfully kicked off the generation.
+      try {
+        if (typeof globalThis.close === 'function') globalThis.close();
+        (globalThis as { window?: Window }).window?.close();
+      } catch {
+        // window.close is a no-op in some evaluation harnesses
+      }
     }
   }
 
