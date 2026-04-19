@@ -77,9 +77,22 @@ import { downloadBlob } from './lib/download';
 import { buildArtifactFilename, defaultFilenameForType } from './lib/filename';
 
 function downloadArtifact(artifact: GenerationArtifact): void {
-  const { suffix, ext } = defaultFilenameForType(artifact.kind, 'text/plain');
+  if (typeof artifact.content !== 'string') return;
+  const kind =
+    typeof artifact.kind === 'string'
+      ? artifact.kind
+      : typeof artifact.type === 'string'
+      ? artifact.type
+      : 'other';
+  const { suffix, ext } = defaultFilenameForType(kind, 'text/plain');
   const filename = buildArtifactFilename({}, suffix, ext);
   void downloadBlob(artifact.content, filename, 'application/octet-stream');
+}
+
+function artifactKindLabel(artifact: GenerationArtifact): string {
+  if (typeof artifact.kind === 'string' && artifact.kind.length > 0) return artifact.kind;
+  if (typeof artifact.type === 'string' && artifact.type.length > 0) return artifact.type;
+  return 'artifact';
 }
 import type { AgentId } from '@/src/background/agents';
 import { clientEnv } from '@/src/shared/env';
@@ -265,13 +278,14 @@ export function GenerationView({
           <div className="flex flex-col gap-1">
             {(latest?.artifacts ?? []).map((artifact, idx) => (
               <button
-                key={`${artifact.kind}-${idx}`}
+                key={`${artifactKindLabel(artifact)}-${idx}`}
                 type="button"
-                data-testid={`download-${artifact.kind}`}
+                data-testid={`download-${artifactKindLabel(artifact)}`}
                 onClick={() => downloadArtifact(artifact)}
+                disabled={typeof artifact.content !== 'string'}
                 className="rounded-card border border-zinc-300 bg-white px-3 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
               >
-                Download {artifact.kind}
+                Download {artifactKindLabel(artifact)}
               </button>
             ))}
             <button

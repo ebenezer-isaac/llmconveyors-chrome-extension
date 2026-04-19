@@ -1,0 +1,159 @@
+{
+  "generatedAt": "2026-04-18T19:19:12.663Z",
+  "extensionId": "kepefhkhcamgfpefobckbcdpgamebimd",
+  "options": {
+    "interactiveSignIn": true,
+    "cookieUrl": "http://localhost:3000",
+    "cookieDomain": "localhost",
+    "concurrency": 6,
+    "captureAuthState": true,
+    "useStoredAuthState": true
+  },
+  "authState": {
+    "storagePath": "E:\\llmconveyors-chrome-extension\\.local\\auth-chaos\\stored-auth-state.json",
+    "hasStoredState": false
+  },
+  "totals": {
+    "total": 10,
+    "passed": 8,
+    "failed": 2
+  },
+  "results": [
+    {
+      "id": "status-initial",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 123
+    },
+    {
+      "id": "cookie-exchange-no-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 34
+    },
+    {
+      "id": "cookie-exchange-invalid-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 19
+    },
+    {
+      "id": "cookie-exchange-endpoint-500",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 33
+    },
+    {
+      "id": "cookie-exchange-endpoint-malformed-json",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 39
+    },
+    {
+      "id": "cookie-exchange-concurrency-race",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "concurrency": 6,
+        "validCount": 6,
+        "durationMs": 26,
+        "responses": [
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          }
+        ]
+      },
+      "durationMs": 27
+    },
+    {
+      "id": "malformed-auth-sign-in-payload",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "ok": false,
+          "reason": "invalid sign-in payload"
+        }
+      },
+      "durationMs": 6
+    },
+    {
+      "id": "interactive-sign-in-manual",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "reason": "interactive sign-in timeout",
+        "signInResp": {
+          "ok": false,
+          "reason": "Could not reach sign-in page. Check your network and try again."
+        },
+        "finalState": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 181385
+    },
+    {
+      "id": "session-capture-redacted",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "reason": "session absent as expected for signed-out state",
+        "storageKeys": [
+          "llmc.sw.main-entered"
+        ]
+      },
+      "durationMs": 6
+    },
+    {
+      "id": "stored-auth-state-captured",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "reason": "llmc.session.v1 missing or invalid - sign in first",
+        "storagePath": "E:\\llmconveyors-chrome-extension\\.local\\auth-chaos\\stored-auth-state.json"
+      },
+      "durationMs": 1
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "generatedAt": "2026-04-18T18:58:26.005Z",
+  "extensionId": "kepefhkhcamgfpefobckbcdpgamebimd",
+  "options": {
+    "interactiveSignIn": false,
+    "cookieUrl": "https://llmconveyors.com",
+    "cookieDomain": ".llmconveyors.com",
+    "concurrency": 6
+  },
+  "totals": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0
+  },
+  "results": [
+    {
+      "id": "status-initial",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 66
+    },
+    {
+      "id": "cookie-exchange-no-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 12
+    },
+    {
+      "id": "cookie-exchange-invalid-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 13
+    },
+    {
+      "id": "cookie-exchange-endpoint-500",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 18
+    },
+    {
+      "id": "cookie-exchange-endpoint-malformed-json",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 22
+    },
+    {
+      "id": "cookie-exchange-concurrency-race",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "concurrency": 6,
+        "validCount": 6,
+        "durationMs": 34,
+        "responses": [
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          }
+        ]
+      },
+      "durationMs": 35
+    },
+    {
+      "id": "malformed-auth-sign-in-payload",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "ok": false,
+          "reason": "invalid sign-in payload"
+        }
+      },
+      "durationMs": 9
+    },
+    {
+      "id": "session-capture-redacted",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "reason": "session absent as expected for signed-out state",
+        "storageKeys": [
+          "llmc.sw.main-entered"
+        ]
+      },
+      "durationMs": 16
+    }
+  ]
+}

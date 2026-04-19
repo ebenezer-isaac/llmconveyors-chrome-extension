@@ -89,21 +89,21 @@ async function resolveTabId(
 async function dispatchTabsMessage(
   context: BrowserContext,
   extId: string,
-  tabId: number,
+  _tabId: number,
   envelope: unknown,
 ): Promise<unknown> {
   const driver = await context.newPage();
   await driver.goto(`chrome-extension://${extId}/e2e/seed.html`);
   const resp = await driver.evaluate(
-    async ({ id, env }) => {
+    async ({ env }) => {
       return await new Promise<unknown>((resolve) => {
-        chrome.tabs.sendMessage(id, env, (r) => {
+        chrome.runtime.sendMessage(env, (r) => {
           const le = chrome.runtime.lastError;
           resolve(le ? { lastError: le.message } : r);
         });
       });
     },
-    { id: tabId, env: envelope },
+    { env: envelope },
   );
   await driver.close();
   return resp;
@@ -173,9 +173,7 @@ test('full demo flow -- greenhouse fill + highlight + sidepanel + workday fill',
 
     // Fill greenhouse form.
     const fillResp = await dispatchTabsMessage(context, extId, ghTabId, {
-      id: 1,
-      type: 'FILL_REQUEST',
-      timestamp: Date.now(),
+      key: 'FILL_REQUEST',
       data: { tabId: ghTabId, url: greenhouseUrl },
     });
     const fillInner = (fillResp as { res?: { ok?: boolean } }).res ??
@@ -190,9 +188,7 @@ test('full demo flow -- greenhouse fill + highlight + sidepanel + workday fill',
 
     // Highlight keywords.
     const hlResp = await dispatchTabsMessage(context, extId, ghTabId, {
-      id: 2,
-      type: 'HIGHLIGHT_APPLY',
-      timestamp: Date.now(),
+      key: 'HIGHLIGHT_APPLY',
       data: { tabId: ghTabId },
     });
     const hlInner = (hlResp as { res?: { ok?: boolean; keywordCount?: number } })
@@ -224,9 +220,7 @@ test('full demo flow -- greenhouse fill + highlight + sidepanel + workday fill',
 
     const wdTabId = await resolveTabId(context, extId, workdayUrl);
     const wdFillResp = await dispatchTabsMessage(context, extId, wdTabId, {
-      id: 3,
-      type: 'FILL_REQUEST',
-      timestamp: Date.now(),
+      key: 'FILL_REQUEST',
       data: { tabId: wdTabId, url: workdayUrl },
     });
     const wdFillInner =

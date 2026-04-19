@@ -52,7 +52,6 @@ test('diagnose cookie exchange with a seeded sAccessToken', async () => {
     sw.on('console', (msg) => {
       const line = `[sw] ${msg.type()}: ${msg.text()}`;
       swLogs.push(line);
-      // eslint-disable-next-line no-console
       console.log(line);
     });
   };
@@ -77,7 +76,6 @@ test('diagnose cookie exchange with a seeded sAccessToken', async () => {
   ]);
 
   const extId = await getExtensionId(context);
-  // eslint-disable-next-line no-console
   console.log(`Extension loaded at id=${extId}`);
 
   // Give the SW time to boot and attempt cookie exchange
@@ -186,6 +184,5 @@ test('diagnose cookie exchange with a seeded sAccessToken', async () => {
   await popup.close();
   await context.close();
 
-  // eslint-disable-next-line no-console
   console.log('Outputs written to', OUTPUT_DIR);
 });

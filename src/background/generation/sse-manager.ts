@@ -22,7 +22,7 @@
  */
 
 import type { Logger } from '../log';
-import type { SessionManager } from '../session/session-manager';
+import type { FetchAuthed } from '../auth';
 import {
   GenerationUpdateBroadcastSchema,
   type GenerationUpdateBroadcast,
@@ -38,10 +38,9 @@ export interface SseSubscribeArgs {
 }
 
 export interface SseManagerDeps {
-  readonly fetch: typeof globalThis.fetch;
+  readonly fetchAuthed: FetchAuthed;
   readonly logger: Logger;
   readonly buildUrl: (generationId: string) => string;
-  readonly sessionManager: SessionManager;
   readonly broadcast: Broadcaster;
   /**
    * Optional auth-recovery hook. Invoked when the SSE handshake returns
@@ -111,91 +110,34 @@ export function createSseManager(deps: SseManagerDeps): {
     }
   }
 
-  async function attemptHandshake(
-    generationId: string,
-    token: string,
-    controller: AbortController,
-  ): Promise<Response | null> {
-    try {
-      return await deps.fetch(deps.buildUrl(generationId), {
-        method: 'GET',
-        headers: {
-          accept: 'text/event-stream',
-          authorization: `Bearer ${token}`,
-        },
-        signal: controller.signal,
-      });
-    } catch (err: unknown) {
-      deps.logger.warn('sse: fetch failed', {
-        error: err instanceof Error ? err.message : String(err),
-        generationId,
-      });
-      return null;
-    }
-  }
-
   async function pump(
     generationId: string,
-    initialToken: string,
     controller: AbortController,
   ): Promise<void> {
-    let res = await attemptHandshake(generationId, initialToken, controller);
-    if (res === null) {
+    const res = await deps.fetchAuthed(deps.buildUrl(generationId), {
+      method: 'GET',
+      headers: { accept: 'text/event-stream' },
+      signal: controller.signal,
+    });
+
+    if (res.kind === 'unauthenticated') {
+      deps.logger.warn('sse: handshake auth rejected', { generationId });
+      await notifyAuthLost();
       active.delete(generationId);
       return;
     }
-    if (res.status === 401 || res.status === 403) {
-      // Free the unread 401 body before issuing recovery work.
-      try {
-        void res.body?.cancel();
-      } catch {
-        // already cancelled
-      }
-      deps.logger.warn('sse: handshake auth rejected', {
-        status: res.status,
-        generationId,
-      });
-      const recovered = deps.onAuthLost !== undefined ? await deps.onAuthLost() : false;
-      if (!recovered) {
-        await notifyAuthLost();
-        active.delete(generationId);
-        return;
-      }
-      const refreshed = await deps.sessionManager.getSession();
-      if (refreshed === null) {
-        await notifyAuthLost();
-        active.delete(generationId);
-        return;
-      }
-      res = await attemptHandshake(generationId, refreshed.accessToken, controller);
-      if (res === null) {
-        active.delete(generationId);
-        return;
-      }
-      if (res.status === 401 || res.status === 403) {
-        try {
-          void res.body?.cancel();
-        } catch {
-          // already cancelled
-        }
-        deps.logger.warn('sse: handshake auth rejected after retry', {
-          status: res.status,
-          generationId,
-        });
-        await notifyAuthLost();
-        active.delete(generationId);
-        return;
-      }
-    }
-    if (!res.ok || res.body === null) {
-      deps.logger.warn('sse: non-ok response', {
-        status: res.status,
+
+    if (res.kind === 'network-error' || !res.response.ok || res.response.body === null) {
+      deps.logger.warn('sse: handshake failed', {
+        error: res.kind === 'network-error' ? String(res.error) : res.response.status,
         generationId,
       });
       active.delete(generationId);
       return;
     }
-    const reader = res.body.getReader();
+
+    const { response } = res;
+    const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
     try {
@@ -300,15 +242,11 @@ export function createSseManager(deps: SseManagerDeps): {
       if (active.has(generationId)) {
         return { ok: false, reason: 'already-subscribed' };
       }
-      const session = await deps.sessionManager.getSession();
-      if (session === null) {
-        return { ok: false, reason: 'signed-out' };
-      }
       const controller = new AbortController();
       active.set(generationId, { generationId, controller });
       // Fire-and-forget; the pump lifetime is managed by the controller and
       // any terminal frame.
-      void pump(generationId, session.accessToken, controller);
+      void pump(generationId, controller);
       return { ok: true };
     },
     unsubscribe(generationId: string): void {

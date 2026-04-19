@@ -1,0 +1,102 @@
+{
+  "generatedAt": "2026-04-18T18:57:24.600Z",
+  "extensionId": "kepefhkhcamgfpefobckbcdpgamebimd",
+  "options": {
+    "interactiveSignIn": false,
+    "cookieUrl": "https://llmconveyors.com",
+    "cookieDomain": ".llmconveyors.com",
+    "concurrency": 6
+  },
+  "totals": {
+    "total": 6,
+    "passed": 4,
+    "failed": 2
+  },
+  "results": [
+    {
+      "id": "status-initial",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 85
+    },
+    {
+      "id": "cookie-exchange-no-cookie",
+      "ok": false,
+      "detail": {
+        "error": "browserContext.addCookies: Cookie should have either url or path"
+      },
+      "durationMs": 6
+    },
+    {
+      "id": "cookie-exchange-invalid-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 20
+    },
+    {
+      "id": "cookie-exchange-concurrency-race",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "concurrency": 6,
+        "validCount": 6,
+        "durationMs": 34,
+        "responses": [
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          }
+        ]
+      },
+      "durationMs": 35
+    },
+    {
+      "id": "malformed-auth-sign-in-payload",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "ok": false,
+          "reason": "invalid sign-in payload"
+        }
+      },
+      "durationMs": 9
+    },
+    {
+      "id": "session-capture-redacted",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "reason": "llmc.session.v1 missing",
+        "storageKeys": [
+          "llmc.sw.main-entered"
+        ]
+      },
+      "durationMs": 4
+    }
+  ]
+}

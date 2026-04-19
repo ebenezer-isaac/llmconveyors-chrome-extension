@@ -110,6 +110,54 @@ describe('AtsComparisonBody adversarial', () => {
       );
       expect(screen.queryByTestId('artifact-body-ats')).toBeTruthy();
     });
+
+    it('parses nested wrapper payload shape', () => {
+      render(
+        <AtsComparisonBody
+          artifact={atsArtifact({
+            payload: {
+              result: {
+                atsScorecard: {
+                  before: fullScore({ overallScore: 23, grade: 'F' }),
+                  after: fullScore({ overallScore: 72, grade: 'B' }),
+                  change: 49,
+                },
+              },
+            },
+          })}
+          open={true}
+        />,
+      );
+      const body = screen.getByTestId('artifact-body-ats');
+      expect(body.textContent).toContain('49');
+      expect(body.textContent).toContain('72');
+    });
+
+    it('accepts score field alias when overallScore is missing', () => {
+      render(
+        <AtsComparisonBody
+          artifact={atsArtifact({
+            before: {
+              score: 30,
+              grade: 'D',
+              matchedKeywords: [],
+              missingKeywords: [],
+            },
+            after: {
+              score: 55,
+              grade: 'C',
+              matchedKeywords: [],
+              missingKeywords: [],
+            },
+            delta: 25,
+          })}
+          open={true}
+        />,
+      );
+      const body = screen.getByTestId('artifact-body-ats');
+      expect(body.textContent).toContain('55');
+      expect(body.textContent).toContain('25');
+    });
   });
 
   describe('numeric edge cases', () => {

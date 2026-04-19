@@ -9,11 +9,13 @@ import type { BrowserContext, Route } from '@playwright/test';
  * are routed so the E2E build can run without touching the network.
  */
 const BACKEND_HOSTS: readonly string[] = [
+  'http://localhost:4000/**',
   'https://api.llmconveyors.local/**',
   'https://api.llmconveyors.com/**',
 ];
 
 const BRIDGE_HOSTS: readonly string[] = [
+  'http://localhost:3000/**',
   'https://llmconveyors.com/**',
   'https://llmconveyors.local/**',
 ];
@@ -23,14 +25,21 @@ async function backendHandler(route: Route): Promise<void> {
   const url = new URL(req.url());
   const method = req.method();
   if (method === 'POST' && url.pathname === '/api/v1/auth/extension-token-exchange') {
+    const exp = Date.now() + 60 * 60 * 1000;
+    const accessToken = buildTestJwt('user_e2e_001');
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        accessToken: 'at_e2e_001',
-        refreshToken: 'rt_e2e_001',
-        expiresAt: Date.now() + 60 * 60 * 1000,
-        userId: 'user_e2e_001',
+        success: true,
+        data: {
+          accessToken,
+          refreshToken: 'rt_e2e_001_longrefreshtokenvaluexxxxxxxxxx',
+          accessTokenExpiry: exp,
+          // Keep legacy fields for any old readers still in the test harness.
+          expiresAt: exp,
+          userId: 'user_e2e_001',
+        },
       }),
     });
     return;
@@ -166,8 +175,8 @@ export async function seedE2ETestCookieJar(
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
   await page.evaluate(
-    ({ key, jar }) =>
-      new Promise<void>((resolve, reject) => {
+    async ({ key, jar }) => {
+      await new Promise<void>((resolve, reject) => {
         chrome.storage.local.set({ [key]: jar }, () => {
           if (chrome.runtime.lastError) {
             reject(chrome.runtime.lastError);
@@ -175,7 +184,40 @@ export async function seedE2ETestCookieJar(
           }
           resolve();
         });
-      }),
+      });
+
+      await new Promise<void>((resolve) => {
+        chrome.cookies.set(
+          {
+            url: 'http://localhost:3000/',
+            name: 'sAccessToken',
+            value: 'e2e-cookie-token',
+            path: '/',
+            expirationDate: Math.floor(Date.now() / 1000) + 60 * 60,
+          },
+          () => {
+            void chrome.runtime.lastError;
+            resolve();
+          },
+        );
+      });
+
+      await new Promise<void>((resolve) => {
+        chrome.cookies.set(
+          {
+            url: 'https://llmconveyors.com/',
+            name: 'sAccessToken',
+            value: 'e2e-cookie-token',
+            path: '/',
+            expirationDate: Math.floor(Date.now() / 1000) + 60 * 60,
+          },
+          () => {
+            void chrome.runtime.lastError;
+            resolve();
+          },
+        );
+      });
+    },
     { key: E2E_TEST_COOKIE_JAR_KEY, jar: 'st-auth-session=e2e-test-cookie' },
   );
   await page.close();

@@ -42,6 +42,7 @@ function isListItem(value: unknown): value is SessionListItem {
 export function useSessionList(
   enabled: boolean,
   limit: number = 5,
+  authUserId: string | null = null,
 ): UseSessionListResult {
   const [items, setItems] = useState<readonly SessionListItem[]>([]);
   const [hasMore, setHasMore] = useState<boolean>(false);
@@ -108,7 +109,11 @@ export function useSessionList(
         mountedRef.current = false;
       };
     }
-    void refresh();
+    // On account switch, clear list eagerly to avoid showing stale sessions
+    // for the previous user while the fresh request is in flight.
+    setItems([]);
+    setHasMore(false);
+    void refresh({ force: true });
     const runtime = getRuntime();
     const listener = (msg: unknown): void => {
       if (!msg || typeof msg !== 'object') return;
@@ -122,7 +127,7 @@ export function useSessionList(
       mountedRef.current = false;
       runtime?.onMessage.removeListener(listener);
     };
-  }, [enabled, refresh]);
+  }, [enabled, authUserId, refresh]);
 
   return { items, hasMore, loading, error, refresh };
 }

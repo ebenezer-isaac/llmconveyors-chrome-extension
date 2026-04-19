@@ -172,6 +172,147 @@ function scanForGenericIntent(agent: GenericScanAgent): GenericScanResult {
     return candidates[0]!.slice(0, MAX_TEXT);
   }
 
+  function normalizeText(input: string): string {
+    return input.replace(/\s+/g, ' ').trim();
+  }
+
+  function clampHint(input: string, max: number): string | undefined {
+    const normalized = normalizeText(input);
+    if (normalized.length < 2) return undefined;
+    return normalized.slice(0, max);
+  }
+
+  function cleanCompany(raw: string): string | undefined {
+    let normalized = normalizeText(raw);
+    normalized = normalized
+      .replace(/\b(careers?|jobs?|job postings?|job board)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (normalized.length < 2) return undefined;
+    return normalized.slice(0, 120);
+  }
+
+  function parseTitleCompanyPair(source: string): {
+    jobTitle?: string;
+    company?: string;
+  } {
+    const text = normalizeText(source);
+    if (!text) return {};
+
+    // Common pattern: "Senior Engineer at Acme" or "Senior Engineer @ Acme"
+    const atMatch = text.match(/^(.+?)\s+(?:at|@)\s+(.+)$/i);
+    if (atMatch) {
+      return {
+        jobTitle: clampHint(atMatch[1] ?? '', 160),
+        company: cleanCompany(atMatch[2] ?? ''),
+      };
+    }
+
+    // Common pattern: "Senior Engineer - Acme" / "| Acme"
+    const split = text.split(/\s*(?:\||-)\s*/).filter((part) => part.length > 0);
+    if (split.length >= 2) {
+      const left = clampHint(split[0] ?? '', 160);
+      const rightRaw = split[1] ?? '';
+      const rightLooksPortal = /\b(careers?|jobs?|hiring|workday|greenhouse|lever|linkedin)\b/i.test(
+        rightRaw,
+      );
+      return {
+        ...(left ? { jobTitle: left } : {}),
+        ...(!rightLooksPortal
+          ? (() => {
+              const company = cleanCompany(rightRaw);
+              return company ? { company } : {};
+            })()
+          : {}),
+      };
+    }
+
+    return { jobTitle: clampHint(text, 160) };
+  }
+
+  function extractJobHints(
+    doc: Document,
+    objs: readonly unknown[],
+  ): { jobTitle?: string; company?: string } {
+    let jobTitle: string | undefined;
+    let company: string | undefined;
+
+    for (const raw of objs) {
+      if (!raw || typeof raw !== 'object') continue;
+      const obj = raw as Record<string, unknown>;
+      const type = obj['@type'];
+      const isJobPosting =
+        (typeof type === 'string' && type === 'JobPosting') ||
+        (Array.isArray(type) && type.includes('JobPosting'));
+      if (!isJobPosting) continue;
+      if (!jobTitle && typeof obj.title === 'string') {
+        jobTitle = clampHint(obj.title, 160);
+      }
+      const org = obj.hiringOrganization;
+      if (
+        !company &&
+        org &&
+        typeof org === 'object' &&
+        typeof (org as Record<string, unknown>).name === 'string'
+      ) {
+        company = cleanCompany((org as Record<string, unknown>).name as string);
+      }
+      if (jobTitle && company) break;
+    }
+
+    if (!company) {
+      for (const raw of objs) {
+        if (!raw || typeof raw !== 'object') continue;
+        const obj = raw as Record<string, unknown>;
+        const type = obj['@type'];
+        const isOrg =
+          (typeof type === 'string' && type === 'Organization') ||
+          (Array.isArray(type) && type.includes('Organization'));
+        if (!isOrg) continue;
+        if (typeof obj.name === 'string') {
+          company = cleanCompany(obj.name);
+          if (company) break;
+        }
+      }
+    }
+
+    const getMeta = (selector: string): string | undefined => {
+      const node = doc.querySelector(selector);
+      if (!node) return undefined;
+      const content = node.getAttribute('content');
+      if (!content) return undefined;
+      return normalizeText(content);
+    };
+
+    const candidates: string[] = [];
+    const h1 = doc.querySelector('h1')?.textContent;
+    if (typeof h1 === 'string' && h1.trim().length > 0) candidates.push(h1);
+    const ogTitle = getMeta('meta[property="og:title"]');
+    if (ogTitle) candidates.push(ogTitle);
+    const twTitle = getMeta('meta[name="twitter:title"]');
+    if (twTitle) candidates.push(twTitle);
+    if (typeof doc.title === 'string' && doc.title.trim().length > 0) {
+      candidates.push(doc.title);
+    }
+
+    for (const candidate of candidates) {
+      const parsed = parseTitleCompanyPair(candidate);
+      if (!jobTitle && parsed.jobTitle) jobTitle = parsed.jobTitle;
+      if (!company && parsed.company) company = parsed.company;
+      if (jobTitle && company) break;
+    }
+
+    if (!company) {
+      const siteName = getMeta('meta[property="og:site_name"]');
+      if (siteName) company = cleanCompany(siteName);
+    }
+
+    return {
+      ...(jobTitle ? { jobTitle } : {}),
+      ...(company ? { company } : {}),
+    };
+  }
+
   function hasJobPostingMarkers(doc: Document): boolean {
     const url = doc.location?.href ?? '';
     if (/careers|jobs|job-description|apply/i.test(url)) return true;
@@ -269,10 +410,13 @@ function scanForGenericIntent(agent: GenericScanAgent): GenericScanResult {
     if (hasJobPostingMarkers(document)) {
       const text = textViaReadability(document);
       if (text.length >= 300) {
+        const hints = extractJobHints(document, objs);
         const result: GenericScanJdResult = {
           kind: 'job-description',
           text: withSourceUrl(text),
           method: 'readability',
+          ...(hints.jobTitle ? { jobTitle: hints.jobTitle } : {}),
+          ...(hints.company ? { company: hints.company } : {}),
           url,
         };
         return { ok: true, result };

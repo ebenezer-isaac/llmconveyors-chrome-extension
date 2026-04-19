@@ -20,6 +20,7 @@ export interface CachedSessionList {
   readonly items: readonly SessionListItem[];
   readonly hasMore: boolean;
   readonly nextCursor: string | null;
+  readonly userId?: string | null;
   readonly fetchedAt: number;
 }
 
@@ -39,6 +40,7 @@ export function createSessionListCache(deps: SessionListCacheDeps): {
     readonly items: readonly SessionListItem[];
     readonly hasMore: boolean;
     readonly nextCursor: string | null;
+    readonly userId?: string;
   }) => Promise<CachedSessionList>;
   clear: () => Promise<void>;
   isFresh: (entry: CachedSessionList) => boolean;
@@ -55,9 +57,13 @@ export function createSessionListCache(deps: SessionListCacheDeps): {
         const hasMore = obj.hasMore === true;
         const nextCursor =
           typeof obj.nextCursor === 'string' ? obj.nextCursor : null;
+        const userId =
+          typeof obj.userId === 'string' && obj.userId.length > 0
+            ? obj.userId
+            : null;
         const items = Array.isArray(obj.items) ? (obj.items as SessionListItem[]) : [];
         if (fetchedAt === 0) return null;
-        return { items, hasMore, nextCursor, fetchedAt };
+        return { items, hasMore, nextCursor, userId, fetchedAt };
       } catch (err: unknown) {
         deps.logger.warn('session-list-cache: read failed', {
           error: err instanceof Error ? err.message : String(err),
@@ -66,10 +72,15 @@ export function createSessionListCache(deps: SessionListCacheDeps): {
       }
     },
     async write(entry): Promise<CachedSessionList> {
+      const userId =
+        typeof entry.userId === 'string' && entry.userId.length > 0
+          ? entry.userId
+          : null;
       const payload: CachedSessionList = {
         items: entry.items,
         hasMore: entry.hasMore,
         nextCursor: entry.nextCursor,
+        userId,
         fetchedAt: deps.now(),
       };
       try {

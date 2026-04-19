@@ -78,6 +78,8 @@ export interface SidepanelGenerationFormBase {
   readonly intent: DetectedIntent | null;
   readonly genericIntent: GenericIntentSeed | null;
   readonly tabUrl: string | null;
+  /** Fallback role title sourced from MASTER_RESUME_GET. */
+  readonly resumeJobTitle?: string | null;
   readonly boundSession?: BoundSessionSeed | null;
 }
 
@@ -92,6 +94,7 @@ function deriveDefaults(
   intent: DetectedIntent | null,
   genericIntent: GenericIntentSeed | null,
   tabUrl: string | null,
+  resumeJobTitle: string | null | undefined,
   boundSession: BoundSessionSeed | null | undefined,
   locked: boolean,
 ): Defaults {
@@ -137,6 +140,9 @@ function deriveDefaults(
       : undefined) ??
     (typeof genericIntent?.jobTitle === 'string' && genericIntent.jobTitle.length > 0
       ? genericIntent.jobTitle
+      : undefined) ??
+    (typeof resumeJobTitle === 'string' && resumeJobTitle.length > 0
+      ? resumeJobTitle
       : undefined) ??
     '';
   const jobDescription =
@@ -241,6 +247,7 @@ export function SidepanelGenerationFormProvider({
   intent,
   genericIntent,
   tabUrl,
+  resumeJobTitle = null,
   boundSession,
   children,
 }: SidepanelGenerationFormBase & {
@@ -261,8 +268,16 @@ export function SidepanelGenerationFormProvider({
   const locked = boundSession !== null && boundSession !== undefined && !userUnlocked;
 
   const defaults = useMemo(
-    () => deriveDefaults(intent, genericIntent, tabUrl, boundSession ?? null, locked),
-    [intent, genericIntent, tabUrl, boundSession, locked],
+    () =>
+      deriveDefaults(
+        intent,
+        genericIntent,
+        tabUrl,
+        resumeJobTitle,
+        boundSession ?? null,
+        locked,
+      ),
+    [intent, genericIntent, tabUrl, resumeJobTitle, boundSession, locked],
   );
   const jdDetected = useMemo(
     () => hasDetectedJobDescription(intent, genericIntent, tabUrl),

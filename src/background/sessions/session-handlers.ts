@@ -24,6 +24,7 @@ import type { SessionHydrateClientOutcome } from './session-hydrate-client';
 import type { CachedSessionList } from './session-list-cache';
 
 export interface SessionHandlerDeps {
+  readonly readSession: () => Promise<{ readonly userId: string } | null>;
   readonly client: {
     list: (q: {
       limit?: number;
@@ -39,6 +40,7 @@ export interface SessionHandlerDeps {
       items: readonly SessionListItem[];
       hasMore: boolean;
       nextCursor: string | null;
+      userId?: string;
     }) => Promise<CachedSessionList>;
     clear: () => Promise<void>;
     isFresh: (entry: CachedSessionList) => boolean;
@@ -70,6 +72,23 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
   }) => Promise<SessionHydrateGetResponse>;
   invalidateCache: () => Promise<void>;
 } {
+  async function resolveCurrentUserId(): Promise<string | null> {
+    try {
+      const session = await deps.readSession();
+      if (session === null) return null;
+      if (typeof session.userId !== 'string' || session.userId.length === 0) {
+        return null;
+      }
+      return session.userId;
+    } catch {
+      return null;
+    }
+  }
+
+  function isCacheForUser(entry: CachedSessionList, userId: string): boolean {
+    return entry.userId === userId;
+  }
+
   return {
     async SESSION_LIST(msg): Promise<SessionListResult> {
       const parsed = SessionListRequestSchema.safeParse(msg.data ?? {});
@@ -80,10 +99,18 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
         };
       }
       const req = parsed.data;
+      const currentUserId = await resolveCurrentUserId();
+      if (currentUserId === null) {
+        return { ok: false, reason: 'signed-out' };
+      }
 
       if (!req.forceRefresh) {
         const cached = await deps.cache.read();
-        if (cached !== null && deps.cache.isFresh(cached)) {
+        if (
+          cached !== null &&
+          isCacheForUser(cached, currentUserId) &&
+          deps.cache.isFresh(cached)
+        ) {
           return {
             ok: true,
             items: [...cached.items],
@@ -104,6 +131,7 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
           items: outcome.items,
           hasMore: outcome.hasMore,
           nextCursor: outcome.nextCursor,
+          userId: currentUserId,
         });
         return {
           ok: true,
@@ -121,12 +149,16 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
       if (!parsed.success) {
         return { ok: false, reason: 'shape-mismatch' };
       }
+      const currentUserId = await resolveCurrentUserId();
+      if (currentUserId === null) {
+        return { ok: false, reason: 'signed-out' };
+      }
       // The popup-side session lookup reads from the cached list because the
       // bg does not yet own a single-session detail endpoint. If the entry is
       // absent we surface a not-found so the caller can open the web
       // dashboard.
       const cached = await deps.cache.read();
-      if (cached !== null) {
+      if (cached !== null && isCacheForUser(cached, currentUserId)) {
         const match = cached.items.find((it) => it.sessionId === parsed.data.sessionId);
         if (match) {
           return { ok: true, session: match };
@@ -140,6 +172,7 @@ export function createSessionHandlers(deps: SessionHandlerDeps): {
           items: outcome.items,
           hasMore: outcome.hasMore,
           nextCursor: outcome.nextCursor,
+          userId: currentUserId,
         });
         if (match) return { ok: true, session: match };
         return { ok: false, reason: 'not-found' };

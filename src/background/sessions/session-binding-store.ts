@@ -47,10 +47,10 @@ export type SessionBinding = Readonly<z.infer<typeof SessionBindingSchema>> & {
 };
 
 export interface SessionBindingStore {
-  get(urlKey: string, agentId: AgentId): Promise<SessionBinding | null>;
-  put(binding: SessionBinding): Promise<void>;
-  evict(urlKey: string, agentId: AgentId): Promise<void>;
-  list(): Promise<readonly SessionBinding[]>;
+  get(urlKey: string, agentId: AgentId, userId?: string): Promise<SessionBinding | null>;
+  put(binding: SessionBinding, userId?: string): Promise<void>;
+  evict(urlKey: string, agentId: AgentId, userId?: string): Promise<void>;
+  list(userId?: string): Promise<readonly SessionBinding[]>;
 }
 
 export interface SessionBindingStorageFacade {
@@ -64,8 +64,16 @@ export interface SessionBindingStoreDeps {
   readonly now: () => number;
 }
 
-function composeKey(urlKey: string, agentId: AgentId): string {
-  return `${urlKey}|${agentId}`;
+function normalizeUserScope(userId?: string): string | null {
+  if (typeof userId !== 'string') return null;
+  const normalized = userId.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function composeKey(urlKey: string, agentId: AgentId, userId?: string): string {
+  const scope = normalizeUserScope(userId);
+  if (scope === null) return `${urlKey}|${agentId}`;
+  return `${scope}|${urlKey}|${agentId}`;
 }
 
 function parseRecord(
@@ -173,10 +181,10 @@ export function createSessionBindingStore(
   }
 
   return {
-    async get(urlKey: string, agentId: AgentId): Promise<SessionBinding | null> {
+    async get(urlKey: string, agentId: AgentId, userId?: string): Promise<SessionBinding | null> {
       if (typeof urlKey !== 'string' || urlKey.length === 0) return null;
       if (!isAgentId(agentId)) return null;
-      const key = composeKey(urlKey, agentId);
+      const key = composeKey(urlKey, agentId, userId);
       const current = await loadAll();
       const reference = now();
       const pruned = pruneStale(current, reference);
@@ -185,7 +193,7 @@ export function createSessionBindingStore(
       const hit = pruned[key];
       return hit ?? null;
     },
-    async put(binding: SessionBinding): Promise<void> {
+    async put(binding: SessionBinding, userId?: string): Promise<void> {
       const validated = SessionBindingSchema.safeParse(binding);
       if (!validated.success) {
         logger.warn('session-binding-store: rejecting invalid binding', {
@@ -194,7 +202,7 @@ export function createSessionBindingStore(
         return;
       }
       if (!isAgentId(validated.data.agentId)) return;
-      const key = composeKey(validated.data.urlKey, validated.data.agentId);
+      const key = composeKey(validated.data.urlKey, validated.data.agentId, userId);
       const current = await loadAll();
       const reference = now();
       const pruned = pruneStale(current, reference);
@@ -203,20 +211,25 @@ export function createSessionBindingStore(
       const capped = enforceCap(next);
       await saveAll(capped);
     },
-    async evict(urlKey: string, agentId: AgentId): Promise<void> {
+    async evict(urlKey: string, agentId: AgentId, userId?: string): Promise<void> {
       if (!isAgentId(agentId)) return;
-      const key = composeKey(urlKey, agentId);
+      const key = composeKey(urlKey, agentId, userId);
       const current = await loadAll();
       if (!(key in current)) return;
       const next: Record<string, SessionBinding> = { ...current };
       delete next[key];
       await saveAll(next);
     },
-    async list(): Promise<readonly SessionBinding[]> {
+    async list(userId?: string): Promise<readonly SessionBinding[]> {
       const current = await loadAll();
       const reference = now();
       const pruned = pruneStale(current, reference);
-      return Object.values(pruned);
+      const scope = normalizeUserScope(userId);
+      if (scope === null) return Object.values(pruned);
+      const prefix = `${scope}|`;
+      return Object.entries(pruned)
+        .filter(([k]) => k.startsWith(prefix))
+        .map(([, v]) => v);
     },
   };
 }

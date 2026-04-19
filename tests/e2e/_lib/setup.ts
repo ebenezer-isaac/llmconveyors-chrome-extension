@@ -101,8 +101,8 @@ export async function seedAuthSession(
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
   await page.evaluate(
-    ({ session }) =>
-      new Promise<void>((resolve, reject) => {
+    async ({ session }) => {
+      await new Promise<void>((resolve, reject) => {
         chrome.storage.local.set({ 'llmc.session.v1': session }, () => {
           if (chrome.runtime.lastError) {
             reject(chrome.runtime.lastError);
@@ -110,7 +110,52 @@ export async function seedAuthSession(
           }
           resolve();
         });
-      }),
+      });
+
+      // Cookie-first recovery runs at startup; seed the auth cookie so tests
+      // that preseed session state do not get immediately signed out.
+      await new Promise<void>((resolve) => {
+        chrome.cookies.set(
+          {
+            url: 'http://localhost:3000/',
+            name: 'sAccessToken',
+            value: 'e2e-cookie-token',
+            path: '/',
+            expirationDate: Math.floor(Date.now() / 1000) + 60 * 60,
+          },
+          () => {
+            // Ignore per-host cookie failures to keep this helper resilient
+            // across prod/local profile builds.
+            void chrome.runtime.lastError;
+            resolve();
+          },
+        );
+      });
+      await new Promise<void>((resolve) => {
+        chrome.cookies.set(
+          {
+            url: 'https://llmconveyors.com/',
+            name: 'sAccessToken',
+            value: 'e2e-cookie-token',
+            path: '/',
+            expirationDate: Math.floor(Date.now() / 1000) + 60 * 60,
+          },
+          () => {
+            void chrome.runtime.lastError;
+            resolve();
+          },
+        );
+      });
+
+      // Ensure the background has a canonical signed-in session even if
+      // startup recovery briefly raced and cleared the seeded row.
+      await new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ key: 'AUTH_COOKIE_EXCHANGE', data: {} }, () => {
+          void chrome.runtime.lastError;
+          resolve();
+        });
+      });
+    },
     {
       session: {
         accessToken: 'at_e2e_001',

@@ -72,6 +72,32 @@ describe('normalizeArtifactPreview', () => {
       normalizeArtifactPreview({ type: 'ats-report', content: 'x' }, 'f.json')
         ?.type,
     ).toBe('ats-comparison');
+    expect(
+      normalizeArtifactPreview({ type: 'ats-scorecard', content: 'x' }, 'f.json')
+        ?.type,
+    ).toBe('ats-comparison');
+    expect(
+      normalizeArtifactPreview({ type: 'ats_score', content: 'x' }, 'f.json')
+        ?.type,
+    ).toBe('ats-comparison');
+  });
+
+  it('accepts payload-only ATS scorecard artifacts for rich card rendering', () => {
+    const out = normalizeArtifactPreview(
+      {
+        type: 'ats-scorecard',
+        payload: {
+          before: { overallScore: 23, grade: 'F', matchedKeywords: [], missingKeywords: [] },
+          after: { overallScore: 72, grade: 'B', matchedKeywords: [], missingKeywords: [] },
+        },
+      },
+      'ATS_Report.json',
+      'sess-1',
+    );
+    expect(out).not.toBeNull();
+    expect(out?.type).toBe('ats-comparison');
+    expect(out?.content).toBeNull();
+    expect(out?.payload).toBeTruthy();
   });
 
   it('carries through payload for type-specific bodies (ATS, cold-email)', () => {

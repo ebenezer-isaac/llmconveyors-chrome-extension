@@ -14,11 +14,14 @@ export const AuthSignInRequestSchema = z
   .object({
     cookieJar: z.string().max(16_384).optional(),
     /**
-     * When `false`, drive `chrome.identity.launchWebAuthFlow` with
-     * `interactive: false` for a silent token refresh. The popup uses this
-     * on mount to sign in automatically when the web cookie is still valid,
-     * falling back to the signed-out panel + explicit Sign In button when
-     * silent exchange fails. Defaults to `true`.
+     * Optional agent context used for analytics/logging and future
+     * agent-specific auth UX. Current bridge flow is shared across agents.
+     */
+    agent: z.enum(['job-hunter', 'b2b-sales']).optional(),
+    /**
+      * When `false`, AUTH_SIGN_IN performs preflight cookie recovery only and
+      * does not open an interactive sign-in popup.
+     * Defaults to `true`.
      */
     interactive: z.boolean().optional(),
   })

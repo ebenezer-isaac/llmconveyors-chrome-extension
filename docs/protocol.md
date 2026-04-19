@@ -52,6 +52,13 @@ Request schema:
       "type": "string",
       "maxLength": 16384
     },
+    "agent": {
+      "type": "string",
+      "enum": [
+        "job-hunter",
+        "b2b-sales"
+      ]
+    },
     "interactive": {
       "type": "boolean"
     }
@@ -414,6 +421,32 @@ Request schema:
       "type": "string",
       "format": "uri",
       "maxLength": 2048
+    },
+    "resumeAttachment": {
+      "type": "object",
+      "properties": {
+        "fileName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "contentBase64": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000000
+        }
+      },
+      "required": [
+        "fileName",
+        "mimeType",
+        "contentBase64"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -608,6 +641,15 @@ Request schema:
       "type": "integer",
       "minimum": 1,
       "maximum": 100
+    },
+    "rawPageText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200000
+    },
+    "hostname": {
+      "type": "string",
+      "maxLength": 256
     }
   },
   "required": [
@@ -1067,27 +1109,40 @@ Request schema:
         "properties": {
           "kind": {
             "type": "string",
-            "enum": [
-              "cv",
-              "cover-letter",
-              "email",
-              "other"
-            ]
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "content": {
             "type": "string",
             "maxLength": 1000000
           },
+          "payload": {
+            "type": "object",
+            "additionalProperties": {}
+          },
           "metadata": {
             "type": "object",
             "additionalProperties": {}
+          },
+          "mimeType": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "storageKey": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "downloadUrl": {
+            "type": "string",
+            "maxLength": 4000
           }
         },
-        "required": [
-          "kind",
-          "content"
-        ],
-        "additionalProperties": false
+        "additionalProperties": true
       },
       "maxItems": 20
     }

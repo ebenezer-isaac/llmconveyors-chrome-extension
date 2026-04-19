@@ -15,6 +15,7 @@ import { clientEnv } from '../shared/env';
 export const API_BASE_URL: string = clientEnv.apiBaseUrl;
 
 export const AUTH_EXCHANGE_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/extension-token-exchange';
+export const AUTH_COOKIE_SYNC_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/extension-cookie-sync';
 export const AUTH_SIGN_OUT_ENDPOINT: string = API_BASE_URL + '/api/v1/auth/sign-out';
 export const EXTRACT_SKILLS_ENDPOINT: string = API_BASE_URL + '/api/v1/ats/extract-skills';
 export const EXTRACT_JD_ENDPOINT: string = API_BASE_URL + '/api/v1/ats/extract-jd';

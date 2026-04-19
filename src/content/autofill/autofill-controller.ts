@@ -41,10 +41,17 @@ import { buildFillPlan } from 'ats-autofill-engine';
 import type { Profile } from 'ats-autofill-engine/profile';
 import type { Logger } from '@/src/background/log';
 import type {
+  FillRequest,
   FillRequestResponse,
   DetectedIntentPayload,
 } from '@/src/background/messaging/protocol-types';
 import { isEmptyProfile } from './profile-reader';
+
+type ResumeAttachment = NonNullable<FillRequest['resumeAttachment']>;
+
+export interface ExecuteFillOptions {
+  readonly resumeAttachment?: ResumeAttachment;
+}
 
 /** Abort reasons aligned with FillRequestResponseSchema. */
 export type FillAbortReason =
@@ -59,6 +66,19 @@ export type FillAbortReason =
 export interface AutofillControllerDeps {
   /** Load adapter for URL. Returns null if no match or import fails. */
   readonly loadAdapter: (url: string) => Promise<AtsAdapter | null>;
+
+  /**
+   * Generic DOM scanner used when no ATS adapter matches the current URL.
+   */
+  readonly scanGenericForm: (root: Document) => FormModel;
+
+  /**
+   * Generic DOM field writer used when no ATS adapter matches the URL.
+   */
+  readonly fillGenericField: (
+    instruction: FillInstruction,
+    root: Document,
+  ) => FillResult;
 
   /** Read user profile. Returns null if missing/invalid. */
   readonly readProfile: () => Promise<Profile | null>;
@@ -163,7 +183,7 @@ export class AutofillController {
    * arrives from the background. NEVER throws; every failure path
    * produces a typed FillRequestResponse.
    */
-  async executeFill(): Promise<FillRequestResponse> {
+  async executeFill(options: ExecuteFillOptions = {}): Promise<FillRequestResponse> {
     let url: string;
     try {
       url = this.deps.document.location.href;
@@ -175,10 +195,10 @@ export class AutofillController {
     this.deps.logger.info('executeFill start', { url });
 
     const adapter = await this.ensureAdapter(url);
-    if (!adapter) {
-      this.deps.logger.warn('executeFill: no adapter for URL', { url });
-      return aborted('no-adapter');
-    }
+    this.deps.logger.info('executeFill adapter resolution complete', {
+      url,
+      adapterKind: adapter?.kind ?? null,
+    });
 
     const profile = await this.deps.readProfile();
     if (isEmptyProfile(profile)) {
@@ -186,6 +206,14 @@ export class AutofillController {
       return aborted('profile-missing');
     }
     const p: Profile = profile as Profile;
+
+    if (!adapter) {
+      this.deps.logger.info(
+        'executeFill: no ATS adapter for URL; falling back to generic DOM fill',
+        { url },
+      );
+      return this.executeGenericFill(p, startedAt, options.resumeAttachment);
+    }
 
     if (
       adapter.kind === 'workday' &&
@@ -195,7 +223,7 @@ export class AutofillController {
       return this.executeWorkdayFill(adapter, p, startedAt);
     }
 
-    return this.executeSinglePassFill(adapter, p, startedAt);
+    return this.executeSinglePassFill(adapter, p, startedAt, options.resumeAttachment);
   }
 
   private async executeWorkdayFill(
@@ -275,10 +303,143 @@ export class AutofillController {
     };
   }
 
+  private async executeGenericFill(
+    profile: Profile,
+    startedAt: number,
+    resumeAttachment?: ResumeAttachment,
+  ): Promise<FillRequestResponse> {
+    let formModel: FormModel;
+    try {
+      formModel = this.deps.scanGenericForm(this.deps.document);
+    } catch (err: unknown) {
+      this.deps.logger.error('generic scanForm threw', err);
+      return aborted('scan-failed');
+    }
+
+    this.deps.logger.debug('generic scanForm complete', {
+      fieldCount: formModel.fields.length,
+    });
+
+    if (formModel.fields.length === 0) {
+      this.deps.logger.info('generic scanForm returned empty form');
+      return aborted('no-form');
+    }
+
+    let plan: FillPlan;
+    try {
+      plan = buildFillPlan({ formModel, profile });
+    } catch (err: unknown) {
+      this.deps.logger.error('generic buildFillPlan threw', err);
+      return aborted('plan-failed');
+    }
+
+    this.deps.logger.info('generic fill plan built', {
+      planId: plan.planId,
+      instructionCount: plan.instructions.length,
+      skippedCount: plan.skipped.length,
+    });
+
+    const filled: FilledEntry[] = [];
+    const failed: FailedEntry[] = [];
+    for (const instruction of plan.instructions) {
+      const result = this.executeGenericInstruction(instruction);
+      if (result.ok) {
+        filled.push({
+          ok: true,
+          selector: instruction.selector,
+          value: truncateForWire(instruction.value),
+          fieldType: instruction.fieldType,
+        });
+      } else {
+        failed.push({
+          selector: instruction.selector,
+          reason: result.reason,
+        });
+      }
+    }
+
+    let skipped: FilledEntry[] = plan.skipped.map((s) => ({
+      ok: false,
+      selector: s.instruction.selector,
+      value: truncateForWire(s.reason),
+      fieldType: s.instruction.fieldType ?? 'unknown',
+    }));
+
+    if (resumeAttachment) {
+      const resumeOutcome = await this.attachResumeFromPlanSkips({
+        plan,
+        file: base64ToFile(
+          resumeAttachment.contentBase64,
+          resumeAttachment.mimeType,
+          resumeAttachment.fileName,
+        ),
+        adapter: null,
+      });
+      if (resumeOutcome !== null) {
+        for (const entry of resumeOutcome.filled) filled.push(entry);
+        for (const entry of resumeOutcome.failed) failed.push(entry);
+        skipped = skipped.filter(
+          (entry) => !resumeOutcome.consumedSelectors.has(entry.selector),
+        );
+      }
+    }
+
+    this.deps.logger.info('generic executeFill complete', {
+      planId: plan.planId,
+      filled: filled.length,
+      skipped: skipped.length,
+      failed: failed.length,
+      durationMs: this.deps.now() - startedAt,
+    });
+
+    return {
+      ok: true,
+      planId: plan.planId,
+      executedAt: new Date(this.deps.now()).toISOString(),
+      filled,
+      skipped,
+      failed,
+      aborted: false,
+    };
+  }
+
+  private executeGenericInstruction(
+    instruction: FillInstruction,
+  ): FillResult {
+    try {
+      const result = this.deps.fillGenericField(instruction, this.deps.document);
+      if (result === undefined || result === null) {
+        this.deps.logger.warn('generic fillField returned no result', {
+          selector: instruction.selector,
+          fieldType: instruction.fieldType,
+        });
+        return {
+          ok: false,
+          selector: instruction.selector,
+          reason: 'write-failed',
+          error: 'generic filler returned no result',
+        };
+      }
+      return result;
+    } catch (err: unknown) {
+      this.deps.logger.error('generic fillField threw', err, {
+        selector: instruction.selector,
+        fieldType: instruction.fieldType,
+      });
+      return {
+        ok: false,
+        selector: instruction.selector,
+        reason: 'write-failed',
+        error: serializeError(err).message,
+      };
+    }
+  }
+
   private async executeSinglePassFill(
     adapter: AtsAdapter,
     profile: Profile,
     startedAt: number,
+    resumeAttachment?: ResumeAttachment,
   ): Promise<FillRequestResponse> {
     let formModel: FormModel;
     try {
@@ -334,12 +495,31 @@ export class AutofillController {
       }
     }
 
-    const skipped: FilledEntry[] = plan.skipped.map((s) => ({
+    let skipped: FilledEntry[] = plan.skipped.map((s) => ({
       ok: false,
       selector: s.instruction.selector,
       value: truncateForWire(s.reason),
       fieldType: s.instruction.fieldType ?? 'unknown',
     }));
+
+    if (resumeAttachment) {
+      const resumeOutcome = await this.attachResumeFromPlanSkips({
+        plan,
+        file: base64ToFile(
+          resumeAttachment.contentBase64,
+          resumeAttachment.mimeType,
+          resumeAttachment.fileName,
+        ),
+        adapter,
+      });
+      if (resumeOutcome !== null) {
+        for (const entry of resumeOutcome.filled) filled.push(entry);
+        for (const entry of resumeOutcome.failed) failed.push(entry);
+        skipped = skipped.filter(
+          (entry) => !resumeOutcome.consumedSelectors.has(entry.selector),
+        );
+      }
+    }
 
     this.deps.logger.info('singlePass executeFill complete', {
       kind: adapter.kind,
@@ -359,6 +539,143 @@ export class AutofillController {
       failed,
       aborted: false,
     };
+  }
+
+  private async attachResumeFromPlanSkips(args: {
+    readonly plan: FillPlan;
+    readonly file: File | null;
+    readonly adapter: AtsAdapter | null;
+  }): Promise<{
+    readonly consumedSelectors: ReadonlySet<string>;
+    readonly filled: readonly FilledEntry[];
+    readonly failed: readonly FailedEntry[];
+  } | null> {
+    const resumeSkips = args.plan.skipped.filter(
+      (entry) => entry.instruction.fieldType === 'resume-upload',
+    );
+    if (resumeSkips.length === 0) return null;
+    if (args.file === null) {
+      this.deps.logger.warn('resume attachment decode failed; skipping upload');
+      return null;
+    }
+
+    const consumedSelectors = new Set<string>();
+    const filled: FilledEntry[] = [];
+    const failed: FailedEntry[] = [];
+
+    for (const skipped of resumeSkips) {
+      consumedSelectors.add(skipped.instruction.selector);
+      const result = await this.attachResumeForInstruction(
+        skipped.instruction,
+        args.file,
+        args.adapter,
+      );
+      if (result.ok) {
+        filled.push({
+          ok: true,
+          selector: skipped.instruction.selector,
+          value: truncateForWire(args.file.name),
+          fieldType: skipped.instruction.fieldType,
+        });
+      } else {
+        failed.push({
+          selector: skipped.instruction.selector,
+          reason: result.reason,
+        });
+      }
+    }
+
+    return { consumedSelectors, filled, failed };
+  }
+
+  private async attachResumeForInstruction(
+    instruction: FillInstruction,
+    file: File,
+    adapter: AtsAdapter | null,
+  ): Promise<FillResult> {
+    if (adapter?.attachFile) {
+      try {
+        return await adapter.attachFile(instruction, file);
+      } catch (err: unknown) {
+        this.deps.logger.error('adapter.attachFile threw', err, {
+          selector: instruction.selector,
+        });
+        return {
+          ok: false,
+          selector: instruction.selector,
+          reason: 'write-failed',
+          error: serializeError(err).message,
+        };
+      }
+    }
+
+    return this.attachFileInDomBySelector(instruction.selector, file);
+  }
+
+  private attachFileInDomBySelector(
+    selector: string,
+    file: File,
+  ): FillResult {
+    let nodes: NodeListOf<Element>;
+    try {
+      nodes = this.deps.document.querySelectorAll(selector);
+    } catch {
+      return {
+        ok: false,
+        selector,
+        reason: 'element-not-found',
+        error: 'invalid selector',
+      };
+    }
+    if (nodes.length === 0) {
+      return {
+        ok: false,
+        selector,
+        reason: 'element-not-found',
+        error: 'no element matched selector',
+      };
+    }
+    if (nodes.length > 1) {
+      return {
+        ok: false,
+        selector,
+        reason: 'selector-ambiguous',
+        error: 'selector matched multiple elements',
+      };
+    }
+    const only = nodes[0];
+    if (!(only instanceof HTMLInputElement) || only.type !== 'file') {
+      return {
+        ok: false,
+        selector,
+        reason: 'write-failed',
+        error: 'target is not a file input',
+      };
+    }
+
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      only.files = transfer.files;
+      only.dispatchEvent(new Event('input', { bubbles: true }));
+      only.dispatchEvent(new Event('change', { bubbles: true }));
+      if (only.files !== null && only.files.length > 0) {
+        return { ok: true, selector };
+      }
+      return {
+        ok: false,
+        selector,
+        reason: 'write-failed',
+        error: 'file assignment produced empty file list',
+      };
+    } catch (err: unknown) {
+      return {
+        ok: false,
+        selector,
+        reason: 'write-failed',
+        error: serializeError(err).message,
+      };
+    }
   }
 
   private async executeInstruction(
@@ -438,8 +755,18 @@ export class AutofillController {
    * controller lifetime.
    */
   private async ensureAdapter(url: string): Promise<AtsAdapter | null> {
-    if (this.adapter) return this.adapter;
-    if (this.adapterLoadingPromise) return this.adapterLoadingPromise;
+    if (this.adapter) {
+      this.deps.logger.debug('ensureAdapter: using cached adapter', {
+        kind: this.adapter.kind,
+      });
+      return this.adapter;
+    }
+    if (this.adapterLoadingPromise) {
+      this.deps.logger.debug('ensureAdapter: awaiting in-flight load', { url });
+      return this.adapterLoadingPromise;
+    }
+
+    this.deps.logger.info('ensureAdapter: loading adapter for URL', { url });
 
     this.adapterLoadingPromise = this.deps
       .loadAdapter(url)
@@ -448,6 +775,10 @@ export class AutofillController {
           this.adapter = loaded;
           this.deps.logger.debug('adapter cached on controller', {
             kind: loaded.kind,
+          });
+        } else {
+          this.deps.logger.info('ensureAdapter: no adapter resolved for URL', {
+            url,
           });
         }
         return loaded;
@@ -523,6 +854,30 @@ function truncateForWire(s: string): string {
 
 function randomSuffix(): string {
   return Math.floor(Math.random() * 1e9).toString(36);
+}
+
+function base64ToFile(
+  contentBase64: string,
+  mimeType: string,
+  fileName: string,
+): File | null {
+  try {
+    const U8 = Uint8Array as unknown as {
+      fromBase64?: (b: string) => Uint8Array;
+    };
+    let bytes: Uint8Array;
+    if (typeof U8.fromBase64 === 'function') {
+      bytes = U8.fromBase64(contentBase64);
+    } else {
+      const binary = atob(contentBase64);
+      const len = binary.length;
+      bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+    }
+    return new File([bytes], fileName, { type: mimeType });
+  } catch {
+    return null;
+  }
 }
 
 function serializeError(err: unknown): { message: string; name?: string } {

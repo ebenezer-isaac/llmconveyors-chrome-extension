@@ -38,8 +38,13 @@ function PopupBody(): React.ReactElement {
   const { state: authState, loading: authLoading, error: authError, signIn, signOut } =
     useAuthState();
   const { intent, tabId, loading: intentLoading } = useIntent();
-  const { credits, loading: creditsLoading, error: creditsError } = useCredits();
-  const { profile, loading: profileLoading } = useProfile();
+  const {
+    credits,
+    loading: creditsLoading,
+    error: creditsError,
+    refresh: refreshCredits,
+  } = useCredits();
+  const { profile, loading: profileLoading, refresh: refreshProfile } = useProfile();
   const {
     agents,
     activeAgentId,
@@ -59,6 +64,12 @@ function PopupBody(): React.ReactElement {
     agentId: activeAgentId,
   });
 
+  useEffect(() => {
+    if (!signedIn) return;
+    void refreshCredits();
+    void refreshProfile();
+  }, [signedIn, userId, refreshCredits, refreshProfile]);
+
   // Check if a URL-bound session exists for this page.
   const [boundSessionTitle, setBoundSessionTitle] = useState<string | null>(null);
   const lastBindingLookupRef = useRef<string>('');
@@ -74,7 +85,7 @@ function PopupBody(): React.ReactElement {
       setBoundSessionTitle(null);
       return;
     }
-    const lookupKey = `${activeAgentId}:${tabUrl}`;
+    const lookupKey = `${activeAgentId}:${tabUrl}:${userId ?? ''}`;
     if (lastBindingLookupRef.current === lookupKey) return;
 
     const runtime = (globalThis as unknown as {
@@ -123,7 +134,7 @@ function PopupBody(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [signedIn, activeAgentId, tabUrl]);
+  }, [signedIn, userId, activeAgentId, tabUrl]);
 
   return (
     <div
@@ -198,7 +209,11 @@ function PopupBody(): React.ReactElement {
         )}
 
         {signedIn ? (
-          <SessionList enabled={signedIn} activeAgentId={activeAgentId} />
+          <SessionList
+            enabled={signedIn}
+            userId={userId}
+            activeAgentId={activeAgentId}
+          />
         ) : null}
 
         {authError !== null ? (

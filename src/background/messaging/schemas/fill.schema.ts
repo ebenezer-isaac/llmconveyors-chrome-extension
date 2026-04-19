@@ -11,6 +11,14 @@ export const FillRequestSchema = z
   .object({
     tabId: z.number().int().nonnegative(),
     url: z.string().url().max(2048),
+    resumeAttachment: z
+      .object({
+        fileName: z.string().trim().min(1).max(255),
+        mimeType: z.string().trim().min(1).max(200),
+        contentBase64: z.string().min(1).max(4_000_000),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

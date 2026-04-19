@@ -2,11 +2,10 @@
 /**
  * React hook that subscribes the popup to the current auth state.
  *
- * On mount, sends an AUTH_STATUS message and stores the response. If the
- * response is unauthed, the hook immediately attempts a silent web-auth
- * flow (`interactive: false`) so users whose web session is still live get
- * signed in automatically without clicking Sign In. Silent failures are
- * swallowed -- the user can still click Sign In explicitly.
+ * On mount, sends AUTH_STATUS and stores the response. If unauthed, it
+ * attempts AUTH_COOKIE_EXCHANGE for silent recovery from an existing web
+ * cookie session. Explicit Sign In still uses AUTH_SIGN_IN and drives the
+ * launchWebAuthFlow bridge handshake.
  *
  * Also registers a chrome.runtime.onMessage listener that reacts to
  * AUTH_STATE_CHANGED broadcasts fired by the background service worker
@@ -52,27 +51,13 @@ function isAuthState(value: unknown): value is AuthState {
   return false;
 }
 
-/** E2E-only test hook key. Never set in production. */
-const E2E_TEST_COOKIE_JAR_KEY = 'llmc.e2e.test-cookie-jar';
+const MANUAL_SIGN_IN_POLL_WINDOW_MS = 120_000;
+const MANUAL_SIGN_IN_STATUS_POLL_INTERVAL_MS = 1_000;
+const MANUAL_SIGN_IN_EXCHANGE_INTERVAL_MS = 30_000;
 
-async function readTestCookieJar(): Promise<string | null> {
-  const g = globalThis as unknown as {
-    chrome?: {
-      storage?: {
-        local?: { get: (key: string) => Promise<Record<string, unknown>> };
-      };
-    };
-  };
-  const localStorage = g.chrome?.storage?.local;
-  if (!localStorage) return null;
-  try {
-    const raw = await localStorage.get(E2E_TEST_COOKIE_JAR_KEY);
-    const value = raw[E2E_TEST_COOKIE_JAR_KEY];
-    if (typeof value === 'string' && value.length > 0) return value;
-    return null;
-  } catch {
-    return null;
-  }
+function shouldAutoSyncAfterSignInFailure(reason: string): boolean {
+  const normalized = reason.toLowerCase();
+  return normalized === 'sign-in-window-opened';
 }
 
 export interface UseAuthStateResult {
@@ -89,6 +74,58 @@ export function useAuthState(): UseAuthStateResult {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef<boolean>(true);
+  const manualSyncInFlightRef = useRef<boolean>(false);
+
+  const waitForManualSignInSync = useCallback(async (): Promise<void> => {
+    if (manualSyncInFlightRef.current) return;
+    const runtime = getRuntime();
+    if (runtime === null) return;
+
+    manualSyncInFlightRef.current = true;
+    const deadline = Date.now() + MANUAL_SIGN_IN_POLL_WINDOW_MS;
+    let lastExchangeAttemptAt = Date.now() - MANUAL_SIGN_IN_EXCHANGE_INTERVAL_MS;
+    try {
+      while (mountedRef.current && Date.now() < deadline) {
+        try {
+          const status = await runtime.sendMessage({
+            key: 'AUTH_STATUS',
+            data: {},
+          });
+          if (mountedRef.current && isAuthState(status) && status.signedIn) {
+            setState(status);
+            setError(null);
+            return;
+          }
+        } catch {
+          // Ignore transient runtime failures; continue probing.
+        }
+
+        const now = Date.now();
+        if (now - lastExchangeAttemptAt >= MANUAL_SIGN_IN_EXCHANGE_INTERVAL_MS) {
+          lastExchangeAttemptAt = now;
+          try {
+            const exchange = await runtime.sendMessage({
+              key: 'AUTH_COOKIE_EXCHANGE',
+              data: {},
+            });
+            if (mountedRef.current && isAuthState(exchange) && exchange.signedIn) {
+              setState(exchange);
+              setError(null);
+              return;
+            }
+          } catch {
+            // Ignore exchange failures; next probe may succeed.
+          }
+        }
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, MANUAL_SIGN_IN_STATUS_POLL_INTERVAL_MS),
+        );
+      }
+    } finally {
+      manualSyncInFlightRef.current = false;
+    }
+  }, []);
 
   const runSignIn = useCallback(
     async (interactive: boolean): Promise<void> => {
@@ -100,15 +137,10 @@ export function useAuthState(): UseAuthStateResult {
       if (interactive) setError(null);
       setLoading(true);
       try {
-        // The E2E harness seeds `llmc.e2e.test-cookie-jar` so Playwright can
-        // drive sign-in without launching the real identity popup. Only
-        // honour it for the interactive click path; silent mount should
-        // still go through the real launchWebAuthFlow so the code exercises
-        // the same cookie refresh path the production popup takes.
-        const testJar = interactive ? await readTestCookieJar() : null;
-        const payload: { cookieJar?: string; interactive?: boolean } = testJar
-          ? { cookieJar: testJar }
-          : { interactive };
+        const payload: {
+          interactive?: boolean;
+          agent?: 'job-hunter' | 'b2b-sales';
+        } = { interactive, agent: 'job-hunter' };
         const response = (await runtime.sendMessage({
           key: 'AUTH_SIGN_IN',
           data: payload,
@@ -122,7 +154,12 @@ export function useAuthState(): UseAuthStateResult {
           setState({ signedIn: true, userId: response.userId });
           return;
         }
-        if (interactive) setError(response.reason);
+        if (interactive) {
+          setError(response.reason);
+          if (shouldAutoSyncAfterSignInFailure(response.reason)) {
+            void waitForManualSignInSync();
+          }
+        }
       } catch (err) {
         if (!mountedRef.current) return;
         if (interactive) setError(err instanceof Error ? err.message : String(err));
@@ -130,7 +167,7 @@ export function useAuthState(): UseAuthStateResult {
         if (mountedRef.current) setLoading(false);
       }
     },
-    [],
+    [waitForManualSignInSync],
   );
 
   // Initial status fetch + subscribe to broadcasts.

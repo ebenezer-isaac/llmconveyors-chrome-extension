@@ -1,0 +1,131 @@
+{
+  "generatedAt": "2026-04-18T19:01:40.589Z",
+  "extensionId": "kepefhkhcamgfpefobckbcdpgamebimd",
+  "options": {
+    "interactiveSignIn": true,
+    "cookieUrl": "https://llmconveyors.com",
+    "cookieDomain": ".llmconveyors.com",
+    "concurrency": 6
+  },
+  "totals": {
+    "total": 9,
+    "passed": 7,
+    "failed": 2
+  },
+  "results": [
+    {
+      "id": "status-initial",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 64
+    },
+    {
+      "id": "cookie-exchange-no-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 21
+    },
+    {
+      "id": "cookie-exchange-invalid-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 22
+    },
+    {
+      "id": "cookie-exchange-endpoint-500",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 31
+    },
+    {
+      "id": "cookie-exchange-endpoint-malformed-json",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 24
+    },
+    {
+      "id": "cookie-exchange-concurrency-race",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "concurrency": 6,
+        "validCount": 6,
+        "durationMs": 20,
+        "responses": [
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          }
+        ]
+      },
+      "durationMs": 20
+    },
+    {
+      "id": "malformed-auth-sign-in-payload",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "ok": false,
+          "reason": "invalid sign-in payload"
+        }
+      },
+      "durationMs": 7
+    },
+    {
+      "id": "interactive-sign-in-manual",
+      "ok": false,
+      "detail": {
+        "error": "page.waitForTimeout: Target page, context or browser has been closed"
+      },
+      "durationMs": 33770
+    },
+    {
+      "id": "session-capture-redacted",
+      "ok": false,
+      "detail": {
+        "error": "page.evaluate: Target page, context or browser has been closed"
+      },
+      "durationMs": 3
+    }
+  ]
+}

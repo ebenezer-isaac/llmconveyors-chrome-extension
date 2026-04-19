@@ -85,6 +85,16 @@ function makeDeps(
 ): AutofillControllerDeps {
   return {
     loadAdapter: async () => makeFakeAdapter('greenhouse'),
+    scanGenericForm: (): FormModel => ({
+      url: 'https://example.com',
+      title: 'Generic',
+      scannedAt: '2026-04-16T00:00:00.000Z',
+      fields: [],
+    }),
+    fillGenericField: (instruction: FillInstruction): FillResult => ({
+      ok: true,
+      selector: instruction.selector,
+    }),
     readProfile: async () => makeProfile(),
     resolveFile: async () => null,
     broadcastIntent: vi.fn(),
@@ -142,7 +152,7 @@ describe('AutofillController.executeFill - single-pass happy path', () => {
 });
 
 describe('AutofillController.executeFill - abort paths', () => {
-  it('returns abort no-adapter when loadAdapter returns null', async () => {
+  it('falls back to generic scan when loadAdapter returns null', async () => {
     const controller = new AutofillController(
       makeDeps({ loadAdapter: async () => null }),
     );
@@ -150,8 +160,50 @@ describe('AutofillController.executeFill - abort paths', () => {
     expect(resp).toEqual({
       ok: false,
       aborted: true,
-      abortReason: 'no-adapter',
+      abortReason: 'no-form',
     });
+  });
+
+  it('uses generic DOM fill when no ATS adapter matches URL', async () => {
+    const genericScan = vi.fn((): FormModel => ({
+      url: 'https://www.metacareers.com/profile/job_details/1',
+      title: 'Meta Careers',
+      scannedAt: '2026-04-16T00:00:00.000Z',
+      fields: [
+        {
+          selector: '#first_name',
+          htmlType: 'text',
+          name: 'first_name',
+          id: 'first_name',
+          label: 'First name',
+        },
+        {
+          selector: '#email',
+          htmlType: 'email',
+          name: 'email',
+          id: 'email',
+          label: 'Email',
+        },
+      ],
+    }));
+    const genericFill = vi.fn(
+      (instruction: FillInstruction): FillResult => ({
+        ok: true,
+        selector: instruction.selector,
+      }),
+    );
+
+    const controller = new AutofillController(
+      makeDeps({
+        loadAdapter: async () => null,
+        scanGenericForm: genericScan,
+        fillGenericField: genericFill,
+      }),
+    );
+    const resp = await controller.executeFill();
+    expect(resp.ok).toBe(true);
+    expect(genericScan).toHaveBeenCalledTimes(1);
+    expect(genericFill).toHaveBeenCalled();
   });
 
   it('returns abort profile-missing when profile is null', async () => {
@@ -201,6 +253,48 @@ describe('AutofillController.executeFill - abort paths', () => {
       aborted: true,
       abortReason: 'scan-failed',
     });
+  });
+
+  it('attaches a resume file when a resume attachment is provided', async () => {
+    const attachFile = vi.fn(
+      async (instruction: FillInstruction): Promise<FillResult> => ({
+        ok: true,
+        selector: instruction.selector,
+      }),
+    );
+    const adapter = makeFakeAdapter('greenhouse', {
+      scanForm: (): FormModel => ({
+        url: 'https://boards.greenhouse.io/example/jobs/1',
+        title: 'Apply',
+        scannedAt: '2026-04-16T00:00:00.000Z',
+        sourceATS: 'greenhouse',
+        fields: [
+          {
+            selector: '#resume',
+            htmlType: 'file',
+            name: 'job_application[resume]',
+            id: 'resume',
+            label: 'Resume',
+          },
+        ],
+      }),
+      attachFile,
+    });
+    const controller = new AutofillController(
+      makeDeps({ loadAdapter: async () => adapter }),
+    );
+    const resp = await controller.executeFill({
+      resumeAttachment: {
+        fileName: 'Resume.pdf',
+        mimeType: 'application/pdf',
+        contentBase64: 'YWJjZA==',
+      },
+    });
+    expect(resp.ok).toBe(true);
+    expect(attachFile).toHaveBeenCalled();
+    if (resp.ok) {
+      expect(resp.filled.some((f) => f.fieldType === 'resume-upload')).toBe(true);
+    }
   });
 });
 

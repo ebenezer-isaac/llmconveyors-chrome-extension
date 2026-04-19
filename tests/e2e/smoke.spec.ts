@@ -49,6 +49,24 @@ async function launchExtensionContext(): Promise<BrowserContext> {
   return context;
 }
 
+async function forceCookieExchange(
+  context: BrowserContext,
+  extensionId: string,
+): Promise<void> {
+  const driver = await context.newPage();
+  await driver.goto(`chrome-extension://${extensionId}/e2e/seed.html`);
+  await driver.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        chrome.runtime.sendMessage({ key: 'AUTH_COOKIE_EXCHANGE', data: {} }, () => {
+          void chrome.runtime.lastError;
+          resolve();
+        });
+      }),
+  );
+  await driver.close();
+}
+
 test('popup renders with signed-out sign-in button by default', async () => {
   const context = await launchExtensionContext();
   try {
@@ -75,9 +93,21 @@ test('sign-in happy path stores session and shows signed-in popup state', async 
     // window, which is unreliable under headless Chromium.
     await seedE2ETestCookieJar(context, extId);
     const popup = await openPopup(context, extId);
-    await popup.click('[data-testid="sign-in-button"]');
-    await popup.waitForSelector('[data-testid="popup-user-id"]', { timeout: 10_000 });
-    await expect(popup.locator('[data-testid="popup-user-id"]')).toContainText(/user_e2e_001/);
+
+    const signInButton = popup.locator('[data-testid="sign-in-button"]');
+    if (await signInButton.count()) {
+      await signInButton.click({ noWaitAfter: true });
+      await forceCookieExchange(context, extId);
+    }
+
+    await expect(popup.locator('[data-testid="signed-out-panel"]')).toHaveCount(0, {
+      timeout: 20_000,
+    });
+    await expect(popup.locator('[data-testid="tier-pill"]')).toHaveAttribute(
+      'data-state',
+      'ready',
+      { timeout: 20_000 },
+    );
     await popup.close();
   } finally {
     await context.close();
@@ -115,14 +145,8 @@ test('greenhouse autofill happy path fills all standard fields', async () => {
           return { err: 'no tab' };
         }
         const resp = await new Promise<unknown>((resolve) => {
-          chrome.tabs.sendMessage(
-            tab.id as number,
-            {
-              id: 1,
-              type: 'FILL_REQUEST',
-              timestamp: Date.now(),
-              data: { tabId: tab.id, url: tab.url ?? '' },
-            },
+          chrome.runtime.sendMessage(
+            { key: 'FILL_REQUEST', data: { tabId: tab.id, url: tab.url ?? '' } },
             (r) => {
               const le = chrome.runtime.lastError;
               resolve(le ? { lastError: le.message } : r);

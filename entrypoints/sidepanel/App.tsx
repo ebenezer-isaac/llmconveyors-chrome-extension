@@ -15,7 +15,7 @@
  *   the user can run Generate again.
  */
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ErrorBoundary } from '../popup/ErrorBoundary';
 import { useAgentPreference } from '../popup/useAgentPreference';
 import { useAuthState } from '../popup/useAuthState';
@@ -44,9 +44,15 @@ import { useIntent } from '../popup/useIntent';
 import { useGenericIntent } from '../popup/useGenericIntent';
 import { useActiveTabUrl } from '../popup/useActiveTabUrl';
 import type { AgentId } from '@/src/background/agents';
+import type { FillRequest } from '@/src/background/messaging/protocol-types';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
+import {
+  getOrPreloadResumeAttachment,
+  selectResumeArtifact,
+} from './lib/autofill-resume-cache';
 
 type RuntimeMessenger = {
+  sendMessage?: (msg: unknown) => Promise<unknown>;
   onMessage: {
     addListener: (fn: (msg: unknown) => void) => void;
     removeListener: (fn: (msg: unknown) => void) => void;
@@ -58,6 +64,127 @@ function getRuntime(): RuntimeMessenger | null {
     browser?: { runtime?: RuntimeMessenger };
   };
   return g.chrome?.runtime ?? g.browser?.runtime ?? null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function firstNonEmptyString(values: readonly unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value !== 'string') continue;
+    const normalized = value.trim();
+    if (normalized.length > 0) return normalized;
+  }
+  return null;
+}
+
+function normalizeDateLikeValue(value: unknown): number {
+  if (typeof value !== 'string') return 0;
+  const raw = value.trim();
+  if (!raw) return 0;
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) return parsed;
+  const yearMatch = raw.match(/\b(19|20)\d{2}\b/);
+  if (!yearMatch) return 0;
+  const year = Number.parseInt(yearMatch[0], 10);
+  if (!Number.isFinite(year)) return 0;
+  return Date.UTC(year, 0, 1);
+}
+
+function looksCurrentRole(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  return /\b(present|current|now|ongoing|to date)\b/i.test(value);
+}
+
+function extractWorkItems(structuredData: Record<string, unknown>): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [];
+
+  const work = Array.isArray(structuredData.work) ? structuredData.work : [];
+  for (const item of work) {
+    const workItem = asRecord(item);
+    if (workItem) out.push(workItem);
+  }
+
+  const sections = asRecord(structuredData.sections);
+  const sectionWork = asRecord(sections?.work);
+  const workItems = Array.isArray(sectionWork?.items) ? sectionWork.items : [];
+  for (const item of workItems) {
+    const workItem = asRecord(item);
+    if (workItem) out.push(workItem);
+  }
+
+  return out;
+}
+
+function scoreWorkItem(workItem: Record<string, unknown>): number {
+  const endRaw = firstNonEmptyString([workItem.endDate, workItem.end, workItem.to, workItem.period]);
+  const startRaw = firstNonEmptyString([
+    workItem.startDate,
+    workItem.start,
+    workItem.from,
+    workItem.period,
+  ]);
+  if (endRaw === null || looksCurrentRole(endRaw)) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+  const endScore = normalizeDateLikeValue(endRaw);
+  const startScore = normalizeDateLikeValue(startRaw);
+  return endScore * 10 + startScore;
+}
+
+function extractResumeJobTitleFromStructuredData(
+  structuredData: Record<string, unknown>,
+): string | null {
+  // Prefer most recent/current work role over static basics headline.
+  const sortedWork = extractWorkItems(structuredData).sort(
+    (a, b) => scoreWorkItem(b) - scoreWorkItem(a),
+  );
+  for (const workItem of sortedWork) {
+    const title = firstNonEmptyString([
+      workItem.position,
+      workItem.title,
+      workItem.jobTitle,
+      workItem.role,
+    ]);
+    if (title) return title;
+  }
+
+  const basics = asRecord(structuredData.basics);
+  const basicsTitle = firstNonEmptyString([
+    basics?.headline,
+    basics?.title,
+    basics?.label,
+    basics?.position,
+  ]);
+  if (basicsTitle) return basicsTitle;
+
+  const sections = asRecord(structuredData.sections);
+  const sectionBasics = asRecord(sections?.basics);
+  const basicsItems = Array.isArray(sectionBasics?.items) ? sectionBasics?.items : [];
+  if (basicsItems.length > 0) {
+    const basicsFirst = asRecord(basicsItems[0]);
+    const title = firstNonEmptyString([
+      basicsFirst?.headline,
+      basicsFirst?.title,
+      basicsFirst?.label,
+      basicsFirst?.position,
+    ]);
+    if (title) return title;
+  }
+
+  return null;
+}
+
+function extractResumeJobTitleFromMasterResumeResponse(response: unknown): string | null {
+  const envelope = asRecord(response);
+  if (!envelope || envelope.ok !== true) return null;
+  const resume = asRecord(envelope.resume);
+  if (!resume) return null;
+  const structuredData = asRecord(resume.structuredData);
+  if (!structuredData) return null;
+  return extractResumeJobTitleFromStructuredData(structuredData);
 }
 
 const STATUS_PILL_CLASSES: Record<string, string> = {
@@ -160,7 +287,9 @@ type AutofillOutcome =
   | { readonly kind: 'success'; readonly filled: number; readonly skipped: number; readonly failed: number }
   | { readonly kind: 'error'; readonly message: string };
 
-async function runAutofill(): Promise<AutofillOutcome> {
+async function runAutofill(
+  resumeAttachment: NonNullable<FillRequest['resumeAttachment']> | null = null,
+): Promise<AutofillOutcome> {
   const g = globalThis as unknown as {
     chrome?: {
       tabs?: {
@@ -179,9 +308,14 @@ async function runAutofill(): Promise<AutofillOutcome> {
     if (!tab || typeof tab.id !== 'number' || !tab.url) {
       return { kind: 'error', message: 'no active tab' };
     }
+    const fillData: FillRequest = {
+      tabId: tab.id,
+      url: tab.url,
+      ...(resumeAttachment !== null ? { resumeAttachment } : {}),
+    };
     const raw = (await runtime.sendMessage({
       key: 'FILL_REQUEST',
-      data: { tabId: tab.id, url: tab.url },
+      data: fillData,
     })) as {
       ok?: boolean;
       filled?: unknown[];
@@ -217,13 +351,38 @@ function BoundSessionPanel(props: {
 }): React.ReactElement {
   const { session, logs, artifacts, urlBound, agentId } = props;
   const [autofill, setAutofill] = React.useState<AutofillOutcome>({ kind: 'idle' });
+  const [resumeAttachment, setResumeAttachment] = React.useState<
+    NonNullable<FillRequest['resumeAttachment']> | null
+  >(null);
   const title =
     session.jobTitle ?? session.companyName ?? `Session ${session.sessionId.slice(0, 8)}`;
   const showAutofill = agentId === 'job-hunter';
+  const resumeArtifact = React.useMemo(() => selectResumeArtifact(artifacts), [artifacts]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    if (resumeArtifact === null) {
+      setResumeAttachment(null);
+      return;
+    }
+    void (async () => {
+      const loaded = await getOrPreloadResumeAttachment(resumeArtifact);
+      if (cancelled) return;
+      setResumeAttachment(loaded);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeArtifact]);
 
   async function handleAutofill(): Promise<void> {
     setAutofill({ kind: 'pending' });
-    const result = await runAutofill();
+    let payload = resumeAttachment;
+    if (payload === null && resumeArtifact !== null) {
+      payload = await getOrPreloadResumeAttachment(resumeArtifact);
+      setResumeAttachment(payload);
+    }
+    const result = await runAutofill(payload);
     setAutofill(result);
   }
 
@@ -320,11 +479,18 @@ function BoundSessionPanel(props: {
 function SidepanelBody(): React.ReactElement {
   const { agents, activeAgentId, setActiveAgent, loading, error } = useAgentPreference();
   const { state: authState, signOut, loading: authLoading } = useAuthState();
-  const { credits, loading: creditsLoading, error: creditsError } = useCredits();
-  const { profile, loading: profileLoading } = useProfile();
+  const {
+    credits,
+    loading: creditsLoading,
+    error: creditsError,
+    refresh: refreshCredits,
+  } = useCredits();
+  const { profile, loading: profileLoading, refresh: refreshProfile } = useProfile();
   const { tabId } = useTargetTabId();
   const { intent } = useIntent();
   const tabUrl = useActiveTabUrl(tabId);
+  const [resumeJobTitle, setResumeJobTitle] = useState<string | null>(null);
+  const signedInUserId = authState.signedIn ? authState.userId : null;
   const genericIntent = useGenericIntent({
     enabled: authState.signedIn && activeAgentId !== null,
     tabId,
@@ -332,6 +498,41 @@ function SidepanelBody(): React.ReactElement {
     adapterIntent: intent,
     agentId: activeAgentId,
   });
+
+  useEffect(() => {
+    if (!authState.signedIn) return;
+    void refreshCredits();
+    void refreshProfile();
+  }, [authState.signedIn, signedInUserId, refreshCredits, refreshProfile]);
+
+  useEffect(() => {
+    if (!authState.signedIn) {
+      setResumeJobTitle(null);
+      return;
+    }
+    const runtime = getRuntime();
+    if (!runtime?.sendMessage) {
+      setResumeJobTitle(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = await runtime.sendMessage!({
+          key: 'MASTER_RESUME_GET',
+          data: {},
+        });
+        if (cancelled) return;
+        setResumeJobTitle(extractResumeJobTitleFromMasterResumeResponse(raw));
+      } catch {
+        if (cancelled) return;
+        setResumeJobTitle(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState.signedIn, signedInUserId]);
 
   const agent = useMemo(
     () => agents.find((a) => a.id === activeAgentId) ?? agents[0] ?? null,
@@ -449,6 +650,7 @@ function SidepanelBody(): React.ReactElement {
             company: genericIntent.company,
           }}
           tabUrl={tabUrl}
+          resumeJobTitle={resumeJobTitle}
           boundSession={
             showBoundPanel && binding.session !== null
               ? {

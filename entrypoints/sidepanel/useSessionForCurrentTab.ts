@@ -268,7 +268,13 @@ function canonicalTypeForFilename(raw: string): string {
   if (lower === 'cv' || lower === 'resume') return 'cv';
   if (lower === 'cover-letter' || lower === 'cover' || lower === 'letter') return 'cover-letter';
   if (lower === 'cold-email' || lower === 'email' || lower === 'outreach') return 'cold-email';
-  if (lower === 'ats' || lower === 'ats-comparison' || lower === 'ats-report') {
+  if (
+    lower === 'ats' ||
+    lower === 'ats-comparison' ||
+    lower === 'ats-report' ||
+    lower === 'ats-score' ||
+    lower === 'ats-scorecard'
+  ) {
     return 'ats-comparison';
   }
   if (lower === 'research' || lower === 'deep-research' || lower === 'company-research') {

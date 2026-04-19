@@ -12,7 +12,9 @@ import type { MasterResumeResponse } from './master-resume-schema';
 import { MasterResumeResponseSchema } from './master-resume-schema';
 
 export const MASTER_RESUME_CACHE_KEY = 'llmc.master-resume.v1';
-const TTL_MS = 5 * 60 * 1000;
+// Resume changes are infrequent; keep it warm longer to avoid repeated
+// background fetches every popup/sidepanel open.
+const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface MasterResumeCacheEntry {
   readonly response: MasterResumeResponse;

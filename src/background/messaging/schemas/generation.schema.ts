@@ -35,11 +35,20 @@ export const GenerationStartResponseSchema = defineDiscriminatedUnion(
 
 export const GenerationArtifactSchema = z
   .object({
-    kind: z.enum(['cv', 'cover-letter', 'email', 'other']),
-    content: z.string().max(1_000_000),
+    kind: z.string().min(1).max(100).optional(),
+    type: z.string().min(1).max(100).optional(),
+    content: z.string().max(1_000_000).optional(),
+    payload: z.record(z.unknown()).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    mimeType: z.string().max(200).optional(),
+    storageKey: z.string().max(2_000).optional(),
+    downloadUrl: z.string().max(4_000).optional(),
   })
-  .strict();
+  .passthrough()
+  .refine(
+    (value) => typeof value.kind === 'string' || typeof value.type === 'string',
+    'artifact must include kind or type',
+  );
 
 export const GenerationUpdateBroadcastSchema = z
   .object({

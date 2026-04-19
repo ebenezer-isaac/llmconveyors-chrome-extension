@@ -71,6 +71,7 @@ const RawArtifactShape = z
   .object({
     type: z.string().optional(),
     kind: z.string().optional(),
+    artifactType: z.string().optional(),
     label: z.string().optional(),
     name: z.string().optional(),
     content: z.string().optional(),
@@ -88,7 +89,15 @@ function canonicalType(raw: string | undefined): ArtifactType {
   if (lower === 'cv' || lower === 'resume') return 'cv';
   if (lower === 'cover-letter' || lower === 'cover' || lower === 'letter') return 'cover-letter';
   if (lower === 'cold-email' || lower === 'email' || lower === 'outreach') return 'cold-email';
-  if (lower === 'ats' || lower === 'ats-comparison' || lower === 'ats-report') return 'ats-comparison';
+  if (
+    lower === 'ats' ||
+    lower === 'ats-comparison' ||
+    lower === 'ats-report' ||
+    lower === 'ats-score' ||
+    lower === 'ats-scorecard'
+  ) {
+    return 'ats-comparison';
+  }
   if (
     lower === 'research' ||
     lower === 'deep-research' ||
@@ -150,8 +159,9 @@ export function normalizeArtifactPreview(
   const parsed = RawArtifactShape.safeParse(raw);
   if (!parsed.success) return null;
   const d = parsed.data;
-  const type = canonicalType(d.type ?? d.kind);
-  const label = labelFor(type, d.label, d.name, d.type ?? d.kind);
+  const rawType = d.type ?? d.kind ?? d.artifactType;
+  const type = canonicalType(rawType);
+  const label = labelFor(type, d.label, d.name, rawType);
   // Backend artifact shapes nest the primary text under payload.content
   // (e.g. company-research markdown, cover-letter body). Flatten that up
   // so the sidepanel's TextArtifactBody has something to render without
@@ -173,11 +183,14 @@ export function normalizeArtifactPreview(
     typeof d.storageKey === 'string' && d.storageKey.length > 0 ? d.storageKey : null;
   const pdfStorageKey =
     typeof d.pdfStorageKey === 'string' && d.pdfStorageKey.length > 0 ? d.pdfStorageKey : null;
+  const hasStructuredPayload =
+    d.payload !== undefined && typeof d.payload === 'object' && d.payload !== null;
   if (
     content === null &&
     downloadUrl === null &&
     storageKey === null &&
-    pdfStorageKey === null
+    pdfStorageKey === null &&
+    !(type === 'ats-comparison' && hasStructuredPayload)
   ) {
     // Nothing for the sidepanel to render or download.
     return null;

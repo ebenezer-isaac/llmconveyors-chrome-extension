@@ -85,6 +85,7 @@ function formatTime(ts: number | null | undefined): string {
 
 export interface SessionListProps {
   readonly enabled: boolean;
+  readonly userId: string | null;
   /**
    * Scope the list to the currently-selected agent. Matches the web
    * dashboard's client-side filter on `metadata.agentType` so the popup
@@ -197,10 +198,11 @@ function openDashboard(agentId: AgentId | null): void {
 
 export function SessionList({
   enabled,
+  userId,
   activeAgentId,
 }: SessionListProps): React.ReactElement | null {
   const [expanded, setExpanded] = useState<boolean>(true);
-  const { items, loading, error } = useSessionList(enabled, 20);
+  const { items, loading, error } = useSessionList(enabled, 20, userId);
   const visible = useMemo(() => {
     const scoped =
       activeAgentId === null

@@ -14,11 +14,9 @@ export const blueprint: ModuleBlueprint = {
   moduleId: 'background/auth',
   label: 'Extension Auth Flow',
   description:
-    'Client-side auth handshake: launchWebAuthFlow -> chromiumapp.org ' +
-    'redirect -> fragment parse -> JWT userId extract -> StoredSession ' +
-    'persist -> AUTH_STATE_CHANGED broadcast. Owns zero ProtocolMap keys ' +
-    "(A5 owns them) and is a client of A5's storage + broadcast surface. " +
-    'Every external effect flows through an injected dependency (D20).',
+    'Native Chrome OAuth leveraging chrome.identity.getAuthToken, ' +
+    'exchanging with backend, and seamlessly synchronizing the resulting SuperTokens session ' +
+    'into Chrome\'s native cookie jar. Also watches cookies to broadcast AUTH_STATE_CHANGED.',
   category: 'auth',
   publicExports: [
     'AuthError',
@@ -29,17 +27,8 @@ export const blueprint: ModuleBlueprint = {
     'AuthStorageError',
     'decodeJwtPayload',
     'extractUserIdFromJwt',
-    'parseAuthFragment',
-    'MAX_FUTURE_EXPIRY_MS',
-    'buildSignInUrl',
-    'classifyLaunchError',
-    'launchWebAuthFlow',
-    'defaultWebAuthFlowDeps',
-    'defaultParseAuthFragmentDeps',
-    'DEFAULT_BRIDGE_URL',
-    'buildDefaultSignInDeps',
-    'buildStoredSession',
-    'createSignInOrchestrator',
+    'registerCookieWatcher',
+    'createFetchAuthed',
     'AUTH_MODULE_BLUEPRINT',
     'blueprint',
   ],
@@ -50,25 +39,11 @@ export const blueprint: ModuleBlueprint = {
     '@webext-core/messaging',
   ],
   messageHandlers: [],
-  invariants: [
-    {
-      id: 'AUTH-001',
-      description:
-        'Fragment parser rejects any redirect URL whose host is not ' +
-        '<extensionId>.chromiumapp.org with a 32-char a-p extension id.',
-      severity: 'error',
-      check: {
-        type: 'custom',
-        description: 'parseAuthFragment host regex + unit tests',
-      },
-      sourceRef: { file: 'parse-auth-fragment.ts', line: 1 },
-    },
     {
       id: 'AUTH-002',
       description:
-        'JWT payload decoder must NOT verify the signature; that is the ' +
-        "server bridge endpoint's responsibility. Attempting to verify " +
-        'would require HMAC secrets that must not ship to the client.',
+        'JWT payload decoder must NOT verify signature client-side; userId is ' +
+        'extracted from token claims only after exchange succeeds.',
       severity: 'error',
       check: {
         type: 'custom',
@@ -79,39 +54,14 @@ export const blueprint: ModuleBlueprint = {
     {
       id: 'AUTH-003',
       description:
-        'Sign-in orchestrator uses a module-level single-flight promise ' +
-        'mutex so concurrent AUTH_SIGN_IN calls share one ' +
-        'launchWebAuthFlow invocation.',
+        'Cookie watcher only reacts to relevant auth cookie domain/name and ' +
+        'suppresses overwrite rotation pairs to avoid false sign-out loops.',
       severity: 'error',
       check: {
         type: 'custom',
-        description: 'sign-in-orchestrator createSignInOrchestrator + tests',
+        description: 'cookie-watcher event filtering + overwrite suppression tests',
       },
-      sourceRef: { file: 'sign-in-orchestrator.ts', line: 1 },
-    },
-    {
-      id: 'AUTH-004',
-      description:
-        'StoredSession expiresAt must be in the future and within 24h of ' +
-        'now. Past or far-future values are treated as tampering.',
-      severity: 'error',
-      check: {
-        type: 'custom',
-        description: 'parseAuthFragment expiry clamp + unit tests',
-      },
-      sourceRef: { file: 'parse-auth-fragment.ts', line: 1 },
-    },
-    {
-      id: 'AUTH-005',
-      description:
-        'Tokens must match /^[A-Za-z0-9._=+/-]+$/ and be between 20 and ' +
-        '8192 chars. Any other character or length is rejected.',
-      severity: 'error',
-      check: {
-        type: 'custom',
-        description: 'parseAuthFragment token shape assertion + tests',
-      },
-      sourceRef: { file: 'parse-auth-fragment.ts', line: 1 },
+      sourceRef: { file: 'cookie-watcher.ts', line: 1 },
     },
   ],
   knownIssues: [],

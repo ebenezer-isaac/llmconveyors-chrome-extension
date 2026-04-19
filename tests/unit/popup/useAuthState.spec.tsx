@@ -44,12 +44,10 @@ interface FakeChrome {
 
 function installFakeChrome(
   sendMessageImpl: (msg: unknown) => Promise<unknown>,
-  testJar?: string,
 ): FakeChrome {
   const listeners: MessageListener[] = [];
   const tabListeners: TabsListener[] = [];
   const storeMap = new Map<string, unknown>();
-  if (testJar) storeMap.set('llmc.e2e.test-cookie-jar', testJar);
   const fake: FakeChrome = {
     runtime: {
       sendMessage: sendMessageImpl,
@@ -170,28 +168,27 @@ describe('popup App + useAuthState', () => {
     expect(query('user-menu-trigger')).not.toBeNull();
   });
 
-  it('transitions to signed-in after clicking sign-in-button (cookieJar mode)', async () => {
+  it('transitions to signed-in after clicking sign-in-button', async () => {
     const sendMessage = vi.fn(async (msg: unknown) => {
       const typed = msg as {
         key?: string;
-        data?: { cookieJar?: string; interactive?: boolean };
+        data?: { interactive?: boolean };
       };
       if (typed.key === 'AUTH_STATUS') return { signedIn: false };
       if (typed.key === 'AUTH_SIGN_IN') {
         // The on-mount silent attempt sends `{ interactive: false }` and
-        // should quietly fail so the popup shows the Sign In button; the
-        // explicit click sends the test cookie jar and succeeds.
+        // should quietly fail so the popup shows the Sign In button.
         if (typed.data?.interactive === false) {
           return { ok: false, reason: 'silent sign-in not available' };
         }
-        expect(typed.data?.cookieJar).toBe('test-jar');
+        expect(typed.data?.interactive).toBe(true);
         return { ok: true, userId: 'user_signed_in' };
       }
       if (typed.key === 'INTENT_GET') return null;
       if (typed.key === 'CREDITS_GET') return { credits: 0, tier: 'free', byoKeyEnabled: false };
       return undefined;
     });
-    installFakeChrome(sendMessage, 'test-jar');
+    installFakeChrome(sendMessage);
     await mountApp();
     await flushMicrotasks();
     const btn = query('sign-in-button');
@@ -232,6 +229,67 @@ describe('popup App + useAuthState', () => {
     const errEl = query('auth-error');
     expect(errEl).not.toBeNull();
     expect(errEl?.textContent).toContain('network error');
+  });
+
+  it('auto-syncs after recoverable popup sign-in failure without remount', async () => {
+    vi.useFakeTimers();
+    try {
+      let currentState: { signedIn: boolean; userId?: string } = { signedIn: false };
+      const sendMessage = vi.fn(async (msg: unknown) => {
+        const typed = msg as { key?: string };
+        if (typed.key === 'AUTH_STATUS') return currentState;
+        if (typed.key === 'AUTH_COOKIE_EXCHANGE') return currentState;
+        if (typed.key === 'AUTH_SIGN_IN') {
+          return {
+            ok: false,
+            reason: 'sign-in-window-opened',
+          };
+        }
+        if (typed.key === 'INTENT_GET') return null;
+        if (typed.key === 'CREDITS_GET') {
+          return { credits: 0, tier: 'free', byoKeyEnabled: false };
+        }
+        return undefined;
+      });
+      installFakeChrome(sendMessage);
+
+      await mountApp();
+      await flushMicrotasks();
+      await click(query('sign-in-button')!);
+      await flushMicrotasks();
+
+      const errEl = query('auth-error');
+      expect(errEl).not.toBeNull();
+      expect(errEl?.textContent).toContain('sign-in-window-opened');
+
+      const exchangeCallsBefore = sendMessage.mock.calls.filter((args) => {
+        const msg = args[0] as { key?: string };
+        return msg.key === 'AUTH_COOKIE_EXCHANGE';
+      }).length;
+      await act(async () => {
+        vi.advanceTimersByTime(5_000);
+        await Promise.resolve();
+      });
+      await flushMicrotasks();
+      const exchangeCallsAfter = sendMessage.mock.calls.filter((args) => {
+        const msg = args[0] as { key?: string };
+        return msg.key === 'AUTH_COOKIE_EXCHANGE';
+      }).length;
+      expect(exchangeCallsAfter - exchangeCallsBefore).toBeLessThanOrEqual(1);
+
+      currentState = { signedIn: true, userId: 'user_after_manual_signin' };
+      await act(async () => {
+        vi.advanceTimersByTime(1_100);
+        await Promise.resolve();
+      });
+      await flushMicrotasks();
+
+      const userId = query('popup-user-id');
+      expect(userId).not.toBeNull();
+      expect(userId?.textContent).toBe('user_after_manual_signin');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('signs out via the user-menu Logout item', async () => {

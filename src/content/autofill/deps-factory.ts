@@ -13,6 +13,7 @@ import { readProfile, defaultRequestMasterResume } from './profile-reader';
 import { sendMessage } from '@/src/background/messaging/protocol';
 import { createLogger } from '@/src/background/log';
 import type { AtsAdapter } from 'ats-autofill-engine';
+import { scanForm, fillField } from 'ats-autofill-engine/dom';
 import { adapter as greenhouseAdapter } from 'ats-autofill-engine/greenhouse';
 import { adapter as leverAdapter } from 'ats-autofill-engine/lever';
 import { adapter as workdayAdapter } from 'ats-autofill-engine/workday';
@@ -50,6 +51,8 @@ export function createProductionDeps(): AutofillControllerDeps {
         logger: adapterLoaderLogger,
         dynamicImport: staticAdapterImport,
       }),
+    scanGenericForm: (root) => scanForm(root),
+    fillGenericField: (instruction, root) => fillField(instruction, root),
     readProfile: () =>
       readProfile({
         logger: profileReaderLogger,

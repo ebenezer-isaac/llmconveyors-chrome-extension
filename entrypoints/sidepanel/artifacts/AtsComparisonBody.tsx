@@ -129,20 +129,107 @@ export interface AtsComparisonBodyProps {
 }
 
 function extractPayload(artifact: ArtifactPreview): AtsPayload | null {
-  const tryParse = (raw: unknown): AtsPayload | null => {
-    if (!raw || typeof raw !== 'object') return null;
-    const obj = raw as { before?: unknown; after?: unknown; improvement?: unknown };
-    if (!obj.before || !obj.after) return null;
-    const before = obj.before as AtsScore;
-    const after = obj.after as AtsScore;
-    if (typeof before.overallScore !== 'number' || typeof after.overallScore !== 'number') {
-      return null;
+  const asRecord = (raw: unknown): Record<string, unknown> | null => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    return raw as Record<string, unknown>;
+  };
+
+  const asScore = (raw: unknown): AtsScore | null => {
+    const rec = asRecord(raw);
+    if (rec === null) return null;
+    const overallRaw =
+      typeof rec.overallScore === 'number'
+        ? rec.overallScore
+        : typeof rec.score === 'number'
+        ? rec.score
+        : null;
+    if (overallRaw === null) return null;
+    return {
+      overallScore: overallRaw,
+      grade: typeof rec.grade === 'string' ? rec.grade : '-',
+      matchedKeywords: Array.isArray(rec.matchedKeywords)
+        ? (rec.matchedKeywords as readonly KeywordMatch[])
+        : [],
+      missingKeywords: Array.isArray(rec.missingKeywords)
+        ? (rec.missingKeywords as readonly string[])
+        : [],
+      ...(rec.breakdown && typeof rec.breakdown === 'object'
+        ? { breakdown: rec.breakdown as AtsBreakdown }
+        : {}),
+      ...(typeof rec.reasoning === 'string' ? { reasoning: rec.reasoning } : {}),
+      ...(Array.isArray(rec.suggestions)
+        ? { suggestions: rec.suggestions as readonly string[] }
+        : {}),
+      ...(Array.isArray(rec.keywordConfidences)
+        ? { keywordConfidences: rec.keywordConfidences as readonly KeywordConfidence[] }
+        : {}),
+      ...(Array.isArray(rec.enrichedSuggestions)
+        ? { enrichedSuggestions: rec.enrichedSuggestions as readonly EnrichedSuggestion[] }
+        : {}),
+      ...(Array.isArray(rec.enrichedMissingKeywords)
+        ? { enrichedMissingKeywords: rec.enrichedMissingKeywords as readonly EnrichedMissingKeyword[] }
+        : {}),
+      ...(rec.semanticInsights && typeof rec.semanticInsights === 'object'
+        ? {
+            semanticInsights: rec.semanticInsights as {
+              readonly equivalentExperience?: readonly SemanticEquivalence[];
+            },
+          }
+        : {}),
+      ...(rec.domainIntelligence && typeof rec.domainIntelligence === 'object'
+        ? { domainIntelligence: rec.domainIntelligence as DomainIntelligence }
+        : {}),
+    };
+  };
+
+  const unwrapCandidates = (raw: unknown): readonly unknown[] => {
+    const queue: unknown[] = [raw];
+    const out: unknown[] = [];
+    const seen = new Set<unknown>();
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined || seen.has(current)) continue;
+      seen.add(current);
+      out.push(current);
+      const rec = asRecord(current);
+      if (rec === null) continue;
+      for (const key of [
+        'payload',
+        'data',
+        'result',
+        'output',
+        'ats',
+        'atsScore',
+        'atsScorecard',
+        'scorecard',
+        'comparison',
+        'atsComparison',
+      ]) {
+        const nested = rec[key];
+        if (nested !== undefined) queue.push(nested);
+      }
     }
-    const improvement =
-      typeof obj.improvement === 'number'
-        ? obj.improvement
-        : after.overallScore - before.overallScore;
-    return { before, after, improvement };
+    return out;
+  };
+
+  const tryParse = (raw: unknown): AtsPayload | null => {
+    for (const candidate of unwrapCandidates(raw)) {
+      const obj = asRecord(candidate);
+      if (obj === null) continue;
+      const before = asScore(obj.before);
+      const after = asScore(obj.after);
+      if (before === null || after === null) continue;
+      const improvement =
+        typeof obj.improvement === 'number'
+          ? obj.improvement
+          : typeof obj.delta === 'number'
+          ? obj.delta
+          : typeof obj.change === 'number'
+          ? obj.change
+          : after.overallScore - before.overallScore;
+      return { before, after, improvement };
+    }
+    return null;
   };
   if (artifact.payload) {
     const p = tryParse(artifact.payload);

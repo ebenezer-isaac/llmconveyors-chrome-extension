@@ -40,3 +40,4 @@ tests/e2e/fixture-server/.dist/
 *.png
 .mcp.json
 .playwright-mcp/
+.local/

@@ -11,8 +11,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createHandlers } from '@/src/background/messaging/handlers';
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
-
 function buildMinimalDeps(sendToTabImpl: (tabId: number, msg: unknown) => Promise<unknown>): any {
   return {
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -41,6 +39,7 @@ function buildMinimalDeps(sendToTabImpl: (tabId: number, msg: unknown) => Promis
     },
     endpoints: {
       authExchange: '',
+      authCookieSync: '',
       authSignOut: '',
       extractSkills: '',
       settingsProfile: '',
@@ -79,6 +78,7 @@ function buildMinimalDeps(sendToTabImpl: (tabId: number, msg: unknown) => Promis
         executeScript: vi.fn(async () => [{ result: { ok: false, reason: 'no-match' } }]),
       },
     },
+    webBaseUrl: 'https://llmconveyors.com',
   };
 }
 
@@ -188,7 +188,7 @@ describe('HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR forwarders adversarial', () => {
   });
 
   describe('payload forwarding shape', () => {
-    it('forwards the exact same payload shape the popup sent', async () => {
+    it('forwards popup payload with webext envelope fields', async () => {
       const sendToTab = vi.fn(async () => ({ ok: true, applied: 1 }));
       const deps = buildMinimalDeps(sendToTab);
       const handlers = createHandlers(deps);
@@ -196,10 +196,22 @@ describe('HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR forwarders adversarial', () => {
         data: { tabId: 42 },
         sender: {} as any,
       });
-      expect(sendToTab).toHaveBeenCalledWith(42, {
-        key: 'HIGHLIGHT_APPLY',
+      expect(sendToTab).toHaveBeenCalledTimes(1);
+      const calls = sendToTab.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      const first = calls[0] as unknown as [number, {
+        id: number;
+        type: string;
+        timestamp: number;
+        data: { tabId: number };
+      }];
+      expect(first[0]).toBe(42);
+      expect(first[1]).toMatchObject({
+        type: 'HIGHLIGHT_APPLY',
         data: { tabId: 42 },
       });
+      expect(typeof first[1].id).toBe('number');
+      expect(typeof first[1].timestamp).toBe('number');
     });
 
     it('does NOT forward to a different tabId than requested', async () => {

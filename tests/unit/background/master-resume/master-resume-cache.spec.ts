@@ -57,7 +57,7 @@ describe('master-resume cache', () => {
     let t = 1_000;
     const cache = createMasterResumeCache({ storage, logger: makeLogger(), now: () => t });
     await cache.write(RESPONSE);
-    t = 1_000 + 10 * 60 * 1000; // 10 minutes
+    t = 1_000 + 8 * 24 * 60 * 60 * 1000; // 8 days (> 7-day TTL)
     const read = await cache.read();
     expect(read).toBeNull();
   });
@@ -67,7 +67,7 @@ describe('master-resume cache', () => {
     let t = 1_000;
     const cache = createMasterResumeCache({ storage, logger: makeLogger(), now: () => t });
     await cache.write(RESPONSE);
-    t = 1_000 + 10 * 60 * 1000;
+    t = 1_000 + 8 * 24 * 60 * 60 * 1000;
     const stale = await cache.readStale();
     expect(stale?.response).toEqual(RESPONSE);
   });

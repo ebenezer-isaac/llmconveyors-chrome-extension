@@ -1,8 +1,30 @@
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: effective auth config {"profile":"local","mode":"coordinator","apiBaseUrl":"http://localhost:4000","webBaseUrl":"http://localhost:3000","cookieUrl":"http://localhost:3000","cookieDomain":"localhost","manifestHost":"localhost","exchangeEndpoint":"http://localhost:4000/api/v1/auth/extension-token-exchange","refreshEndpoint":"http://localhost:4000/api/v1/auth/session/refresh"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery manager: init {"mode":"coordinator","exchangeEndpoint":"http://localhost:4000/api/v1/auth/extension-token-exchange","cookieUrl":"http://localhost:3000","hasFailureThresholdOverride":false,"hasBaseBackoffOverride":false,"hasMaxBackoffOverride":false}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: coordinator init {"threshold":2,"baseBackoffMs":3000,"maxBackoffMs":30000}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery manager: coordinator initialized 
 [sw] info: [llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {"keys":36}
+[sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: init {"cookieDomainSuffix":"localhost","overwritePairWindowMs":3000,"autoExchangeCooldownMs":15000,"loginWindowCloseDelayMs":1500}
 [sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: registered onChanged listener 
 [sw] info: [llmc-ext:bg] INFO service worker booted 
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: startup path start {"trigger":"startup"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":1,"trigger":"startup","state":"closed","failures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"preferredCookieUrl":"http://localhost:3000","cookieLookupUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:4000/api/v1/auth/extension-token-exchange"}
 [sw] info: [llmc-ext:bg] INFO installed 
-[sw] warning: [llmc-ext:bg.auth.cookie-exchange] WARN cookie-exchange: exchange returned non-200 {"status":401}
-[sw] info: [llmc-ext:bg] INFO boot: cookie exchange {"kind":"exchange-failed"}
-[sw] warning: [llmc-ext:bg.handlers] WARN cookie-exchange: exchange returned non-200 {"status":401}
-[sw] warning: [llmc-ext:bg.handlers] WARN cookie-exchange: exchange returned non-200 {"status":401}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":1,"trigger":"startup","kind":"no-cookie","elapsedMs":20}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: reset breaker state {"previousState":"closed","previousFailures":0}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: startup path result {"trigger":"startup","ok":false,"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg] INFO boot: recovery {"ok":false,"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":1,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":2,"trigger":"cookie-change","state":"closed","failures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"preferredCookieUrl":"http://localhost:3000","cookieLookupUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:4000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":2,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":4}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: reset breaker state {"previousState":"closed","previousFailures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: no-cookie on opportunistic trigger, preserving session {"trigger":"cookie-change"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":2,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":3,"trigger":"cookie-change","state":"closed","failures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"preferredCookieUrl":"http://localhost:3000","cookieLookupUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:4000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":3,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":4}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: reset breaker state {"previousState":"closed","previousFailures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: no-cookie on opportunistic trigger, preserving session {"trigger":"cookie-change"}

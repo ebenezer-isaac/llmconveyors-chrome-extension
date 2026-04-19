@@ -1,0 +1,60 @@
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: effective auth config {"profile":"local","mode":"coordinator","apiBaseUrl":"http://localhost:3000","webBaseUrl":"http://localhost:3000","cookieUrl":"http://localhost:3000","cookieDomain":"localhost","manifestHost":"localhost","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange","refreshEndpoint":"http://localhost:3000/api/v1/auth/session/refresh"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery manager: init {"mode":"coordinator","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange","cookieUrl":"http://localhost:3000","hasFailureThresholdOverride":false,"hasBaseBackoffOverride":false,"hasMaxBackoffOverride":false}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: coordinator init {"threshold":2,"baseBackoffMs":3000,"maxBackoffMs":30000}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery manager: coordinator initialized 
+[sw] info: [llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {"keys":36}
+[sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: init {"cookieDomainSuffix":"localhost","overwritePairWindowMs":3000,"autoExchangeCooldownMs":15000}
+[sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: registered onChanged listener 
+[sw] info: [llmc-ext:bg] INFO service worker booted 
+[sw] info: [llmc-ext:bg] INFO installed 
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: startup path start {"trigger":"startup"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":1,"trigger":"startup","state":"closed","failures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":1,"trigger":"startup","kind":"no-cookie","elapsedMs":7}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"closed","previousFailures":0,"nextFailures":1}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker remains closed after failure {"failures":1,"threshold":2}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: startup path result {"trigger":"startup","ok":false,"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg] INFO boot: recovery {"ok":false,"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":1,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":2,"trigger":"cookie-change","state":"closed","failures":1}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":2,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":1}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"closed","previousFailures":1,"nextFailures":2}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":2,"untilMs":1776538869806}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":1,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":2,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866707,"untilMs":1776538869806,"retryAfterMs":3099}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":2,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":3,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866729,"untilMs":1776538869806,"retryAfterMs":3077}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":3,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":4,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866756,"untilMs":1776538869806,"retryAfterMs":3050}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":4,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":5,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866783,"untilMs":1776538869806,"retryAfterMs":3023}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":5,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":6,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866800,"untilMs":1776538869806,"retryAfterMs":3006}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":6,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":7,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866801,"untilMs":1776538869806,"retryAfterMs":3005}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":7,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":8,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866801,"untilMs":1776538869806,"retryAfterMs":3005}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":8,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":9,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866802,"untilMs":1776538869806,"retryAfterMs":3004}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":9,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":10,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866804,"untilMs":1776538869806,"retryAfterMs":3002}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":10,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":11,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776538866805,"untilMs":1776538869806,"retryAfterMs":3001}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":11,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_SIGN_IN: starting bridge auth flow {"interactive":true,"profile":"local","agent":"job-hunter","bridgeUrl":"http://localhost:3000/auth/extension-signin","authCookieUrl":"http://localhost:3000","authCookieDomain":"localhost"}
+[sw] info: [llmc-ext:bg.auth.signin] INFO sign-in: start {"interactive":true}

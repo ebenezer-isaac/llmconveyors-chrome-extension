@@ -68,14 +68,8 @@ test('highlight apply on greenhouse fixture marks expected keyword ranges', asyn
         const tab = tabs[0];
         if (!tab || typeof tab.id !== 'number') return { err: 'no tab' };
         return await new Promise<unknown>((resolve) => {
-          chrome.tabs.sendMessage(
-            tab.id as number,
-            {
-              id: 1,
-              type: 'HIGHLIGHT_APPLY',
-              timestamp: Date.now(),
-              data: { tabId: tab.id },
-            },
+          chrome.runtime.sendMessage(
+            { key: 'HIGHLIGHT_APPLY', data: { tabId: tab.id } },
             (r) => {
               const le = chrome.runtime.lastError;
               resolve(le ? { lastError: le.message } : r);
@@ -140,15 +134,8 @@ test('highlight clear removes all mark elements', async () => {
         const tab = tabs[0];
         if (!tab || typeof tab.id !== 'number') return { err: 'no tab' };
         return await new Promise<unknown>((resolve) => {
-          chrome.tabs.sendMessage(
-            tab.id as number,
-            {
-              id: 1,
-              type: 'HIGHLIGHT_APPLY',
-              timestamp: Date.now(),
-              data: { tabId: tab.id },
-            },
-            (r) => resolve(r),
+          chrome.runtime.sendMessage({ key: 'HIGHLIGHT_APPLY', data: { tabId: tab.id } }, (r) =>
+            resolve(r),
           );
         });
       },
@@ -171,15 +158,8 @@ test('highlight clear removes all mark elements', async () => {
         const tab = tabs[0];
         if (!tab || typeof tab.id !== 'number') return { err: 'no tab' };
         return await new Promise<unknown>((resolve) => {
-          chrome.tabs.sendMessage(
-            tab.id as number,
-            {
-              id: 2,
-              type: 'HIGHLIGHT_CLEAR',
-              timestamp: Date.now(),
-              data: { tabId: tab.id },
-            },
-            (r) => resolve(r),
+          chrome.runtime.sendMessage({ key: 'HIGHLIGHT_CLEAR', data: { tabId: tab.id } }, (r) =>
+            resolve(r),
           );
         });
       },
@@ -226,12 +206,7 @@ test('intent detection dispatches INTENT_DETECTED on JSON-LD JobPosting page', a
         if (!tab || typeof tab.id !== 'number') return { err: 'no tab' };
         return await new Promise<unknown>((resolve) => {
           chrome.runtime.sendMessage(
-            {
-              id: 10,
-              type: 'INTENT_GET',
-              timestamp: Date.now(),
-              data: { tabId: tab.id },
-            },
+            { key: 'INTENT_GET', data: { tabId: tab.id } },
             (r) => resolve(r),
           );
         });

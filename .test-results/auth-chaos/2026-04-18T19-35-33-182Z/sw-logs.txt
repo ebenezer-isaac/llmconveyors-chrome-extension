@@ -1,0 +1,557 @@
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: effective auth config {"profile":"local","mode":"coordinator","apiBaseUrl":"http://localhost:3000","webBaseUrl":"http://localhost:3000","cookieUrl":"http://localhost:3000","cookieDomain":"localhost","manifestHost":"localhost","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange","refreshEndpoint":"http://localhost:3000/api/v1/auth/session/refresh"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery manager: init {"mode":"coordinator","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange","cookieUrl":"http://localhost:3000","hasFailureThresholdOverride":false,"hasBaseBackoffOverride":false,"hasMaxBackoffOverride":false}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: coordinator init {"threshold":2,"baseBackoffMs":3000,"maxBackoffMs":30000}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery manager: coordinator initialized 
+[sw] info: [llmc-ext:bg.handlers] INFO registerHandlers: bound onMessage listener {"keys":36}
+[sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: init {"cookieDomainSuffix":"localhost","overwritePairWindowMs":3000,"autoExchangeCooldownMs":15000}
+[sw] info: [llmc-ext:bg.auth.cookie] INFO cookie-watcher: registered onChanged listener 
+[sw] info: [llmc-ext:bg] INFO service worker booted 
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: startup path start {"trigger":"startup"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":1,"trigger":"startup","state":"closed","failures":0}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg] INFO installed 
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":1,"trigger":"startup","kind":"no-cookie","elapsedMs":12}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"closed","previousFailures":0,"nextFailures":1}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker remains closed after failure {"failures":1,"threshold":2}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO AUTH_RECOVERY: startup path result {"trigger":"startup","ok":false,"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg] INFO boot: recovery {"ok":false,"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":1,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":2,"trigger":"cookie-change","state":"closed","failures":1}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":2,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":8}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"closed","previousFailures":1,"nextFailures":2}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":2,"untilMs":1776540937071}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":1,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":2,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934140,"untilMs":1776540937071,"retryAfterMs":2931}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":2,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":3,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934163,"untilMs":1776540937071,"retryAfterMs":2908}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":3,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":4,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934204,"untilMs":1776540937071,"retryAfterMs":2867}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":4,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":5,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934247,"untilMs":1776540937071,"retryAfterMs":2824}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":5,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":6,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934249,"untilMs":1776540937071,"retryAfterMs":2822}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":6,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":7,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934251,"untilMs":1776540937071,"retryAfterMs":2820}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":7,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":8,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934252,"untilMs":1776540937071,"retryAfterMs":2819}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":8,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":9,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934253,"untilMs":1776540937071,"retryAfterMs":2818}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":9,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":10,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540934256,"untilMs":1776540937071,"retryAfterMs":2815}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":10,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_SIGN_IN: starting bridge auth flow {"interactive":true,"profile":"local","agent":"job-hunter","bridgeUrl":"http://localhost:3000/auth/extension-signin","authCookieUrl":"http://localhost:3000","authCookieDomain":"localhost"}
+[sw] info: [llmc-ext:bg.auth.signin] INFO sign-in: start {"interactive":true}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":11,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540936152,"untilMs":1776540937071,"retryAfterMs":919}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":11,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":12,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":2}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":3,"trigger":"cookie-change","state":"half-open","failures":2}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":3,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":4}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":2,"nextFailures":3}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":3,"untilMs":1776540944453}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":12,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":13,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540938686,"untilMs":1776540944453,"retryAfterMs":5767}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":13,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":14,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540939903,"untilMs":1776540944453,"retryAfterMs":4550}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":14,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":15,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540941126,"untilMs":1776540944453,"retryAfterMs":3327}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":15,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":16,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540942351,"untilMs":1776540944453,"retryAfterMs":2102}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":16,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":17,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540943571,"untilMs":1776540944453,"retryAfterMs":882}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":17,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":18,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":3}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":4,"trigger":"cookie-change","state":"half-open","failures":3}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":4,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":3}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":3,"nextFailures":4}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":4,"untilMs":1776540957463}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":18,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":19,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540946007,"untilMs":1776540957463,"retryAfterMs":11456}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":19,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":20,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540947227,"untilMs":1776540957463,"retryAfterMs":10236}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":20,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":21,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540948447,"untilMs":1776540957463,"retryAfterMs":9016}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":21,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":22,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540949675,"untilMs":1776540957463,"retryAfterMs":7788}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":22,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":23,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540950897,"untilMs":1776540957463,"retryAfterMs":6566}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":23,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":24,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540952120,"untilMs":1776540957463,"retryAfterMs":5343}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":24,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":25,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540953340,"untilMs":1776540957463,"retryAfterMs":4123}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":25,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":26,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540954555,"untilMs":1776540957463,"retryAfterMs":2908}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":26,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":27,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540955767,"untilMs":1776540957463,"retryAfterMs":1696}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":27,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":28,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540956989,"untilMs":1776540957463,"retryAfterMs":474}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":28,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":29,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":4}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":5,"trigger":"cookie-change","state":"half-open","failures":4}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":5,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":3}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":4,"nextFailures":5}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":5,"untilMs":1776540980470}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":29,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":30,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540959435,"untilMs":1776540980470,"retryAfterMs":21035}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":30,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":31,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540960661,"untilMs":1776540980470,"retryAfterMs":19809}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":31,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":32,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540961882,"untilMs":1776540980470,"retryAfterMs":18588}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":32,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":33,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540963092,"untilMs":1776540980470,"retryAfterMs":17378}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":33,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":34,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540964302,"untilMs":1776540980470,"retryAfterMs":16168}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":34,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":35,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540965516,"untilMs":1776540980470,"retryAfterMs":14954}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":35,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":36,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540966736,"untilMs":1776540980470,"retryAfterMs":13734}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":36,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":37,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540968119,"untilMs":1776540980470,"retryAfterMs":12351}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":37,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":38,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540969340,"untilMs":1776540980470,"retryAfterMs":11130}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":38,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":39,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540970552,"untilMs":1776540980470,"retryAfterMs":9918}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":39,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":40,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540971762,"untilMs":1776540980470,"retryAfterMs":8708}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":40,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":41,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540972976,"untilMs":1776540980470,"retryAfterMs":7494}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":41,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":42,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540974190,"untilMs":1776540980470,"retryAfterMs":6280}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":42,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":43,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540975403,"untilMs":1776540980470,"retryAfterMs":5067}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":43,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":44,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540976622,"untilMs":1776540980470,"retryAfterMs":3848}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":44,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":45,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540977855,"untilMs":1776540980470,"retryAfterMs":2615}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":45,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":46,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540979069,"untilMs":1776540980470,"retryAfterMs":1401}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":46,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":47,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540980283,"untilMs":1776540980470,"retryAfterMs":187}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":47,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":48,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":5}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":6,"trigger":"cookie-change","state":"half-open","failures":5}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":6,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":2}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":5,"nextFailures":6}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":6,"untilMs":1776541015001}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":48,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":49,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540982723,"untilMs":1776541015001,"retryAfterMs":32278}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":49,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":50,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540983933,"untilMs":1776541015001,"retryAfterMs":31068}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":50,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":51,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540985150,"untilMs":1776541015001,"retryAfterMs":29851}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":51,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":52,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540986361,"untilMs":1776541015001,"retryAfterMs":28640}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":52,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":53,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540987571,"untilMs":1776541015001,"retryAfterMs":27430}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":53,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":54,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540988785,"untilMs":1776541015001,"retryAfterMs":26216}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":54,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":55,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540989999,"untilMs":1776541015001,"retryAfterMs":25002}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":55,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":56,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540991220,"untilMs":1776541015001,"retryAfterMs":23781}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":56,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":57,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540992434,"untilMs":1776541015001,"retryAfterMs":22567}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":57,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":58,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540993647,"untilMs":1776541015001,"retryAfterMs":21354}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":58,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":59,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540994873,"untilMs":1776541015001,"retryAfterMs":20128}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":59,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":60,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540996089,"untilMs":1776541015001,"retryAfterMs":18912}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":60,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":61,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540997311,"untilMs":1776541015001,"retryAfterMs":17690}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":61,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":62,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540998533,"untilMs":1776541015001,"retryAfterMs":16468}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":62,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":63,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776540999758,"untilMs":1776541015001,"retryAfterMs":15243}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":63,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":64,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541000975,"untilMs":1776541015001,"retryAfterMs":14026}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":64,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":65,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541002198,"untilMs":1776541015001,"retryAfterMs":12803}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":65,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":66,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541003422,"untilMs":1776541015001,"retryAfterMs":11579}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":66,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":67,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541004645,"untilMs":1776541015001,"retryAfterMs":10356}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":67,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":68,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541005867,"untilMs":1776541015001,"retryAfterMs":9134}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":68,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":69,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541007080,"untilMs":1776541015001,"retryAfterMs":7921}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":69,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":70,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541008300,"untilMs":1776541015001,"retryAfterMs":6701}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":70,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":71,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541009522,"untilMs":1776541015001,"retryAfterMs":5479}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":71,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":72,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541010736,"untilMs":1776541015001,"retryAfterMs":4265}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":72,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":73,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541011958,"untilMs":1776541015001,"retryAfterMs":3043}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":73,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":74,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541013183,"untilMs":1776541015001,"retryAfterMs":1818}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":74,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":75,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541014403,"untilMs":1776541015001,"retryAfterMs":598}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":75,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":76,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":6}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":7,"trigger":"cookie-change","state":"half-open","failures":6}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":7,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":3}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":6,"nextFailures":7}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":7,"untilMs":1776541051537}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":76,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":77,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541016860,"untilMs":1776541051537,"retryAfterMs":34677}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":77,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":78,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541018086,"untilMs":1776541051537,"retryAfterMs":33451}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":78,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":79,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541019310,"untilMs":1776541051537,"retryAfterMs":32227}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":79,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":80,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541020521,"untilMs":1776541051537,"retryAfterMs":31016}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":80,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":81,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541021740,"untilMs":1776541051537,"retryAfterMs":29797}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":81,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":82,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541022968,"untilMs":1776541051537,"retryAfterMs":28569}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":82,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":83,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541024192,"untilMs":1776541051537,"retryAfterMs":27345}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":83,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":84,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541025417,"untilMs":1776541051537,"retryAfterMs":26120}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":84,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":85,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541026637,"untilMs":1776541051537,"retryAfterMs":24900}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":85,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":86,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541027850,"untilMs":1776541051537,"retryAfterMs":23687}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":86,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":87,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541029074,"untilMs":1776541051537,"retryAfterMs":22463}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":87,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":88,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541030289,"untilMs":1776541051537,"retryAfterMs":21248}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":88,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":89,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541031517,"untilMs":1776541051537,"retryAfterMs":20020}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":89,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":90,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541032736,"untilMs":1776541051537,"retryAfterMs":18801}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":90,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":91,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541033960,"untilMs":1776541051537,"retryAfterMs":17577}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":91,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":92,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541035175,"untilMs":1776541051537,"retryAfterMs":16362}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":92,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":93,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541036384,"untilMs":1776541051537,"retryAfterMs":15153}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":93,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":94,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541037607,"untilMs":1776541051537,"retryAfterMs":13930}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":94,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":95,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541038833,"untilMs":1776541051537,"retryAfterMs":12704}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":95,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":96,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541040056,"untilMs":1776541051537,"retryAfterMs":11481}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":96,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":97,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541041271,"untilMs":1776541051537,"retryAfterMs":10266}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":97,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":98,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541042495,"untilMs":1776541051537,"retryAfterMs":9042}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":98,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":99,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541043711,"untilMs":1776541051537,"retryAfterMs":7826}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":99,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":100,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541044937,"untilMs":1776541051537,"retryAfterMs":6600}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":100,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":101,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541046147,"untilMs":1776541051537,"retryAfterMs":5390}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":101,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":102,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541047364,"untilMs":1776541051537,"retryAfterMs":4173}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":102,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":103,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541048575,"untilMs":1776541051537,"retryAfterMs":2962}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":103,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":104,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541049799,"untilMs":1776541051537,"retryAfterMs":1738}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":104,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":105,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541051012,"untilMs":1776541051537,"retryAfterMs":525}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":105,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":106,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":7}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":8,"trigger":"cookie-change","state":"half-open","failures":7}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":8,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":3}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":7,"nextFailures":8}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":8,"untilMs":1776541078434}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":106,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":107,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541053447,"untilMs":1776541078434,"retryAfterMs":24987}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":107,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":108,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541054673,"untilMs":1776541078434,"retryAfterMs":23761}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":108,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":109,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541055882,"untilMs":1776541078434,"retryAfterMs":22552}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":109,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":110,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541057093,"untilMs":1776541078434,"retryAfterMs":21341}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":110,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":111,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541058308,"untilMs":1776541078434,"retryAfterMs":20126}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":111,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":112,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541059535,"untilMs":1776541078434,"retryAfterMs":18899}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":112,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":113,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541060747,"untilMs":1776541078434,"retryAfterMs":17687}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":113,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":114,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541061960,"untilMs":1776541078434,"retryAfterMs":16474}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":114,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":115,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541063177,"untilMs":1776541078434,"retryAfterMs":15257}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":115,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":116,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541064396,"untilMs":1776541078434,"retryAfterMs":14038}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":116,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":117,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541065620,"untilMs":1776541078434,"retryAfterMs":12814}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":117,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":118,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541066842,"untilMs":1776541078434,"retryAfterMs":11592}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":118,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":119,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541068065,"untilMs":1776541078434,"retryAfterMs":10369}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":119,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":120,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541069286,"untilMs":1776541078434,"retryAfterMs":9148}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":120,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":121,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541070512,"untilMs":1776541078434,"retryAfterMs":7922}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":121,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":122,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541071737,"untilMs":1776541078434,"retryAfterMs":6697}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":122,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":123,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541072960,"untilMs":1776541078434,"retryAfterMs":5474}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":123,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":124,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541074177,"untilMs":1776541078434,"retryAfterMs":4257}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":124,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":125,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541075388,"untilMs":1776541078434,"retryAfterMs":3046}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":125,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":126,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541076601,"untilMs":1776541078434,"retryAfterMs":1833}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":126,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":127,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541077821,"untilMs":1776541078434,"retryAfterMs":613}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":127,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":128,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":8}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":9,"trigger":"cookie-change","state":"half-open","failures":8}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":9,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":3}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":8,"nextFailures":9}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":9,"untilMs":1776541111103}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":128,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":129,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541080257,"untilMs":1776541111103,"retryAfterMs":30846}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":129,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":130,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541081467,"untilMs":1776541111103,"retryAfterMs":29636}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":130,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":131,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541082688,"untilMs":1776541111103,"retryAfterMs":28415}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":131,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":132,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541083899,"untilMs":1776541111103,"retryAfterMs":27204}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":132,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":133,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541085107,"untilMs":1776541111103,"retryAfterMs":25996}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":133,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":134,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541086333,"untilMs":1776541111103,"retryAfterMs":24770}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":134,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":135,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541087554,"untilMs":1776541111103,"retryAfterMs":23549}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":135,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":136,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541088775,"untilMs":1776541111103,"retryAfterMs":22328}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":136,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":137,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541089985,"untilMs":1776541111103,"retryAfterMs":21118}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":137,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":138,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541091197,"untilMs":1776541111103,"retryAfterMs":19906}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":138,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":139,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541092406,"untilMs":1776541111103,"retryAfterMs":18697}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":139,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":140,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541093617,"untilMs":1776541111103,"retryAfterMs":17486}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":140,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":141,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541094840,"untilMs":1776541111103,"retryAfterMs":16263}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":141,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":142,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541096049,"untilMs":1776541111103,"retryAfterMs":15054}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":142,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":143,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541097259,"untilMs":1776541111103,"retryAfterMs":13844}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":143,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":144,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541098470,"untilMs":1776541111103,"retryAfterMs":12633}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":144,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":145,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541099683,"untilMs":1776541111103,"retryAfterMs":11420}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":145,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":146,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541100894,"untilMs":1776541111103,"retryAfterMs":10209}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":146,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":147,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541102104,"untilMs":1776541111103,"retryAfterMs":8999}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":147,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":148,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541103316,"untilMs":1776541111103,"retryAfterMs":7787}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":148,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":149,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541104527,"untilMs":1776541111103,"retryAfterMs":6576}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":149,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":150,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541105743,"untilMs":1776541111103,"retryAfterMs":5360}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":150,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":151,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541106958,"untilMs":1776541111103,"retryAfterMs":4145}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":151,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":152,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541108183,"untilMs":1776541111103,"retryAfterMs":2920}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":152,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":153,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541109399,"untilMs":1776541111103,"retryAfterMs":1704}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":153,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":154,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541110611,"untilMs":1776541111103,"retryAfterMs":492}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":154,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":155,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: breaker half-open probe {"trigger":"cookie-change","failures":9}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt start {"attemptId":10,"trigger":"cookie-change","state":"half-open","failures":9}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO cookie-exchange: start {"cookieUrl":"http://localhost:3000","exchangeEndpoint":"http://localhost:3000/api/v1/auth/extension-token-exchange"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: attempt cookie-exchange result {"attemptId":10,"trigger":"cookie-change","kind":"no-cookie","elapsedMs":2}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: mark failure {"previousState":"half-open","previousFailures":9,"nextFailures":10}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker opened {"failures":10,"untilMs":1776541143638}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: notifying signed-out {"reason":"no-cookie"}
+[sw] info: [llmc-ext:bg.auth.recovery] INFO auth recovery: signed-out callback completed {"reason":"no-cookie"}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":155,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":156,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541113041,"untilMs":1776541143638,"retryAfterMs":30597}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":156,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":157,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541114257,"untilMs":1776541143638,"retryAfterMs":29381}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":157,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}
+[sw] info: [llmc-ext:bg.handlers] INFO AUTH_RECOVERY: attempt start {"attemptId":158,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE","hasCoordinator":true}
+[sw] warning: [llmc-ext:bg.auth.recovery] WARN auth recovery: breaker currently open, skipping attempt {"trigger":"cookie-change","now":1776541115466,"untilMs":1776541143638,"retryAfterMs":28172}
+[sw] warning: [llmc-ext:bg.handlers] WARN AUTH_RECOVERY: attempt failed {"attemptId":158,"trigger":"cookie-change","source":"AUTH_COOKIE_EXCHANGE"}

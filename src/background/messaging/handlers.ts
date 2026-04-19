@@ -9,10 +9,10 @@
  */
 
 import type { Logger } from '../log';
-import type { StoredSession } from './schemas/auth.schema';
+import { clientEnv } from '../../shared/env';
+import { signInWithGoogle } from '../auth/google-auth';
 import type { DetectedIntent } from './schemas/intent.schema';
 import type { FetchAuthed } from '../auth';
-import type { SessionManager } from '../session/session-manager';
 import type {
   AuthState,
   AuthSignInResponse,
@@ -76,12 +76,7 @@ import { API_BASE_URL } from '../config';
 import type { GenericScanAgent, GenericScanResult } from '../generic-intent';
 import {
   AuthSignInRequestSchema,
-  AuthSignOutRequestSchema,
-  AuthStatusRequestSchema,
-  AuthCookieExchangeRequestSchema,
-  AuthStateSchema,
   UNAUTHED,
-  StoredSessionSchema,
 } from './schemas/auth.schema';
 import {
   DetectedIntentPayloadSchema,
@@ -103,19 +98,11 @@ import { GenerationUpdateBroadcastSchema } from './schemas/generation.schema';
 import { CreditsGetRequestSchema } from './schemas/credits.schema';
 import { ProfileGetRequestSchema } from './schemas/profile.schema';
 import type { BgHandledKey, ProtocolMap } from './protocol';
-import {
-  createCookieExchange,
-} from '../auth';
 
-/**
- * Storage facade: tests pass an in-memory stub, production wires
- * chrome.storage.local via the real adapters.
- */
-export interface HandlerStorage {
-  readSession: () => Promise<StoredSession | null>;
-  writeSession: (s: StoredSession) => Promise<void>;
-  clearSession: () => Promise<void>;
-}
+
+
+
+
 
 export interface HandlerTabState {
   getIntent: (tabId: number) => DetectedIntent | null;
@@ -131,6 +118,7 @@ export interface HandlerBroadcast {
 
 export interface HandlerEndpoints {
   readonly authExchange: string;
+  readonly authCookieSync: string;
   readonly authSignOut: string;
   readonly extractSkills: string;
   readonly extractJd: string;
@@ -178,6 +166,7 @@ export interface SessionHandlerAdapters {
       items: readonly SessionListItem[];
       hasMore: boolean;
       nextCursor: string | null;
+      userId?: string;
     }) => Promise<CachedSessionList>;
     clear: () => Promise<void>;
     isFresh: (entry: CachedSessionList) => boolean;
@@ -216,9 +205,7 @@ export interface HandlerDeps {
   readonly logger: Logger;
   readonly fetch: typeof globalThis.fetch;
   readonly fetchAuthed: FetchAuthed;
-  readonly sessionManager: SessionManager;
   readonly now: () => number;
-  readonly storage: HandlerStorage;
   readonly tabState: HandlerTabState;
   readonly broadcast: HandlerBroadcast;
   readonly endpoints: HandlerEndpoints;
@@ -227,7 +214,7 @@ export interface HandlerDeps {
   readonly sessions: SessionHandlerAdapters;
   readonly generation: GenerationHandlerAdapters;
   readonly genericIntent: GenericIntentHandlerAdapters;
-  /** Web app base URL for tab-based sign-in fallback. */
+  /** Web app base URL used to build the interactive sign-in URL. */
   readonly webBaseUrl: string;
 }
 
@@ -246,183 +233,46 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   const log = deps.logger;
 
   // ---- AUTH_SIGN_IN ----
-  // Three execution paths (tried in order):
-  //   1. Cookie-jar exchange (E2E tests): when `data.cookieJar` is set.
-  //   2. Cookie exchange: reads the web app's sAccessToken cookie directly
-  //      via chrome.cookies -- works when user is already logged into the
-  //      web app. No popup needed.
-  //   3. Tab-based sign-in: opens the login page in a new browser tab so
-  //      the user can authenticate on the web app. After login, the
-  //      sAccessToken cookie is set and subsequent cookie exchange succeeds.
-  //      Returns a special `{ ok: false, openedTab: true }` so the popup
-  //      can show a "sign in on the website" message.
   const handleAuthSignIn: HandlerFor<'AUTH_SIGN_IN'> = async ({ data }) => {
     const parsed = AuthSignInRequestSchema.safeParse(data ?? {});
     if (!parsed.success) {
       return { ok: false, reason: 'invalid sign-in payload' };
     }
-    const jar = parsed.data.cookieJar;
-    if (typeof jar === 'string' && jar.length > 0) {
-      return cookieJarExchange(jar);
-    }
+    const interactive = parsed.data.interactive !== false;
 
-    // Try cookie exchange first (works if already logged into the web app)
-    log.info('AUTH_SIGN_IN: attempting cookie exchange', {
-      exchangeEndpoint: deps.endpoints.authExchange,
-    });
-    const exchange = createCookieExchange({
-      logger: log,
-      fetch: deps.fetch,
-      exchangeEndpoint: deps.endpoints.authExchange,
-      storage: { writeSession: deps.storage.writeSession },
-      broadcast: { sendRuntime: deps.broadcast.sendRuntime },
-    });
-    const exchangeResult = await exchange();
-    log.info('AUTH_SIGN_IN: cookie exchange result', {
-      kind: exchangeResult.kind,
-      reason: 'reason' in exchangeResult ? exchangeResult.reason : undefined,
-    });
-    if (exchangeResult.kind === 'ok') {
-      return { ok: true, userId: exchangeResult.userId };
-    }
+    log.info('AUTH_SIGN_IN: start native Google auth', { interactive });
 
-    // Cookie exchange failed -- open a small popup window for login,
-    // then poll for the sAccessToken cookie to appear.
-    const loginUrl = `${deps.webBaseUrl}/login`;
-    log.info('AUTH_SIGN_IN: opening login popup window', { loginUrl });
-
-    let popupWindowId: number | undefined;
+    let result;
     try {
-      const popup = await chrome.windows.create({
-        url: loginUrl,
-        type: 'popup',
-        width: 460,
-        height: 680,
-        focused: true,
-      });
-      popupWindowId = popup?.id;
-    } catch (err) {
-      log.warn('AUTH_SIGN_IN: failed to open login popup', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return {
-        ok: false,
-        reason: 'Could not open sign-in window. Please try again.',
-      };
-    }
-
-    // Poll for the cookie to appear (max ~2 minutes, every 2s)
-    const MAX_POLLS = 60;
-    const POLL_INTERVAL_MS = 2000;
-    for (let i = 0; i < MAX_POLLS; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-
-      // Check if the popup window was closed by the user
-      if (typeof popupWindowId === 'number') {
-        try {
-          await chrome.windows.get(popupWindowId);
-        } catch {
-          log.info('AUTH_SIGN_IN: login popup closed by user');
-          return {
-            ok: false,
-            reason: 'Sign-in window was closed. Click Sign In to try again.',
-          };
-        }
-      }
-
-      // Try cookie exchange
-      const retryExchange = createCookieExchange({
-        logger: log,
-        fetch: deps.fetch,
-        exchangeEndpoint: deps.endpoints.authExchange,
-        storage: { writeSession: deps.storage.writeSession },
-        broadcast: { sendRuntime: deps.broadcast.sendRuntime },
-      });
-      const retryResult = await retryExchange();
-      if (retryResult.kind === 'ok') {
-        log.info('AUTH_SIGN_IN: cookie exchange succeeded after login', {
-          userId: retryResult.userId,
-          pollCount: i + 1,
-        });
-        // Auto-close the login popup
-        if (typeof popupWindowId === 'number') {
-          try {
-            await chrome.windows.remove(popupWindowId);
-          } catch {
-            // window may already be closed
-          }
-        }
-        return { ok: true, userId: retryResult.userId };
-      }
-    }
-
-    // Timed out
-    log.warn('AUTH_SIGN_IN: cookie poll timed out');
-    if (typeof popupWindowId === 'number') {
+      result = await signInWithGoogle({ logger: log, fetch: deps.fetch }, interactive);
+    } catch (err: unknown) {
+      log.error('AUTH_SIGN_IN: FATAL CRASH inside execution block', err instanceof Error ? err.stack : String(err));
       try {
-        await chrome.windows.remove(popupWindowId);
-      } catch {
-        // window may already be closed
-      }
+        log.info('AUTH_SIGN_IN: automatically falling back to web platform login due to crash.');
+        chrome.tabs.create({ url: `${clientEnv.webBaseUrl}/login` });
+      } catch { /* ignore fallback tab failures */ }
+      return { ok: false, reason: 'internal-crash' };
     }
+
+    if (result.kind === 'ok') {
+      log.info('AUTH_SIGN_IN: native auth success', { userId: result.userId });
+      await deps.broadcast.sendRuntime({ key: 'AUTH_STATE_CHANGED', data: { signedIn: true } });
+      return { ok: true, userId: result.userId };
+    }
+
+    log.warn('AUTH_SIGN_IN: native auth failed, routing to seamless web fallback', { reason: result.reason });
+    try {
+      chrome.tabs.create({ url: `${clientEnv.webBaseUrl}/login` });
+    } catch { /* ignore */ }
+
     return {
       ok: false,
-      reason: 'Sign-in timed out. Please try again.',
+      reason: result.reason,
     };
   };
 
-  async function cookieJarExchange(cookieJar: string): Promise<AuthSignInResponse> {
-    try {
-      const res = await deps.fetch(deps.endpoints.authExchange, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-llmc-ext-cookie-jar': cookieJar,
-        },
-        body: JSON.stringify({ cookieJar }),
-      });
-      if (!res.ok) {
-        return { ok: false, reason: `exchange failed: ${res.status}` };
-      }
-      let body: unknown;
-      try {
-        body = await res.json();
-      } catch {
-        return { ok: false, reason: 'exchange response not JSON' };
-      }
-      if (typeof body !== 'object' || body === null) {
-        return { ok: false, reason: 'exchange response not an object' };
-      }
-      const obj = body as Record<string, unknown>;
-      const accessToken = typeof obj.accessToken === 'string' ? obj.accessToken : '';
-      const refreshToken = typeof obj.refreshToken === 'string' ? obj.refreshToken : '';
-      const expiresAt =
-        typeof obj.expiresAt === 'number' && Number.isFinite(obj.expiresAt) && obj.expiresAt > 0
-          ? obj.expiresAt
-          : 0;
-      const userId = typeof obj.userId === 'string' ? obj.userId : '';
-      const candidate: StoredSession = { accessToken, refreshToken, expiresAt, userId };
-      const validated = StoredSessionSchema.safeParse(candidate);
-      if (!validated.success) {
-        return { ok: false, reason: 'exchange response shape invalid' };
-      }
-      await deps.storage.writeSession(validated.data);
-      const nextState: AuthState = { signedIn: true, userId: validated.data.userId };
-      await deps.broadcast.sendRuntime({ key: 'AUTH_STATE_CHANGED', data: nextState });
-      return { ok: true, userId: validated.data.userId };
-    } catch (err) {
-      log.error('AUTH_SIGN_IN: cookie-jar exchange failed', err);
-      return { ok: false, reason: 'network error' };
-    }
-  }
-
   // ---- AUTH_SIGN_OUT ----
-  const handleAuthSignOut: HandlerFor<'AUTH_SIGN_OUT'> = async ({ data }) => {
-    const parsed = AuthSignOutRequestSchema.safeParse(data ?? {});
-    if (!parsed.success) {
-      log.warn('AUTH_SIGN_OUT: invalid payload shape, proceeding with clear');
-    }
-    // Best-effort remote call; local clear runs regardless.
+  const handleAuthSignOut: HandlerFor<'AUTH_SIGN_OUT'> = async () => {
     try {
       await deps.fetch(deps.endpoints.authSignOut, {
         method: 'POST',
@@ -430,72 +280,72 @@ export function createHandlers(deps: HandlerDeps): Handlers {
         body: JSON.stringify({}),
       });
     } catch (err) {
-      log.warn('AUTH_SIGN_OUT: remote call failed, continuing with local clear', {
-        error: String(err),
-      });
+      log.warn('AUTH_SIGN_OUT: remote call failed', { error: String(err) });
     }
+
     try {
-      await deps.storage.clearSession();
+      const targetCookieUrl = clientEnv.authCookieUrl;
+      await new Promise<void>((resolve) => {
+        chrome.cookies.remove({ url: targetCookieUrl, name: 'sAccessToken' }, () => {
+           if (chrome.runtime.lastError) { /* handled */ }
+           resolve();
+        });
+      });
+      await new Promise<void>((resolve) => {
+        chrome.cookies.remove({ url: targetCookieUrl, name: 'sRefreshToken' }, () => {
+           if (chrome.runtime.lastError) { /* handled */ }
+           resolve();
+        });
+      });
+      await new Promise<void>((resolve) => {
+        chrome.cookies.remove({ url: targetCookieUrl, name: 'sFrontToken' }, () => {
+           if (chrome.runtime.lastError) { /* handled */ }
+           resolve();
+        });
+      });
     } catch (err) {
-      log.error('AUTH_SIGN_OUT: clearSession failed', err);
+      log.error('AUTH_SIGN_OUT: cookie removal failed', err);
     }
+    
     deps.tabState.clearAll();
-    const nextState: AuthState = { signedIn: false };
-    await deps.broadcast.sendRuntime({ key: 'AUTH_STATE_CHANGED', data: nextState });
+    await deps.broadcast.sendRuntime({ key: 'AUTH_STATE_CHANGED', data: { signedIn: false } });
     return { ok: true };
   };
 
-  // ---- AUTH_STATUS ----
-  const handleAuthStatus: HandlerFor<'AUTH_STATUS'> = async ({ data }) => {
-    const parsed = AuthStatusRequestSchema.safeParse(data ?? {});
-    if (!parsed.success) {
-      log.warn('AUTH_STATUS: ignoring invalid request shape');
-    }
-    let session: StoredSession | null = null;
+    // ---- AUTH_STATUS ----
+  const handleAuthStatus: HandlerFor<'AUTH_STATUS'> = async () => {
     try {
-      session = await deps.storage.readSession();
-    } catch {
-      session = null;
-    }
-    if (session === null) return UNAUTHED;
-    return { signedIn: true, userId: session.userId };
+      const targetCookieUrl = clientEnv.authCookieUrl;
+      const cookie = await new Promise<chrome.cookies.Cookie | null>((resolve) => {
+        chrome.cookies.get({ url: targetCookieUrl, name: 'sFrontToken' }, (c) => {
+           if (chrome.runtime.lastError) { /* gracefully checked */ }
+           resolve(c ?? null);
+        });
+      });
+      if (cookie?.value) {
+        let userId = 'unknown';
+        try {
+          const b64 = cookie.value.replace(/-/g, '+').replace(/_/g, '/');
+          const pad = b64.length % 4;
+          const padded = pad ? b64 + '='.repeat(4 - pad) : b64;
+          const jsonStr = decodeURIComponent(atob(padded).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+          const b = JSON.parse(jsonStr);
+          if (b && b.uid) userId = b.uid;
+        } catch { /* ignore */ }
+        return { signedIn: true, userId };
+      }
+    } catch { /* ignore */ }
+    return UNAUTHED;
   };
 
   // ---- AUTH_STATE_CHANGED (broadcast-only, inert) ----
-  const handleAuthStateChanged: HandlerFor<'AUTH_STATE_CHANGED'> = async ({ data }) => {
-    const parsed = AuthStateSchema.safeParse(data);
-    if (!parsed.success) {
-      log.warn('AUTH_STATE_CHANGED: invalid payload', {
-        issues: parsed.error.issues.length,
-      });
-    }
+  const handleAuthStateChanged: HandlerFor<'AUTH_STATE_CHANGED'> = async () => {
     return undefined;
   };
 
   // ---- AUTH_COOKIE_EXCHANGE ----
-  // Reads the web app's sAccessToken cookie directly via chrome.cookies
-  // and exchanges it for a header-mode session. Returns AuthState.
-  const handleAuthCookieExchange: HandlerFor<'AUTH_COOKIE_EXCHANGE'> = async ({ data }) => {
-    const parsed = AuthCookieExchangeRequestSchema.safeParse(data ?? {});
-    if (!parsed.success) {
-      log.warn('AUTH_COOKIE_EXCHANGE: invalid payload');
-    }
-    const exchange = createCookieExchange({
-      logger: log,
-      fetch: deps.fetch,
-      exchangeEndpoint: deps.endpoints.authExchange,
-      storage: { writeSession: deps.storage.writeSession },
-      broadcast: { sendRuntime: deps.broadcast.sendRuntime },
-    });
-    const result = await exchange();
-    if (result.kind === 'ok') {
-      return { signedIn: true, userId: result.userId } as AuthState;
-    }
-    log.debug('AUTH_COOKIE_EXCHANGE: not successful', {
-      kind: result.kind,
-      reason: 'reason' in result ? result.reason : undefined,
-    });
-    return UNAUTHED;
+  const handleAuthCookieExchange: HandlerFor<'AUTH_COOKIE_EXCHANGE'> = async () => {
+    return handleAuthStatus({ data: {}, sender: {} as chrome.runtime.MessageSender });
   };
 
   // ---- INTENT_DETECTED ----
@@ -520,6 +370,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       url: parsed.data.url,
       jobTitle: parsed.data.jobTitle,
       company: parsed.data.company,
+
       detectedAt: parsed.data.detectedAt,
     };
     deps.tabState.setIntent(tabId, intent);
@@ -540,21 +391,121 @@ export function createHandlers(deps: HandlerDeps): Handlers {
   const handleFillRequest: HandlerFor<'FILL_REQUEST'> = async ({ data }) => {
     const parsed = FillRequestSchema.safeParse(data);
     if (!parsed.success) {
+      log.warn('FILL_REQUEST: schema parse failed', {
+        issueCount: parsed.error.issues.length,
+      });
       return { ok: false, aborted: true, abortReason: 'no-tab' };
     }
+    const tabId = parsed.data.tabId;
+    log.info('FILL_REQUEST: received', {
+      tabId,
+      url: parsed.data.url,
+      hasResumeAttachment: Boolean(parsed.data.resumeAttachment),
+    });
+    const message = {
+      id: deps.now(),
+      type: 'FILL_REQUEST' as const,
+      timestamp: deps.now(),
+      data: parsed.data,
+    };
+
+    // First attempt: forward to an already-loaded content script.
     try {
-      const resp = await deps.broadcast.sendToTab(parsed.data.tabId, {
-        key: 'FILL_REQUEST',
-        data: { tabId: parsed.data.tabId, url: parsed.data.url },
+      const resp = await deps.broadcast.sendToTab(tabId, message);
+      if (resp && typeof resp === 'object') {
+        const typed = resp as FillRequestResponse;
+        log.info('FILL_REQUEST: tab forward succeeded without injection', {
+          tabId,
+          ok: typed.ok,
+          aborted: typed.aborted,
+          abortReason: typed.ok ? undefined : typed.abortReason,
+          filled: typed.ok ? typed.filled.length : undefined,
+          skipped: typed.ok ? typed.skipped.length : undefined,
+          failed: typed.ok ? typed.failed.length : undefined,
+        });
+        return resp as FillRequestResponse;
+      }
+      log.warn('FILL_REQUEST: tab forward returned non-object, injecting', {
+        tabId,
       });
-      if (!resp || typeof resp !== 'object') {
+    } catch (err) {
+      // Missing content script on non-ATS pages. Inject on demand.
+      log.info('FILL_REQUEST: tab forward failed, injecting content script', {
+        tabId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ['content-scripts/ats.js'],
+      });
+      await new Promise((r) => setTimeout(r, 1000));
+      log.info('FILL_REQUEST: content script injection succeeded', { tabId });
+    } catch (err) {
+      const errMessage = err instanceof Error ? err.message : String(err);
+      const isFrameRemovalError =
+        errMessage.includes('Frame with ID') ||
+        errMessage.includes('Inspected target page');
+      if (isFrameRemovalError) {
+        log.info('FILL_REQUEST: frame removed during injection, will retry once', {
+          tabId,
+          error: errMessage,
+        });
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            files: ['content-scripts/ats.js'],
+          });
+          await new Promise((r) => setTimeout(r, 500));
+          log.info('FILL_REQUEST: content script retry injection succeeded', { tabId });
+        } catch (retryErr) {
+          log.warn('FILL_REQUEST: injection retry failed', {
+            tabId,
+            error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+          });
+          return { ok: false, aborted: true, abortReason: 'content-script-not-loaded' };
+        }
+      } else {
+        log.warn('FILL_REQUEST: scripting.executeScript failed', {
+          tabId,
+          error: errMessage,
+        });
         return { ok: false, aborted: true, abortReason: 'content-script-not-loaded' };
       }
-      return resp as FillRequestResponse;
-    } catch (err) {
-      log.warn('FILL_REQUEST: forward failed', { error: String(err) });
-      return { ok: false, aborted: true, abortReason: 'content-script-not-loaded' };
     }
+
+    try {
+      const resp = await deps.broadcast.sendToTab(tabId, message);
+      if (resp && typeof resp === 'object') {
+        const typed = resp as FillRequestResponse;
+        log.info('FILL_REQUEST: post-injection forward succeeded', {
+          tabId,
+          ok: typed.ok,
+          aborted: typed.aborted,
+          abortReason: typed.ok ? undefined : typed.abortReason,
+          filled: typed.ok ? typed.filled.length : undefined,
+          skipped: typed.ok ? typed.skipped.length : undefined,
+          failed: typed.ok ? typed.failed.length : undefined,
+        });
+        return resp as FillRequestResponse;
+      }
+      log.warn('FILL_REQUEST: post-injection forward returned non-object', {
+        tabId,
+      });
+    } catch (err) {
+      log.warn('FILL_REQUEST: forward failed after injection', {
+        tabId,
+        error: String(err),
+      });
+    }
+
+    log.warn('FILL_REQUEST: returning content-script-not-loaded abort', {
+      tabId,
+    });
+    return { ok: false, aborted: true, abortReason: 'content-script-not-loaded' };
   };
 
   // ---- HIGHLIGHT_APPLY / HIGHLIGHT_CLEAR (forwarders) ----
@@ -570,7 +521,12 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       return { ok: false, reason: 'no-tab' };
     }
     const tabId = parsed.data.tabId;
-    const message = { key: 'HIGHLIGHT_APPLY' as const, data: parsed.data };
+    const message = {
+      id: deps.now(),
+      type: 'HIGHLIGHT_APPLY' as const,
+      timestamp: deps.now(),
+      data: parsed.data,
+    };
     log.info('HIGHLIGHT_APPLY: received popup request', { tabId });
 
     // First attempt: forward to the content script already loaded on ATS pages.
@@ -663,7 +619,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
     try {
       const resp = await deps.broadcast.sendToTab(parsed.data.tabId, {
-        key: 'HIGHLIGHT_CLEAR',
+        id: deps.now(),
+        type: 'HIGHLIGHT_CLEAR',
+        timestamp: deps.now(),
         data: parsed.data,
       });
       if (!resp || typeof resp !== 'object') {
@@ -934,6 +892,10 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     client: deps.sessions.client,
     hydrateClient: deps.sessions.hydrateClient,
     cache: deps.sessions.cache,
+    readSession: async () => {
+      const status = await handleAuthStatus({ data: {}, sender: {} as chrome.runtime.MessageSender });
+      return status.signedIn ? { userId: status.userId!, provider: 'none', rawTokenInfo: {} } : null;
+    },
     now: deps.now,
     logger: log,
   });
@@ -955,7 +917,13 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     if (urlKey === null) return { ok: false };
     const nowMs = deps.now();
     try {
-      const existing = await deps.sessions.bindings.get(urlKey, parsed.data.agentId);
+      const auth = await handleAuthStatus({ data: {}, sender: {} as chrome.runtime.MessageSender });
+      if (!auth.signedIn || !auth.userId) return { ok: false };
+      const existing = await deps.sessions.bindings.get(
+        urlKey,
+        parsed.data.agentId,
+        auth.userId,
+      );
       const createdAt = existing?.createdAt ?? nowMs;
       await deps.sessions.bindings.put({
         sessionId: parsed.data.sessionId,
@@ -968,7 +936,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
             : null,
         createdAt,
         updatedAt: nowMs,
-      });
+      }, auth.userId);
       return { ok: true };
     } catch (err: unknown) {
       log.warn('SESSION_BINDING_PUT: store failed', {
@@ -993,7 +961,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     const urlKey = canonicalizeUrl(parsed.data.url);
     if (urlKey === null) return null;
     try {
-      return await deps.sessions.bindings.get(urlKey, parsed.data.agentId);
+      const auth = await handleAuthStatus({ data: {}, sender: {} as chrome.runtime.MessageSender });
+      if (!auth.signedIn || !auth.userId) return null;
+      return await deps.sessions.bindings.get(urlKey, parsed.data.agentId, auth.userId);
     } catch (err: unknown) {
       log.warn('SESSION_BINDING_GET: store failed', {
         error: err instanceof Error ? err.message : String(err),
@@ -1018,15 +988,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     cache: deps.masterResume.cache,
     logger: log,
     broadcastUnauthenticated: async () => {
-      try {
-        await deps.storage.clearSession();
-      } catch (err) {
-        log.warn('master-resume: clearSession failed', { error: String(err) });
-      }
-      await deps.broadcast.sendRuntime({
-        key: 'AUTH_STATE_CHANGED',
-        data: { signedIn: false },
-      });
+      await handleAuthSignOut({ data: {}, sender: {} as chrome.runtime.MessageSender });
     },
   });
 

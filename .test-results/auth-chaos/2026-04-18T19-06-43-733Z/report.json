@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-04-18T19:07:57.705Z",
+  "extensionId": "kepefhkhcamgfpefobckbcdpgamebimd",
+  "options": {
+    "interactiveSignIn": true,
+    "cookieUrl": "https://llmconveyors.com",
+    "cookieDomain": ".llmconveyors.com",
+    "concurrency": 6,
+    "captureAuthState": true,
+    "useStoredAuthState": true
+  },
+  "authState": {
+    "storagePath": "E:\\llmconveyors-chrome-extension\\.local\\auth-chaos\\stored-auth-state.json",
+    "hasStoredState": false
+  },
+  "totals": {
+    "total": 10,
+    "passed": 1,
+    "failed": 9
+  },
+  "results": [
+    {
+      "id": "status-initial",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 73
+    },
+    {
+      "id": "cookie-exchange-no-cookie",
+      "ok": false,
+      "detail": {
+        "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+      },
+      "durationMs": 2526
+    },
+    {
+      "id": "cookie-exchange-invalid-cookie",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "response": {
+          "__transportError": "chrome.runtime.sendMessage unavailable"
+        }
+      },
+      "durationMs": 31
+    },
+    {
+      "id": "cookie-exchange-endpoint-500",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "response": {
+          "__transportError": "chrome.runtime.sendMessage unavailable"
+        }
+      },
+      "durationMs": 28
+    },
+    {
+      "id": "cookie-exchange-endpoint-malformed-json",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "response": {
+          "__transportError": "chrome.runtime.sendMessage unavailable"
+        }
+      },
+      "durationMs": 24
+    },
+    {
+      "id": "cookie-exchange-concurrency-race",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "concurrency": 6,
+        "validCount": 0,
+        "durationMs": 35,
+        "responses": [
+          {
+            "__transportError": "chrome.runtime.sendMessage unavailable"
+          },
+          {
+            "__transportError": "chrome.runtime.sendMessage unavailable"
+          },
+          {
+            "__transportError": "chrome.runtime.sendMessage unavailable"
+          },
+          {
+            "__transportError": "chrome.runtime.sendMessage unavailable"
+          },
+          {
+            "__transportError": "chrome.runtime.sendMessage unavailable"
+          },
+          {
+            "__transportError": "chrome.runtime.sendMessage unavailable"
+          }
+        ]
+      },
+      "durationMs": 35
+    },
+    {
+      "id": "malformed-auth-sign-in-payload",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "response": {
+          "__transportError": "chrome.runtime.sendMessage unavailable"
+        }
+      },
+      "durationMs": 6
+    },
+    {
+      "id": "interactive-sign-in-manual",
+      "ok": false,
+      "detail": {
+        "error": "page.evaluate: Execution context was destroyed, most likely because of a navigation"
+      },
+      "durationMs": 69913
+    },
+    {
+      "id": "session-capture-redacted",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "reason": "llmc.session.v1 missing",
+        "storageKeys": [
+          "__error"
+        ]
+      },
+      "durationMs": 95
+    },
+    {
+      "id": "stored-auth-state-captured",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "reason": "llmc.session.v1 missing or invalid - sign in first",
+        "storagePath": "E:\\llmconveyors-chrome-extension\\.local\\auth-chaos\\stored-auth-state.json"
+      },
+      "durationMs": 1
+    }
+  ]
+}

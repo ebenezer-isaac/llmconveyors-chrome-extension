@@ -21,39 +21,6 @@ export {
   extractUserIdFromJwt,
 } from './jwt-decode';
 
-export {
-  parseAuthFragment,
-  defaultParseAuthFragmentDeps,
-  MAX_FUTURE_EXPIRY_MS,
-} from './parse-auth-fragment';
-export type {
-  ParsedAuthFragment,
-  ParseAuthFragmentDeps,
-} from './parse-auth-fragment';
-
-export {
-  buildSignInUrl,
-  classifyLaunchError,
-  defaultWebAuthFlowDeps,
-  launchWebAuthFlow,
-} from './web-auth-flow';
-export type { WebAuthFlowDeps } from './web-auth-flow';
-
-export {
-  DEFAULT_BRIDGE_URL,
-  buildDefaultSignInDeps,
-  buildStoredSession,
-  createSignInOrchestrator,
-  __getSignInInflight,
-  __resetSignInMutex,
-} from './sign-in-orchestrator';
-export type {
-  AuthBroadcast,
-  SignInAttemptOptions,
-  SignInOrchestratorDeps,
-  StorageFacade,
-} from './sign-in-orchestrator';
-
 export { AUTH_MODULE_BLUEPRINT, blueprint } from './blueprint';
 
 export { registerCookieWatcher } from './cookie-watcher';
@@ -65,9 +32,3 @@ export type {
   FetchAuthedDeps,
   FetchAuthedResult,
 } from './fetch-authed';
-
-export { createCookieExchange } from './cookie-exchange';
-export type {
-  CookieExchangeDeps,
-  CookieExchangeResult,
-} from './cookie-exchange';

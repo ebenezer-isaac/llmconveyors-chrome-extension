@@ -1,0 +1,148 @@
+{
+  "generatedAt": "2026-04-18T21:49:21.192Z",
+  "extensionId": "kepefhkhcamgfpefobckbcdpgamebimd",
+  "options": {
+    "interactiveSignIn": true,
+    "cookieUrl": "http://localhost:3000",
+    "cookieDomain": "localhost",
+    "concurrency": 6,
+    "captureAuthState": false,
+    "useStoredAuthState": true
+  },
+  "authState": {
+    "storagePath": "E:\\llmconveyors-chrome-extension\\.local\\auth-chaos\\stored-auth-state.json",
+    "hasStoredState": false
+  },
+  "totals": {
+    "total": 10,
+    "passed": 8,
+    "failed": 2
+  },
+  "results": [
+    {
+      "id": "status-initial",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 84
+    },
+    {
+      "id": "cookie-exchange-no-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 27
+    },
+    {
+      "id": "cookie-exchange-invalid-cookie",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 16
+    },
+    {
+      "id": "cookie-exchange-endpoint-500",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 20
+    },
+    {
+      "id": "cookie-exchange-endpoint-malformed-json",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "signedIn": false
+        }
+      },
+      "durationMs": 25
+    },
+    {
+      "id": "cookie-exchange-concurrency-race",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "concurrency": 6,
+        "validCount": 6,
+        "durationMs": 21,
+        "responses": [
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          },
+          {
+            "signedIn": false
+          }
+        ]
+      },
+      "durationMs": 21
+    },
+    {
+      "id": "malformed-auth-sign-in-payload",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "response": {
+          "ok": false,
+          "reason": "invalid sign-in payload"
+        }
+      },
+      "durationMs": 6
+    },
+    {
+      "id": "bridge-preflight",
+      "ok": true,
+      "detail": {
+        "ok": true,
+        "target": "http://localhost:3000/auth/extension-signin",
+        "status": 200
+      },
+      "durationMs": 270
+    },
+    {
+      "id": "interactive-sign-in-manual",
+      "ok": false,
+      "detail": {
+        "error": "page.waitForTimeout: Target page, context or browser has been closed"
+      },
+      "durationMs": 44207
+    },
+    {
+      "id": "session-capture-redacted",
+      "ok": false,
+      "detail": {
+        "ok": false,
+        "reason": "control page closed before session capture"
+      },
+      "durationMs": 0
+    }
+  ]
+}

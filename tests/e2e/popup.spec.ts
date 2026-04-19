@@ -58,6 +58,21 @@ async function installCreditsBackendStub(
   context: BrowserContext,
   balance: number,
 ): Promise<void> {
+  await context.route('http://localhost:4000/**', async (route) => {
+    const req = route.request();
+    const url = new URL(req.url());
+    if (url.pathname.endsWith('/api/v1/settings/profile')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { credits: balance, tier: 'free', byoKeyEnabled: false },
+        }),
+      });
+      return;
+    }
+    await route.fallback();
+  });
   await context.route('https://api.llmconveyors.com/**', async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -71,7 +86,7 @@ async function installCreditsBackendStub(
       });
       return;
     }
-    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    await route.fallback();
   });
   await context.route('https://api.llmconveyors.local/**', async (route) => {
     const req = route.request();
@@ -86,7 +101,7 @@ async function installCreditsBackendStub(
       });
       return;
     }
-    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    await route.fallback();
   });
 }
 
@@ -111,12 +126,7 @@ async function seedIntentForTab(
     async ({ payload }) => {
       await new Promise<void>((resolve) => {
         chrome.runtime.sendMessage(
-          {
-            id: 1,
-            type: 'INTENT_DETECTED',
-            timestamp: Date.now(),
-            data: payload,
-          },
+          { key: 'INTENT_DETECTED', data: payload },
           () => resolve(),
         );
       });
@@ -143,13 +153,15 @@ test('popup shows credits remaining when signed in', async () => {
     await seedAuthSession(context, extId);
 
     const popup = await openPopup(context, extId);
-    await popup.waitForSelector('[data-testid="credits-remaining"]', {
+    await expect(popup.locator('[data-testid="signed-out-panel"]')).toHaveCount(0, {
       timeout: 10_000,
     });
-    const credits = popup.locator('[data-testid="credits-remaining"]');
-    await expect(credits).toBeVisible();
-    await expect(credits).toHaveText(/\d+ credits/);
-    await expect(credits).toContainText('25');
+    const tierPill = popup.locator('[data-testid="tier-pill"]');
+    await expect(tierPill).toHaveAttribute('data-state', 'ready', {
+      timeout: 10_000,
+    });
+    await expect(tierPill).toHaveAttribute('data-balance', '25');
+    await expect(tierPill).toContainText('25 credits');
     await popup.close();
   } finally {
     await context.close();

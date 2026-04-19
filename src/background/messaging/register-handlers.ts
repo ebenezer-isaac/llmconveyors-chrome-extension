@@ -18,6 +18,7 @@ import { createLogger } from '../log';
 import {
   LOG_SCOPES,
   AUTH_EXCHANGE_ENDPOINT,
+  AUTH_COOKIE_SYNC_ENDPOINT,
   AUTH_SIGN_OUT_ENDPOINT,
   EXTRACT_SKILLS_ENDPOINT,
   EXTRACT_JD_ENDPOINT,
@@ -25,11 +26,6 @@ import {
   GENERATION_START_ENDPOINT,
   MASTER_RESUME_ENDPOINT,
 } from '../config';
-import {
-  readSession,
-  writeSession,
-  clearSession,
-} from '../storage/session-storage';
 import {
   clearAllTabState,
   getTabState,
@@ -69,95 +65,22 @@ import type { DetectedIntent } from './schemas/intent.schema';
 import type { HighlightStatus } from './schemas/highlight.schema';
 import {
   createFetchAuthed,
-  createSignInOrchestrator,
-  DEFAULT_BRIDGE_URL,
-  defaultParseAuthFragmentDeps,
-  defaultWebAuthFlowDeps,
-  launchWebAuthFlow,
   type FetchAuthed,
 } from '../auth';
 import { clientEnv } from '../../shared/env';
-import type { SessionManager } from '../session/session-manager';
-import { getSessionManager } from '../session/session-manager';
 
 const logger = createLogger(LOG_SCOPES.handlers);
 
-function resolveSessionManager(): SessionManager {
-  const existing = getSessionManager();
-  if (existing === null) {
-    throw new Error(
-      'SessionManager not initialised; call initSessionManager() before registerHandlers()',
-    );
-  }
-  return existing;
-}
-
 function buildProductionDeps(): HandlerDeps {
   const fetchFn = globalThis.fetch.bind(globalThis);
-  const sessionManager = resolveSessionManager();
-  const silentSignInLogger = createLogger('bg.auth.silent');
-  // Hoisted orchestrator: one instance shared by every silent-signin call.
-  // The orchestrator's module-level mutex (see sign-in-orchestrator.ts)
-  // already coalesces concurrent invocations, so a fresh per-call instance
-  // would only churn allocations.
-  const silentOrchestrator = createSignInOrchestrator({
-    webAuthFlow: defaultWebAuthFlowDeps,
-    storage: { writeSession, readSession },
-    broadcast: {
-      sendRuntime: async (msg) => {
-        try {
-          await browser.runtime.sendMessage(msg);
-        } catch (err: unknown) {
-          silentSignInLogger.debug('silent-signin broadcast: no listener', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      },
-    },
-    parseDeps: defaultParseAuthFragmentDeps,
-    logger: silentSignInLogger,
-    now: () => Date.now(),
-    bridgeUrl: DEFAULT_BRIDGE_URL,
-    launch: launchWebAuthFlow,
-  });
-  const silentSignIn = async (): Promise<boolean> => {
-    try {
-      const state = await silentOrchestrator({ interactive: false });
-      return state.signedIn === true;
-    } catch (err: unknown) {
-      silentSignInLogger.debug('silent-signin: failed', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return false;
-    }
-  };
+  
   const fetchAuthed: FetchAuthed = createFetchAuthed({
-    sessionManager,
     fetch: fetchFn,
-    silentSignIn,
     logger: createLogger('bg.fetchAuthed'),
-    now: () => Date.now(),
-    // When the token is confirmed dead (silent retry also failed), clear
-    // stored session + broadcast so the popup/sidepanel immediately
-    // flips to the signed-out state. Without this, a stale token leaves
-    // the user in a ghost-signed-in state where every action shows
-    // "signed-out" inline but the header still renders the avatar.
-    onAuthFailed: () => {
-      void (async () => {
-        try {
-          await clearSession();
-        } catch {
-          // best-effort
-        }
-        try {
-          await browser.runtime.sendMessage({
-            key: 'AUTH_STATE_CHANGED',
-            data: { signedIn: false },
-          });
-        } catch {
-          // no listener (popup/sidepanel closed)
-        }
-      })();
+    onAuthFailed: async () => {
+      try {
+        await browser.runtime.sendMessage({ key: 'AUTH_STATE_CHANGED', data: { signedIn: false } });
+      } catch { /* ignore */ }
     },
   });
 
@@ -225,20 +148,18 @@ function buildProductionDeps(): HandlerDeps {
     buildInteractUrl: (agentType: AgentType) => buildAgentInteractUrl(agentType),
   });
   const sseManager = createSseManager({
-    fetch: fetchFn,
     logger: generationLogger,
     buildUrl: (generationId: string) => buildSseStreamUrl(generationId),
-    sessionManager,
+    fetchAuthed,
     broadcast: async (msg) => {
       try {
         await browser.runtime.sendMessage(msg);
-      } catch (err) {
-        generationLogger.debug('sse broadcast: no listener', {
-          error: String(err),
-        });
-      }
+      } catch { /* ignore */ }
     },
-    onAuthLost: silentSignIn,
+    onAuthLost: async () => {
+      // Nothing special required anymore, fetchAuthed natively handles refreshes.
+      return false;
+    },
   });
 
   const scriptingApi = {
@@ -271,13 +192,7 @@ function buildProductionDeps(): HandlerDeps {
     logger,
     fetch: fetchFn,
     fetchAuthed,
-    sessionManager,
     now: () => Date.now(),
-    storage: {
-      readSession,
-      writeSession,
-      clearSession,
-    },
     tabState: {
       getIntent: (tabId: number): DetectedIntent | null => getTabState(tabId).intent,
       setIntent,
@@ -300,6 +215,7 @@ function buildProductionDeps(): HandlerDeps {
     },
     endpoints: {
       authExchange: AUTH_EXCHANGE_ENDPOINT,
+      authCookieSync: AUTH_COOKIE_SYNC_ENDPOINT,
       authSignOut: AUTH_SIGN_OUT_ENDPOINT,
       extractSkills: EXTRACT_SKILLS_ENDPOINT,
       extractJd: EXTRACT_JD_ENDPOINT,
@@ -342,6 +258,7 @@ function buildProductionDeps(): HandlerDeps {
         },
       },
     },
+
     genericIntent: {
       scripting: scriptingApi as never,
     },
@@ -415,7 +332,6 @@ export function registerHandlers(customDeps?: Partial<HandlerDeps>): Handlers {
     ? {
         ...baseDeps,
         ...customDeps,
-        storage: { ...baseDeps.storage, ...(customDeps.storage ?? {}) },
         tabState: { ...baseDeps.tabState, ...(customDeps.tabState ?? {}) },
         broadcast: { ...baseDeps.broadcast, ...(customDeps.broadcast ?? {}) },
         endpoints: { ...baseDeps.endpoints, ...(customDeps.endpoints ?? {}) },

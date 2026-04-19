@@ -209,6 +209,64 @@ describe('useSessionForCurrentTab', () => {
     expect(capture.current?.logs.length).toBeGreaterThan(0);
   });
 
+  it('normalizes ats-scorecard hydrate artifacts into ats-comparison cards', async () => {
+    const binding = {
+      sessionId: 's2',
+      generationId: 'g2',
+      agentId: 'job-hunter',
+      urlKey: 'https://example.com/jd',
+      pageTitle: null,
+      createdAt: 1,
+      updatedAt: 2,
+    };
+    const hydratePayload = {
+      session: {
+        id: 's2',
+        status: 'completed',
+        metadata: {
+          agentType: 'job-hunter',
+          companyName: 'Meta',
+          jobTitle: 'Backend Software Engineer',
+        },
+        updatedAt: '2026-04-15T00:00:00.000Z',
+      },
+      artifacts: [
+        {
+          type: 'ats-scorecard',
+          payload: {
+            before: { overallScore: 23, grade: 'F', matchedKeywords: [], missingKeywords: [] },
+            after: { overallScore: 72, grade: 'B', matchedKeywords: [], missingKeywords: [] },
+          },
+        },
+      ],
+      generationLogs: [],
+    };
+    const sendMessage = vi.fn(async (msg: unknown) => {
+      const env = msg as { key?: string };
+      if (env.key === 'SESSION_BINDING_GET') return binding;
+      if (env.key === 'SESSION_HYDRATE_GET') {
+        return { ok: true, payload: hydratePayload };
+      }
+      return null;
+    });
+    installChrome({
+      sendMessage,
+      tabUrl: 'https://example.com/jd',
+    });
+    await mount({
+      tabId: 42,
+      agentId: 'job-hunter',
+      signedIn: true,
+      sendMessage,
+    });
+    await flush();
+    await flush();
+    expect(capture.current?.status).toBe('found');
+    expect(capture.current?.artifacts).toHaveLength(1);
+    expect(capture.current?.artifacts[0]?.type).toBe('ats-comparison');
+    expect(capture.current?.artifacts[0]?.label).toBe('ATS Comparison');
+  });
+
   it('falls back to not-found when the hydrate response is not-found (deleted session)', async () => {
     const binding = {
       sessionId: 's1',

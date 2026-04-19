@@ -41,18 +41,41 @@ export function FillButton({
 
   async function handleClick(): Promise<void> {
     setOutcome({ kind: 'pending' });
+    log.info('Fill button clicked');
     try {
       const [tab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
+      log.debug('active tab query resolved', {
+        hasTab: Boolean(tab),
+        tabId: tab?.id,
+        hasUrl: Boolean(tab?.url),
+      });
       if (!tab || typeof tab.id !== 'number' || !tab.url) {
+        log.warn('aborting fill: no active tab context', {
+          hasTab: Boolean(tab),
+          tabId: tab?.id,
+          hasUrl: Boolean(tab?.url),
+        });
         setOutcome({ kind: 'error', message: 'no active tab' });
         return;
       }
+      log.info('dispatching FILL_REQUEST', {
+        tabId: tab.id,
+        url: tab.url,
+      });
       const response: FillRequestResponse = await sendMessage('FILL_REQUEST', {
         tabId: tab.id,
         url: tab.url,
+      });
+      log.info('received FILL_REQUEST response', {
+        ok: response.ok,
+        aborted: response.aborted,
+        abortReason: response.ok ? undefined : response.abortReason,
+        filled: response.ok ? response.filled.length : undefined,
+        skipped: response.ok ? response.skipped.length : undefined,
+        failed: response.ok ? response.failed.length : undefined,
       });
       if (response.ok) {
         setOutcome({
@@ -62,6 +85,10 @@ export function FillButton({
           failed: response.failed.length,
         });
       } else {
+        log.warn('fill aborted by downstream handler', {
+          tabId: tab.id,
+          abortReason: response.abortReason,
+        });
         setOutcome({ kind: 'error', message: response.abortReason });
       }
     } catch (err: unknown) {

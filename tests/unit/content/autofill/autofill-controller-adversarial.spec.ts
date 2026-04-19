@@ -93,6 +93,16 @@ function makeDeps(
 ): AutofillControllerDeps {
   return {
     loadAdapter: async () => makeAdapter('greenhouse'),
+    scanGenericForm: (): FormModel => ({
+      url: 'https://example.com',
+      title: 'generic',
+      scannedAt: '2026-04-16T00:00:00.000Z',
+      fields: [],
+    }),
+    fillGenericField: (i: FillInstruction): FillResult => ({
+      ok: true,
+      selector: i.selector,
+    }),
     readProfile: async () => baseProfile(),
     resolveFile: async () => null,
     broadcastIntent: vi.fn(),
@@ -117,7 +127,7 @@ describe('AutofillController adversarial -- null/undefined at boundaries', () =>
     expect(r).toMatchObject({ aborted: true, abortReason: 'profile-missing' });
   });
 
-  it('returns no-adapter when loadAdapter rejects rather than returns null', async () => {
+  it('falls back to generic scan when loadAdapter rejects', async () => {
     const controller = new AutofillController(
       makeDeps({
         loadAdapter: async () => {
@@ -126,7 +136,7 @@ describe('AutofillController adversarial -- null/undefined at boundaries', () =>
       }),
     );
     const r = await controller.executeFill();
-    expect(r).toMatchObject({ aborted: true, abortReason: 'no-adapter' });
+    expect(r).toMatchObject({ aborted: true, abortReason: 'no-form' });
   });
 
   it('treats NaN timestamp from now() without throwing', async () => {

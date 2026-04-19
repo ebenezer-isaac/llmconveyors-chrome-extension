@@ -18,11 +18,22 @@ const log = createLogger('content-messaging');
 
 export function registerFillListener(controller: AutofillController): void {
   onMessage('FILL_REQUEST', async (message) => {
-    log.info('received FILL_REQUEST', { tabId: message.data.tabId });
+    log.info('received FILL_REQUEST', {
+      tabId: message.data.tabId,
+      url: message.data.url,
+      hasResumeAttachment: Boolean(message.data.resumeAttachment),
+    });
     try {
-      const response = await controller.executeFill();
+      const response = await controller.executeFill({
+        resumeAttachment: message.data.resumeAttachment,
+      });
       log.info('returning FillRequestResponse', {
         ok: response.ok,
+        aborted: response.aborted,
+        abortReason: response.ok ? undefined : response.abortReason,
+        filled: response.ok ? response.filled.length : undefined,
+        skipped: response.ok ? response.skipped.length : undefined,
+        failed: response.ok ? response.failed.length : undefined,
       });
       return response;
     } catch (err: unknown) {
