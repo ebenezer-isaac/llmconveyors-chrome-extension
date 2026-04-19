@@ -31,6 +31,8 @@ export const SessionBindingGetRequestSchema = z
   .object({
     url: z.string().min(1).max(2048),
     agentId: AgentIdSchema,
+    jobTitle: z.string().optional(),
+    companyName: z.string().optional(),
   })
   .strict();
 

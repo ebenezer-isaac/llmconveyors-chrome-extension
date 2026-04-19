@@ -48,6 +48,9 @@ export function ArtifactsPanel({
   const [open, setOpen] = useState<boolean>(defaultOpen);
   const count = artifacts.length;
 
+  const cvIndex = artifacts.findIndex((a) => a.type === 'cv');
+  const defaultOpenIndex = cvIndex >= 0 ? cvIndex : 0;
+
   return (
     <section
       data-testid="artifacts-panel"
@@ -79,7 +82,7 @@ export function ArtifactsPanel({
           <ul className="flex flex-col gap-2">
             {artifacts.map((artifact, idx) => (
               <li key={`${artifact.type}-${idx}`}>
-                <ArtifactCard artifact={artifact} defaultOpen={idx === 0} />
+                <ArtifactCard artifact={artifact} defaultOpen={idx === defaultOpenIndex} />
               </li>
             ))}
           </ul>

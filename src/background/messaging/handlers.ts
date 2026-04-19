@@ -963,7 +963,41 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     try {
       const auth = await handleAuthStatus({ data: {}, sender: {} as chrome.runtime.MessageSender });
       if (!auth.signedIn || !auth.userId) return null;
-      return await deps.sessions.bindings.get(urlKey, parsed.data.agentId, auth.userId);
+      const existing = await deps.sessions.bindings.get(urlKey, parsed.data.agentId, auth.userId);
+      if (existing !== null) return existing;
+
+      // Semantic match fallback
+      if (
+        typeof parsed.data.jobTitle === 'string' &&
+        parsed.data.jobTitle.length > 0 &&
+        typeof parsed.data.companyName === 'string' &&
+        parsed.data.companyName.length > 0
+      ) {
+        const cache = await deps.sessions.cache.read();
+        if (cache && Array.isArray(cache.items)) {
+          const match = cache.items.find(
+            (item) =>
+              item.agentType === parsed.data.agentId &&
+              item.jobTitle === parsed.data.jobTitle &&
+              item.companyName === parsed.data.companyName
+          );
+          if (match) {
+            const newBinding = {
+              sessionId: match.sessionId,
+              generationId: '', // Unknown from list API, safely empty
+              agentId: parsed.data.agentId,
+              urlKey,
+              pageTitle: parsed.data.jobTitle ?? null,
+              createdAt: deps.now(),
+              updatedAt: deps.now(),
+            };
+            await deps.sessions.bindings.put(newBinding, auth.userId);
+            return newBinding;
+          }
+        }
+      }
+
+      return null;
     } catch (err: unknown) {
       log.warn('SESSION_BINDING_GET: store failed', {
         error: err instanceof Error ? err.message : String(err),

@@ -101,7 +101,12 @@ function PopupBody(): React.ReactElement {
       try {
         const binding = await runtime.sendMessage({
           key: 'SESSION_BINDING_GET',
-          data: { url: tabUrl, agentId: activeAgentId },
+          data: { 
+            url: tabUrl, 
+            agentId: activeAgentId,
+            jobTitle: genericIntent.jobTitle ?? intent?.jobTitle ?? undefined,
+            companyName: genericIntent.company ?? intent?.company ?? undefined
+          },
         });
         if (cancelled) return;
 

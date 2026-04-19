@@ -39,6 +39,7 @@ export const blueprint: ModuleBlueprint = {
     '@webext-core/messaging',
   ],
   messageHandlers: [],
+  invariants: [
     {
       id: 'AUTH-002',
       description:
