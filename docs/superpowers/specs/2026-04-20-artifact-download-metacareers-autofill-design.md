@@ -35,10 +35,19 @@ Modify `ArtifactCard.tsx` to handle PDF artifacts with `pdfStorageKey`:
 |------|--------|
 | `entrypoints/sidepanel/artifacts/ArtifactCard.tsx` | Add async PDF fetch in `handleDownload` |
 
+### Artifact Types and Download Strategy
+
+| Artifact Type | Has `content` | Has `pdfStorageKey` | Has `storageKey` | Download Strategy |
+|---------------|---------------|---------------------|------------------|-------------------|
+| Company Research | Yes (markdown) | No | Maybe | Use `content` directly |
+| Cover Letter | Yes (text) | No | Maybe | Use `content` directly |
+| Resume (CV) | Yes (JSON) | Yes | Yes | Fetch PDF via `ARTIFACT_FETCH_BLOB` |
+| ATS Comparison | Yes (JSON) | No | Maybe | Use `content` (rendered as text) |
+
 ### Implementation Details
 
 ```typescript
-// Current (broken)
+// Current (broken) - downloads may silently fail
 const handleDownload = useCallback(() => {
   if (artifact.downloadUrl !== null) {
     void downloadUrl(artifact.downloadUrl, artifact.filename);
@@ -49,24 +58,61 @@ const handleDownload = useCallback(() => {
   }
 }, [artifact]);
 
-// Fixed
+// Fixed - handles all artifact types with loading/error states
+const [downloadState, setDownloadState] = useState<'idle' | 'loading' | 'error'>('idle');
+
 const handleDownload = useCallback(async () => {
-  // For CV artifacts with pdfStorageKey, fetch and download the PDF
-  if (artifact.pdfStorageKey && artifact.sessionId) {
-    setDownloadState('loading');
-    const result = await fetchArtifactBlob(artifact.sessionId, artifact.pdfStorageKey);
-    if (result.ok) {
-      const bytes = base64ToBytes(result.content);
-      await downloadBlob(bytes, artifact.filename, result.mimeType);
+  setDownloadState('loading');
+  try {
+    // Priority 1: PDF artifacts with pdfStorageKey (Resume)
+    if (artifact.pdfStorageKey && artifact.sessionId) {
+      const result = await fetchArtifactBlob(artifact.sessionId, artifact.pdfStorageKey);
+      if (result.ok) {
+        const bytes = base64ToBytes(result.content);
+        await downloadBlob(new Blob([bytes], { type: result.mimeType }), artifact.filename);
+        setDownloadState('idle');
+        return;
+      }
+      // Fall through to try other methods
     }
-    setDownloadState('idle');
-    return;
+    
+    // Priority 2: Signed download URL
+    if (artifact.downloadUrl !== null) {
+      const success = await downloadUrl(artifact.downloadUrl, artifact.filename);
+      setDownloadState(success ? 'idle' : 'error');
+      return;
+    }
+    
+    // Priority 3: Inline content (Company Research, Cover Letter)
+    if (artifact.content !== null) {
+      const mimeType = artifact.mimeType ?? 'text/plain';
+      const success = await downloadBlob(artifact.content, artifact.filename, mimeType);
+      setDownloadState(success ? 'idle' : 'error');
+      return;
+    }
+    
+    // Priority 4: Fetch via storageKey (fallback for artifacts without inline content)
+    if (artifact.storageKey && artifact.sessionId) {
+      const result = await fetchArtifactBlob(artifact.sessionId, artifact.storageKey);
+      if (result.ok) {
+        const success = await downloadBlob(result.content, artifact.filename, result.mimeType);
+        setDownloadState(success ? 'idle' : 'error');
+        return;
+      }
+    }
+    
+    setDownloadState('error');
+  } catch {
+    setDownloadState('error');
   }
-  // Fallback to existing logic
-  if (artifact.downloadUrl !== null) { ... }
-  if (artifact.content !== null) { ... }
 }, [artifact]);
 ```
+
+### UI Updates
+
+- Show loading spinner on Download button while fetching
+- Show error state if download fails
+- Disable button during download to prevent double-clicks
 
 ### Testing
 
