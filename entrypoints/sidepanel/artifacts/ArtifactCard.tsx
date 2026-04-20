@@ -14,7 +14,56 @@
 
 import React, { useCallback, useState } from 'react';
 import type { ArtifactPreview } from '@/src/background/messaging/schemas/artifact-preview.schema';
-import { downloadBlob, downloadUrl } from '../lib/download';
+import { downloadBlob, downloadUrl, downloadBase64 } from '../lib/download';
+
+type DownloadState = 'idle' | 'loading' | 'success' | 'error';
+
+type RuntimeMessenger = {
+  sendMessage: (msg: unknown) => Promise<unknown>;
+};
+
+function getRuntime(): RuntimeMessenger | null {
+  const g = globalThis as unknown as {
+    chrome?: { runtime?: RuntimeMessenger };
+    browser?: { runtime?: RuntimeMessenger };
+  };
+  return g.chrome?.runtime ?? g.browser?.runtime ?? null;
+}
+
+async function fetchArtifactBlob(
+  sessionId: string,
+  storageKey: string,
+): Promise<{ ok: true; content: string; mimeType: string } | { ok: false; reason: string }> {
+  const runtime = getRuntime();
+  if (runtime === null) {
+    return { ok: false, reason: 'runtime-unavailable' };
+  }
+  try {
+    const raw = await runtime.sendMessage({
+      key: 'ARTIFACT_FETCH_BLOB',
+      data: { sessionId, storageKey },
+    });
+    if (!raw || typeof raw !== 'object') {
+      return { ok: false, reason: 'empty-response' };
+    }
+    const env = raw as {
+      ok?: boolean;
+      content?: string;
+      mimeType?: string;
+      reason?: string;
+    };
+    if (env.ok !== true || typeof env.content !== 'string') {
+      return { ok: false, reason: typeof env.reason === 'string' ? env.reason : 'fetch-failed' };
+    }
+    return {
+      ok: true,
+      content: env.content,
+      mimeType: typeof env.mimeType === 'string' ? env.mimeType : 'application/octet-stream',
+    };
+  } catch (err: unknown) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
 import { copyToClipboard } from '../lib/clipboard';
 import { TextArtifactBody } from './TextArtifactBody';
 import { CvArtifactBody } from './CvArtifactBody';
@@ -68,22 +117,67 @@ export function ArtifactCard({
 }: ArtifactCardProps): React.ReactElement {
   const [open, setOpen] = useState<boolean>(defaultOpen);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [downloadState, setDownloadState] = useState<DownloadState>('idle');
 
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
-  const handleDownload = useCallback(() => {
-    if (artifact.downloadUrl !== null) {
-      void downloadUrl(artifact.downloadUrl, artifact.filename);
-      return;
+  const handleDownload = useCallback(async () => {
+    if (downloadState === 'loading') return;
+    setDownloadState('loading');
+
+    try {
+      // Priority 1: PDF artifacts with pdfStorageKey (Resume)
+      if (artifact.pdfStorageKey !== null && artifact.sessionId !== null) {
+        const result = await fetchArtifactBlob(artifact.sessionId, artifact.pdfStorageKey);
+        if (result.ok) {
+          const success = await downloadBase64(result.content, artifact.filename, result.mimeType);
+          setDownloadState(success ? 'success' : 'error');
+          if (success) setTimeout(() => setDownloadState('idle'), 1500);
+          return;
+        }
+      }
+
+      // Priority 2: Signed download URL
+      if (artifact.downloadUrl !== null) {
+        const success = await downloadUrl(artifact.downloadUrl, artifact.filename);
+        setDownloadState(success ? 'success' : 'error');
+        if (success) setTimeout(() => setDownloadState('idle'), 1500);
+        return;
+      }
+
+      // Priority 3: Inline content (Company Research, Cover Letter)
+      if (artifact.content !== null) {
+        const mimeType = artifact.mimeType ?? 'text/plain';
+        const success = await downloadBlob(artifact.content, artifact.filename, mimeType);
+        setDownloadState(success ? 'success' : 'error');
+        if (success) setTimeout(() => setDownloadState('idle'), 1500);
+        return;
+      }
+
+      // Priority 4: Fetch via storageKey (fallback)
+      if (artifact.storageKey !== null && artifact.sessionId !== null) {
+        const result = await fetchArtifactBlob(artifact.sessionId, artifact.storageKey);
+        if (result.ok) {
+          const isBinary =
+            result.mimeType.startsWith('application/') &&
+            !result.mimeType.includes('json') &&
+            !result.mimeType.includes('text');
+          const success = isBinary
+            ? await downloadBase64(result.content, artifact.filename, result.mimeType)
+            : await downloadBlob(result.content, artifact.filename, result.mimeType);
+          setDownloadState(success ? 'success' : 'error');
+          if (success) setTimeout(() => setDownloadState('idle'), 1500);
+          return;
+        }
+      }
+
+      setDownloadState('error');
+      setTimeout(() => setDownloadState('idle'), 2000);
+    } catch {
+      setDownloadState('error');
+      setTimeout(() => setDownloadState('idle'), 2000);
     }
-    if (artifact.content !== null) {
-      void downloadBlob(
-        artifact.content,
-        artifact.filename,
-        artifact.mimeType ?? 'application/octet-stream',
-      );
-    }
-  }, [artifact]);
+  }, [artifact, downloadState]);
 
   const handleCopy = useCallback(async () => {
     const text = artifact.content;
@@ -97,7 +191,11 @@ export function ArtifactCard({
   }, [artifact.content]);
 
   const canCopy = artifact.content !== null;
-  const canDownload = artifact.downloadUrl !== null || artifact.content !== null;
+  const canDownload =
+    artifact.pdfStorageKey !== null ||
+    artifact.downloadUrl !== null ||
+    artifact.content !== null ||
+    artifact.storageKey !== null;
 
   return (
     <section
@@ -136,12 +234,25 @@ export function ArtifactCard({
           {canDownload ? (
             <button
               type="button"
-              onClick={handleDownload}
+              onClick={() => void handleDownload()}
+              disabled={downloadState === 'loading'}
               data-testid="artifact-card-download"
               aria-label="Download artifact"
-              className="rounded-card border border-zinc-200 px-2 py-0.5 text-[10px] text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+              className={`rounded-card border px-2 py-0.5 text-[10px] hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                downloadState === 'error'
+                  ? 'border-red-300 text-red-600 dark:border-red-700 dark:text-red-400'
+                  : downloadState === 'success'
+                  ? 'border-emerald-300 text-emerald-600 dark:border-emerald-700 dark:text-emerald-400'
+                  : 'border-zinc-200 text-zinc-700 dark:border-zinc-700 dark:text-zinc-200'
+              } ${downloadState === 'loading' ? 'cursor-wait opacity-60' : ''}`}
             >
-              Download
+              {downloadState === 'loading'
+                ? 'Downloading...'
+                : downloadState === 'success'
+                ? 'Downloaded'
+                : downloadState === 'error'
+                ? 'Failed'
+                : 'Download'}
             </button>
           ) : null}
         </div>
