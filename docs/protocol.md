@@ -447,6 +447,10 @@ Request schema:
         "contentBase64"
       ],
       "additionalProperties": false
+    },
+    "profileData": {
+      "type": "object",
+      "additionalProperties": {}
     }
   },
   "required": [

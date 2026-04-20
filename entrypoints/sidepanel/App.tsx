@@ -48,6 +48,7 @@ import type { FillRequest } from '@/src/background/messaging/protocol-types';
 import { ThemeRoot } from '@/entrypoints/shared/ThemeRoot';
 import {
   getOrPreloadResumeAttachment,
+  getProfileDataFromArtifact,
   selectResumeArtifact,
 } from './lib/autofill-resume-cache';
 
@@ -289,6 +290,7 @@ type AutofillOutcome =
 
 async function runAutofill(
   resumeAttachment: NonNullable<FillRequest['resumeAttachment']> | null = null,
+  profileData: Record<string, unknown> | null = null,
 ): Promise<AutofillOutcome> {
   const g = globalThis as unknown as {
     chrome?: {
@@ -312,6 +314,7 @@ async function runAutofill(
       tabId: tab.id,
       url: tab.url,
       ...(resumeAttachment !== null ? { resumeAttachment } : {}),
+      ...(profileData !== null ? { profileData } : {}),
     };
     const raw = (await runtime.sendMessage({
       key: 'FILL_REQUEST',
@@ -382,7 +385,8 @@ function BoundSessionPanel(props: {
       payload = await getOrPreloadResumeAttachment(resumeArtifact);
       setResumeAttachment(payload);
     }
-    const result = await runAutofill(payload);
+    const profileData = await getProfileDataFromArtifact(resumeArtifact);
+    const result = await runAutofill(payload, profileData);
     setAutofill(result);
   }
 
