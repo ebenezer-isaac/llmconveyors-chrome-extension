@@ -33,6 +33,7 @@ export const SessionBindingGetRequestSchema = z
     agentId: AgentIdSchema,
     jobTitle: z.string().optional(),
     companyName: z.string().optional(),
+    activeOnly: z.boolean().optional(),
   })
   .strict();
 

@@ -68,6 +68,7 @@ import { canonicalizeUrl } from '../sessions';
 import {
   SessionBindingPutRequestSchema,
   SessionBindingGetRequestSchema,
+  type SessionBindingEntry,
 } from './schemas/session-binding.schema';
 import type { SessionListItem } from './schemas/session-list.schema';
 import { createGenericIntentHandler } from '../generic-intent';
@@ -83,7 +84,10 @@ import {
   IntentGetRequestSchema,
   DetectedJobBroadcastSchema,
 } from './schemas/intent.schema';
-import { FillRequestSchema } from './schemas/fill.schema';
+import {
+  FillRequestSchema,
+  FillRequestResponseSchema,
+} from './schemas/fill.schema';
 import {
   HighlightApplyRequestSchema,
   HighlightClearRequestSchema,
@@ -94,7 +98,11 @@ import {
   ExtractJdBackendResponseSchema,
 } from './schemas/keywords.schema';
 import { HighlightStatusRequestSchema } from './schemas/highlight.schema';
-import { GenerationUpdateBroadcastSchema } from './schemas/generation.schema';
+import {
+  GenerationUpdateBroadcastSchema,
+  GenerationStartRequestSchema,
+  GenerationCancelRequestSchema,
+} from './schemas/generation.schema';
 import { CreditsGetRequestSchema } from './schemas/credits.schema';
 import { ProfileGetRequestSchema } from './schemas/profile.schema';
 import type { BgHandledKey, ProtocolMap } from './protocol';
@@ -229,8 +237,173 @@ export type HandlerFor<K extends BgHandledKey> = (msg: {
 
 export type Handlers = { readonly [K in BgHandledKey]: HandlerFor<K> };
 
+type PlainRecord = Record<string, unknown>;
+
+function asPlainRecord(value: unknown): PlainRecord | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return value as PlainRecord;
+}
+
+function summarizeKeys(value: unknown, limit = 12): readonly string[] {
+  const rec = asPlainRecord(value);
+  if (rec === null) return [];
+  return Object.keys(rec).slice(0, limit);
+}
+
+type FillResponseShape =
+  | 'direct'
+  | 'wrapped-res'
+  | 'wrapped-result'
+  | 'non-object'
+  | 'invalid';
+
+function normalizeFillForwardResponse(raw: unknown): {
+  readonly response: FillRequestResponse | null;
+  readonly shape: FillResponseShape;
+  readonly rawKeys: readonly string[];
+  readonly innerKeys: readonly string[];
+  readonly parseIssues: number;
+} {
+  const rawObject = asPlainRecord(raw);
+  if (rawObject === null) {
+    return {
+      response: null,
+      shape: 'non-object',
+      rawKeys: [],
+      innerKeys: [],
+      parseIssues: 0,
+    };
+  }
+
+  const direct = FillRequestResponseSchema.safeParse(rawObject);
+  if (direct.success) {
+    return {
+      response: direct.data,
+      shape: 'direct',
+      rawKeys: summarizeKeys(rawObject),
+      innerKeys: [],
+      parseIssues: 0,
+    };
+  }
+
+  const wrappedRes = asPlainRecord(rawObject.res);
+  if (wrappedRes !== null) {
+    const wrapped = FillRequestResponseSchema.safeParse(wrappedRes);
+    if (wrapped.success) {
+      return {
+        response: wrapped.data,
+        shape: 'wrapped-res',
+        rawKeys: summarizeKeys(rawObject),
+        innerKeys: summarizeKeys(wrappedRes),
+        parseIssues: 0,
+      };
+    }
+  }
+
+  const wrappedResult = asPlainRecord(rawObject.result);
+  if (wrappedResult !== null) {
+    const wrapped = FillRequestResponseSchema.safeParse(wrappedResult);
+    if (wrapped.success) {
+      return {
+        response: wrapped.data,
+        shape: 'wrapped-result',
+        rawKeys: summarizeKeys(rawObject),
+        innerKeys: summarizeKeys(wrappedResult),
+        parseIssues: 0,
+      };
+    }
+  }
+
+  return {
+    response: null,
+    shape: 'invalid',
+    rawKeys: summarizeKeys(rawObject),
+    innerKeys: wrappedRes !== null ? summarizeKeys(wrappedRes) : [],
+    parseIssues: direct.error.issues.length,
+  };
+}
+
 export function createHandlers(deps: HandlerDeps): Handlers {
   const log = deps.logger;
+  const ACTIVE_GENERATION_LOCK_MAX_AGE_MS = 30 * 60 * 1000;
+
+  interface ActiveGenerationLock {
+    readonly generationId: string;
+    readonly sessionId: string;
+    readonly agentId: AgentId;
+    readonly urlKey: string;
+    readonly createdAt: number;
+    readonly updatedAt: number;
+  }
+
+  const activeGenerationLocksByKey = new Map<string, ActiveGenerationLock>();
+  const generationIdToLockKey = new Map<string, string>();
+
+  const toGenerationLockKey = (agentId: AgentId, urlKey: string): string =>
+    `${agentId}|${urlKey}`;
+
+  const clearGenerationLockByKey = (lockKey: string): void => {
+    const lock = activeGenerationLocksByKey.get(lockKey);
+    if (!lock) return;
+    generationIdToLockKey.delete(lock.generationId);
+    activeGenerationLocksByKey.delete(lockKey);
+  };
+
+  const clearGenerationLockByGenerationId = (generationId: string): void => {
+    const lockKey = generationIdToLockKey.get(generationId);
+    if (!lockKey) return;
+    clearGenerationLockByKey(lockKey);
+  };
+
+  const pruneStaleGenerationLocks = (): void => {
+    const now = deps.now();
+    for (const [lockKey, lock] of activeGenerationLocksByKey.entries()) {
+      if (now - lock.updatedAt > ACTIVE_GENERATION_LOCK_MAX_AGE_MS) {
+        clearGenerationLockByKey(lockKey);
+      }
+    }
+  };
+
+  const upsertGenerationLock = (args: {
+    readonly generationId: string;
+    readonly sessionId: string;
+    readonly agentId: AgentId;
+    readonly urlKey: string;
+  }): void => {
+    const lock: ActiveGenerationLock = {
+      generationId: args.generationId,
+      sessionId: args.sessionId,
+      agentId: args.agentId,
+      urlKey: args.urlKey,
+      createdAt: deps.now(),
+      updatedAt: deps.now(),
+    };
+    const lockKey = toGenerationLockKey(args.agentId, args.urlKey);
+    activeGenerationLocksByKey.set(lockKey, lock);
+    generationIdToLockKey.set(args.generationId, lockKey);
+  };
+
+  const findActiveGenerationLock = (
+    agentId: AgentId,
+    urlKey: string,
+  ): ActiveGenerationLock | null => {
+    pruneStaleGenerationLocks();
+    return activeGenerationLocksByKey.get(toGenerationLockKey(agentId, urlKey)) ?? null;
+  };
+
+  const toEphemeralBindingEntry = (
+    lock: ActiveGenerationLock,
+  ): SessionBindingEntry => ({
+    sessionId: lock.sessionId,
+    generationId: lock.generationId,
+    agentId: lock.agentId,
+    urlKey: lock.urlKey,
+    pageTitle: null,
+    createdAt: lock.createdAt,
+    updatedAt: lock.updatedAt,
+  });
 
   // ---- AUTH_SIGN_IN ----
   const handleAuthSignIn: HandlerFor<'AUTH_SIGN_IN'> = async ({ data }) => {
@@ -306,6 +479,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     } catch (err) {
       log.error('AUTH_SIGN_OUT: cookie removal failed', err);
     }
+
+    activeGenerationLocksByKey.clear();
+    generationIdToLockKey.clear();
     
     deps.tabState.clearAll();
     await deps.broadcast.sendRuntime({ key: 'AUTH_STATE_CHANGED', data: { signedIn: false } });
@@ -403,20 +579,62 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       hasResumeAttachment: Boolean(parsed.data.resumeAttachment),
       hasProfileData: Boolean(parsed.data.profileData),
     });
+    if (parsed.data.profileData) {
+      const pd = parsed.data.profileData;
+      const basics = pd.basics;
+      const isObj = (v: unknown): v is Record<string, unknown> =>
+        typeof v === 'object' && v !== null && !Array.isArray(v);
+      const basicsObj = isObj(basics) ? basics : null;
+      log.info('FILL_REQUEST: profileData shape', {
+        tabId,
+        topKeys: Object.keys(pd).slice(0, 15),
+        hasBasics: Boolean(basics),
+        basicsValueType: Array.isArray(basics) ? 'array' : typeof basics,
+        basicsKeys: basicsObj ? Object.keys(basicsObj).slice(0, 15) : [],
+        basicsHasItems: basicsObj ? Array.isArray(basicsObj.items) : false,
+        basicsItemCount: basicsObj && Array.isArray(basicsObj.items) ? (basicsObj.items as unknown[]).length : 0,
+        basicsHasName: basicsObj ? typeof basicsObj.name === 'string' : false,
+        basicsHasEmail: basicsObj ? typeof basicsObj.email === 'string' : false,
+        basicsHasFirstName: basicsObj ? typeof basicsObj.firstName === 'string' : false,
+        hasWork: Boolean(pd.work),
+        workIsArray: Array.isArray(pd.work),
+        hasSections: Boolean(pd.sections),
+        sectionsType: isObj(pd.sections) ? 'object' : typeof pd.sections,
+      });
+    }
     const message = {
       id: deps.now(),
       type: 'FILL_REQUEST' as const,
       timestamp: deps.now(),
       data: parsed.data,
     };
+    log.debug('FILL_REQUEST: constructed tab-forward message', {
+      tabId,
+      messageId: message.id,
+      messageType: message.type,
+      messageTimestamp: message.timestamp,
+    });
 
     // First attempt: forward to an already-loaded content script.
     try {
-      const resp = await deps.broadcast.sendToTab(tabId, message);
-      if (resp && typeof resp === 'object') {
-        const typed = resp as FillRequestResponse;
+      log.debug('FILL_REQUEST: initial tab forward attempt start', {
+        tabId,
+        messageId: message.id,
+      });
+      const rawResponse = await deps.broadcast.sendToTab(tabId, message);
+      const normalized = normalizeFillForwardResponse(rawResponse);
+      log.info('FILL_REQUEST: initial tab response received', {
+        tabId,
+        responseShape: normalized.shape,
+        rawKeys: normalized.rawKeys,
+        innerKeys: normalized.innerKeys,
+        parseIssues: normalized.parseIssues,
+      });
+      if (normalized.response !== null) {
+        const typed = normalized.response;
         log.info('FILL_REQUEST: tab forward succeeded without injection', {
           tabId,
+          responseShape: normalized.shape,
           ok: typed.ok,
           aborted: typed.aborted,
           abortReason: typed.ok ? undefined : typed.abortReason,
@@ -424,10 +642,14 @@ export function createHandlers(deps: HandlerDeps): Handlers {
           skipped: typed.ok ? typed.skipped.length : undefined,
           failed: typed.ok ? typed.failed.length : undefined,
         });
-        return resp as FillRequestResponse;
+        return typed;
       }
-      log.warn('FILL_REQUEST: tab forward returned non-object, injecting', {
+      log.warn('FILL_REQUEST: tab forward produced unusable response, injecting', {
         tabId,
+        responseShape: normalized.shape,
+        rawKeys: normalized.rawKeys,
+        innerKeys: normalized.innerKeys,
+        parseIssues: normalized.parseIssues,
       });
     } catch (err) {
       // Missing content script on non-ATS pages. Inject on demand.
@@ -438,9 +660,17 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
 
     try {
+      log.info('FILL_REQUEST: beginning content script injection', {
+        tabId,
+        file: 'content-scripts/ats.js',
+      });
       await chrome.scripting.executeScript({
         target: { tabId },
         files: ['content-scripts/ats.js'],
+      });
+      log.debug('FILL_REQUEST: waiting for content listener registration', {
+        tabId,
+        waitMs: 1000,
       });
       await new Promise((r) => setTimeout(r, 1000));
       log.info('FILL_REQUEST: content script injection succeeded', { tabId });
@@ -454,11 +684,19 @@ export function createHandlers(deps: HandlerDeps): Handlers {
           tabId,
           error: errMessage,
         });
+        log.debug('FILL_REQUEST: waiting before retry injection', {
+          tabId,
+          waitMs: 1500,
+        });
         await new Promise((r) => setTimeout(r, 1500));
         try {
           await chrome.scripting.executeScript({
             target: { tabId },
             files: ['content-scripts/ats.js'],
+          });
+          log.debug('FILL_REQUEST: waiting after retry injection', {
+            tabId,
+            waitMs: 500,
           });
           await new Promise((r) => setTimeout(r, 500));
           log.info('FILL_REQUEST: content script retry injection succeeded', { tabId });
@@ -479,11 +717,24 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     }
 
     try {
-      const resp = await deps.broadcast.sendToTab(tabId, message);
-      if (resp && typeof resp === 'object') {
-        const typed = resp as FillRequestResponse;
+      log.debug('FILL_REQUEST: post-injection tab forward attempt start', {
+        tabId,
+        messageId: message.id,
+      });
+      const rawResponse = await deps.broadcast.sendToTab(tabId, message);
+      const normalized = normalizeFillForwardResponse(rawResponse);
+      log.info('FILL_REQUEST: post-injection tab response received', {
+        tabId,
+        responseShape: normalized.shape,
+        rawKeys: normalized.rawKeys,
+        innerKeys: normalized.innerKeys,
+        parseIssues: normalized.parseIssues,
+      });
+      if (normalized.response !== null) {
+        const typed = normalized.response;
         log.info('FILL_REQUEST: post-injection forward succeeded', {
           tabId,
+          responseShape: normalized.shape,
           ok: typed.ok,
           aborted: typed.aborted,
           abortReason: typed.ok ? undefined : typed.abortReason,
@@ -491,10 +742,14 @@ export function createHandlers(deps: HandlerDeps): Handlers {
           skipped: typed.ok ? typed.skipped.length : undefined,
           failed: typed.ok ? typed.failed.length : undefined,
         });
-        return resp as FillRequestResponse;
+        return typed;
       }
-      log.warn('FILL_REQUEST: post-injection forward returned non-object', {
+      log.warn('FILL_REQUEST: post-injection forward produced unusable response', {
         tabId,
+        responseShape: normalized.shape,
+        rawKeys: normalized.rawKeys,
+        innerKeys: normalized.innerKeys,
+        parseIssues: normalized.parseIssues,
       });
     } catch (err) {
       log.warn('FILL_REQUEST: forward failed after injection', {
@@ -758,6 +1013,50 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     cancelEndpoint: deps.generation.cancelEndpoint,
   });
 
+  // ---- GENERATION_START ----
+  const handleGenerationStart: HandlerFor<'GENERATION_START'> = async ({ data }) => {
+    const parsed = GenerationStartRequestSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, reason: 'invalid payload' };
+    }
+
+    const urlKey =
+      typeof parsed.data.tabUrl === 'string'
+        ? canonicalizeUrl(parsed.data.tabUrl)
+        : null;
+    if (urlKey !== null) {
+      const existingLock = findActiveGenerationLock(parsed.data.agent, urlKey);
+      if (existingLock !== null) {
+        return { ok: false, reason: 'already-generating' };
+      }
+    }
+
+    const outcome = await generationHandlers.GENERATION_START({
+      data: parsed.data,
+    });
+    if (outcome.ok && urlKey !== null) {
+      upsertGenerationLock({
+        generationId: outcome.generationId,
+        sessionId: outcome.sessionId,
+        agentId: parsed.data.agent,
+        urlKey,
+      });
+    }
+    return outcome;
+  };
+
+  // ---- GENERATION_CANCEL ----
+  const handleGenerationCancel: HandlerFor<'GENERATION_CANCEL'> = async ({ data }) => {
+    const outcome = await generationHandlers.GENERATION_CANCEL({ data });
+    if (outcome.ok) {
+      const parsed = GenerationCancelRequestSchema.safeParse(data);
+      if (parsed.success) {
+        clearGenerationLockByGenerationId(parsed.data.generationId);
+      }
+    }
+    return outcome;
+  };
+
   // ---- GENERATION_UPDATE (broadcast-only, inert) ----
   const handleGenerationUpdate: HandlerFor<'GENERATION_UPDATE'> = async ({ data }) => {
     const parsed = GenerationUpdateBroadcastSchema.safeParse(data);
@@ -776,7 +1075,14 @@ export function createHandlers(deps: HandlerDeps): Handlers {
 
   // ---- GENERATION_STARTED / GENERATION_COMPLETE (broadcast-only) ----
   const handleGenerationStarted: HandlerFor<'GENERATION_STARTED'> = async () => undefined;
-  const handleGenerationComplete: HandlerFor<'GENERATION_COMPLETE'> = async () => {
+  const handleGenerationComplete: HandlerFor<'GENERATION_COMPLETE'> = async ({ data }) => {
+    if (data && typeof data === 'object') {
+      const generationId = (data as { generationId?: unknown }).generationId;
+      if (typeof generationId === 'string' && generationId.length > 0) {
+        clearGenerationLockByGenerationId(generationId);
+      }
+    }
+
     // Invalidate the session list cache so the next popup open refetches.
     try {
       await sessionHandlers.invalidateCache();
@@ -949,8 +1255,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
 
   // ---- SESSION_BINDING_GET ----
   // Returns the stored binding or null. Canonicalization + TTL eviction run
-  // inside the store. An uncanonicalizable url returns null (not an error):
-  // the sidepanel treats this as "no binding for this tab".
+  // inside the store. When `activeOnly` is true, this reports only in-flight
+  // generation locks for the url+agent pair. An uncanonicalizable url returns
+  // null (not an error): the sidepanel treats this as "no binding for this tab".
   const handleSessionBindingGet: HandlerFor<'SESSION_BINDING_GET'> = async ({ data }) => {
     const parsed = SessionBindingGetRequestSchema.safeParse(data);
     if (!parsed.success) {
@@ -964,8 +1271,18 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     try {
       const auth = await handleAuthStatus({ data: {}, sender: {} as chrome.runtime.MessageSender });
       if (!auth.signedIn || !auth.userId) return null;
+
+      const activeLock = findActiveGenerationLock(parsed.data.agentId, urlKey);
+      if (parsed.data.activeOnly === true) {
+        return activeLock !== null ? toEphemeralBindingEntry(activeLock) : null;
+      }
+
       const existing = await deps.sessions.bindings.get(urlKey, parsed.data.agentId, auth.userId);
       if (existing !== null) return existing;
+
+      if (activeLock !== null) {
+        return toEphemeralBindingEntry(activeLock);
+      }
 
       // Semantic match fallback
       if (
@@ -1040,9 +1357,9 @@ export function createHandlers(deps: HandlerDeps): Handlers {
     HIGHLIGHT_CLEAR: handleHighlightClear,
     KEYWORDS_EXTRACT: handleKeywordsExtract,
     HIGHLIGHT_STATUS: handleHighlightStatus,
-    GENERATION_START: generationHandlers.GENERATION_START as HandlerFor<'GENERATION_START'>,
+    GENERATION_START: handleGenerationStart,
     GENERATION_UPDATE: handleGenerationUpdate,
-    GENERATION_CANCEL: generationHandlers.GENERATION_CANCEL as HandlerFor<'GENERATION_CANCEL'>,
+    GENERATION_CANCEL: handleGenerationCancel,
     GENERATION_SUBSCRIBE: generationHandlers.GENERATION_SUBSCRIBE as HandlerFor<'GENERATION_SUBSCRIBE'>,
     GENERATION_INTERACT: generationHandlers.GENERATION_INTERACT as HandlerFor<'GENERATION_INTERACT'>,
     GENERATION_STARTED: handleGenerationStarted,

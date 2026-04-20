@@ -882,7 +882,12 @@
               "b2b-sales"
             ]
           },
-          "payload": {}
+          "payload": {},
+          "tabUrl": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          }
         },
         "required": [
           "agent"
@@ -1899,6 +1904,9 @@
           },
           "companyName": {
             "type": "string"
+          },
+          "activeOnly": {
+            "type": "boolean"
           }
         },
         "required": [

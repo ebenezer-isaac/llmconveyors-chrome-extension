@@ -53,8 +53,11 @@ export default defineContentScript({
 
     // Register the FILL_REQUEST listener BEFORE bootstrap so a fill
     // arriving during adapter load is served correctly.
+    logger.info('registering content autofill fill listener');
     registerFillListener(controller);
+    logger.info('content autofill fill listener registered');
 
+    logger.debug('starting autofill controller bootstrap');
     void controller.bootstrap().catch((err: unknown) => {
       logger.error('controller bootstrap threw', err);
     });

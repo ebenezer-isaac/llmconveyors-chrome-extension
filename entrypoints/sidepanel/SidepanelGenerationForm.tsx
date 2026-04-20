@@ -31,6 +31,7 @@ import type { AgentId } from '@/src/background/agents';
 import type { DetectedIntent } from '@/src/background/messaging/protocol';
 import { useGeneration } from '../popup/useGeneration';
 import { Spinner } from '../shared/Spinner';
+import { useGenerationLock } from '../shared/useGenerationLock';
 
 type Mode = 'standard' | 'cold_outreach';
 
@@ -200,6 +201,8 @@ interface FormState {
   readonly freshResearch: boolean;
   readonly formErrors: Record<string, string>;
   readonly busy: boolean;
+  readonly generationLocked: boolean;
+  readonly generationLockChecking: boolean;
   readonly error: string | null;
   readonly isJobHunter: boolean;
   readonly isColdOutreach: boolean;
@@ -254,6 +257,10 @@ export function SidepanelGenerationFormProvider({
   readonly children: React.ReactNode;
 }): React.ReactElement {
   const { start, busy, error } = useGeneration();
+  const generationLock = useGenerationLock({
+    agentId: activeAgentId,
+    tabUrl,
+  });
   const isJobHunter = activeAgentId === 'job-hunter';
 
   // Lock defaults to true whenever a bound session is provided. The
@@ -361,7 +368,9 @@ export function SidepanelGenerationFormProvider({
       !companyWebsite.trim() ||
       (jobDescriptionRequired && !jobDescription.trim())
     : !companyWebsite.trim();
-  const submitDisabled = busy || invalid;
+  const generationLocked = generationLock.active;
+  const generationLockChecking = generationLock.checking;
+  const submitDisabled = busy || invalid || generationLocked;
 
   const boundTitle = boundSession?.title ?? null;
   // Target mismatch: user is on a page whose URL origin differs from
@@ -400,7 +409,7 @@ export function SidepanelGenerationFormProvider({
   const onSubmit = React.useCallback(
     (event: React.FormEvent<HTMLFormElement>): void => {
       event.preventDefault();
-      if (busy) return;
+      if (busy || generationLocked) return;
       void (async () => {
         if (isJobHunter) {
           const errors: Record<string, string> = {};
@@ -456,6 +465,7 @@ export function SidepanelGenerationFormProvider({
     },
     [
       busy,
+      generationLocked,
       isJobHunter,
       company,
       jobTitle,
@@ -485,6 +495,8 @@ export function SidepanelGenerationFormProvider({
     freshResearch,
     formErrors,
     busy,
+    generationLocked,
+    generationLockChecking,
     error,
     isJobHunter,
     isColdOutreach,
@@ -818,6 +830,15 @@ export function SidepanelGenerationFields(): React.ReactElement {
           </label>
         ) : null}
 
+        {s.generationLocked ? (
+          <p
+            data-testid="sidepanel-form-generation-lock"
+            className="rounded-card bg-amber-50 px-3 py-1.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-100"
+          >
+            Generation already in progress for this page.
+          </p>
+        ) : null}
+
         {s.error !== null ? (
           <p
             data-testid="sidepanel-form-error"
@@ -862,7 +883,9 @@ export function SidepanelGenerationSubmitBar(): React.ReactElement {
         disabled={s.submitDisabled}
         className="flex w-full items-center justify-center gap-2 rounded-card bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
       >
-        {s.busy ? (
+        {s.generationLocked ? (
+          'Generation in progress...'
+        ) : s.busy ? (
           <>
             <Spinner size="sm" inline />
             <span>Starting...</span>

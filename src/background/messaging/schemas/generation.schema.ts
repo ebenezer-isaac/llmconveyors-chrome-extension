@@ -11,6 +11,7 @@ export const GenerationStartRequestSchema = z
   .object({
     agent: z.enum(['job-hunter', 'b2b-sales']),
     payload: z.unknown(),
+    tabUrl: z.string().min(1).max(2048).optional(),
   })
   .strict();
 

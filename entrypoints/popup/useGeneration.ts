@@ -64,7 +64,14 @@ export function useGeneration(): UseGenerationResult {
       try {
         const raw = await runtime.sendMessage({
           key: 'GENERATION_START',
-          data: { agent: args.agentId, payload: args.payload },
+          data: {
+            agent: args.agentId,
+            payload: args.payload,
+            tabUrl:
+              typeof args.tabUrl === 'string' && args.tabUrl.length > 0
+                ? args.tabUrl
+                : undefined,
+          },
         });
         if (!raw || typeof raw !== 'object') {
           return { ok: false, reason: 'empty-response' };

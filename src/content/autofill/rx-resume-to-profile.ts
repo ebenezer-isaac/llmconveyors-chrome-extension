@@ -39,26 +39,108 @@ export function structuredDataToProfile(
   structuredData: Record<string, unknown> | undefined | null,
   opts: MapOptions,
 ): Profile | null {
+  opts.logger.info('structuredDataToProfile: entry', {
+    hasInput: Boolean(structuredData),
+    inputType: typeof structuredData,
+    inputIsNull: structuredData === null,
+    inputTopKeys: structuredData && typeof structuredData === 'object'
+      ? Object.keys(structuredData as Record<string, unknown>).slice(0, 15)
+      : [],
+  });
+
   if (!structuredData || typeof structuredData !== 'object') {
     opts.logger.info('structuredData missing / not object; treating as no profile');
     return null;
   }
 
-  const normalized = normalizeToJsonResume(structuredData);
-  if (!normalized) {
-    opts.logger.info('structuredData does not shape as JSON Resume v1');
-    return null;
-  }
+  opts.logger.debug('structuredDataToProfile: calling normalizeToJsonResume', {
+    topKeys: Object.keys(structuredData).slice(0, 15),
+    hasBasics: 'basics' in structuredData,
+    basicsType: typeof structuredData.basics,
+    basicsIsNull: structuredData.basics === null,
+    hasSections: 'sections' in structuredData,
+    hasWork: 'work' in structuredData,
+    workIsArray: Array.isArray(structuredData.work),
+    hasEducation: 'education' in structuredData,
+    hasSkills: 'skills' in structuredData,
+  });
 
-  const draft = jsonResumeToProfile(normalized, opts.nowMs);
-  const parsed = ProfileSchema.safeParse(draft);
-  if (!parsed.success) {
-    opts.logger.warn('mapped profile failed ProfileSchema validation', {
-      issues: parsed.error.issues.length,
-      firstIssue: parsed.error.issues[0]?.path.join('.') ?? '<unknown>',
+  const normalized = normalizeToJsonResume(structuredData, opts.logger);
+  if (!normalized) {
+    opts.logger.info('structuredData does not shape as JSON Resume v1 -- normalizeToJsonResume returned null', {
+      topLevelKeys: Object.keys(structuredData).slice(0, 15),
+      basicsType: typeof structuredData.basics,
+      basicsHasItems: isPlainObject(structuredData.basics) && Array.isArray((structuredData.basics as Record<string,unknown>).items),
     });
     return null;
   }
+
+  opts.logger.info('structuredDataToProfile: normalized OK', {
+    normalizedKeys: Object.keys(normalized).slice(0, 15),
+    hasBasics: 'basics' in normalized,
+    basicsType: typeof normalized.basics,
+    basicsIsNull: normalized.basics === null,
+    basicsKeys: isPlainObject(normalized.basics)
+      ? Object.keys(normalized.basics as Record<string, unknown>).slice(0, 15)
+      : [],
+    basicsHasName: isPlainObject(normalized.basics)
+      ? typeof (normalized.basics as Record<string, unknown>).name === 'string'
+      : false,
+    basicsNameValue: isPlainObject(normalized.basics)
+      ? String((normalized.basics as Record<string, unknown>).name ?? '').slice(0, 40)
+      : null,
+    basicsHasEmail: isPlainObject(normalized.basics)
+      ? typeof (normalized.basics as Record<string, unknown>).email === 'string'
+      : false,
+    basicsEmailValue: isPlainObject(normalized.basics)
+      ? String((normalized.basics as Record<string, unknown>).email ?? '').slice(0, 40)
+      : null,
+    workCount: Array.isArray(normalized.work) ? (normalized.work as unknown[]).length : 0,
+    educationCount: Array.isArray(normalized.education) ? (normalized.education as unknown[]).length : 0,
+    skillsCount: Array.isArray(normalized.skills) ? (normalized.skills as unknown[]).length : 0,
+  });
+
+  opts.logger.debug('structuredDataToProfile: calling jsonResumeToProfile');
+  const draft = jsonResumeToProfile(normalized, opts.nowMs);
+
+  opts.logger.info('structuredDataToProfile: jsonResumeToProfile result', {
+    draftKeys: draft && typeof draft === 'object' ? Object.keys(draft as Record<string, unknown>).slice(0, 12) : [],
+    draftBasicsKeys: (draft as Record<string, unknown>)?.basics && typeof (draft as Record<string, unknown>).basics === 'object'
+      ? Object.keys((draft as Record<string, unknown>).basics as Record<string, unknown>).slice(0, 12)
+      : [],
+    firstName: String(((draft as Record<string, unknown>)?.basics as Record<string, unknown> | undefined)?.firstName ?? '').slice(0, 30),
+    email: String(((draft as Record<string, unknown>)?.basics as Record<string, unknown> | undefined)?.email ?? '').slice(0, 50),
+    workCount: Array.isArray((draft as Record<string, unknown>)?.work) ? ((draft as Record<string, unknown>).work as unknown[]).length : 0,
+  });
+
+  opts.logger.debug('structuredDataToProfile: sanitizing draft before schema validation');
+  const sanitized = sanitizeDraftForSchema(draft, opts.logger);
+  opts.logger.info('structuredDataToProfile: sanitized draft', {
+    workCount: Array.isArray((sanitized as Record<string, unknown>)?.work)
+      ? ((sanitized as Record<string, unknown>).work as unknown[]).length
+      : 0,
+    educationCount: Array.isArray((sanitized as Record<string, unknown>)?.education)
+      ? ((sanitized as Record<string, unknown>).education as unknown[]).length
+      : 0,
+  });
+  opts.logger.debug('structuredDataToProfile: calling ProfileSchema.safeParse');
+  const parsed = ProfileSchema.safeParse(sanitized);
+  if (!parsed.success) {
+    opts.logger.warn('mapped profile failed ProfileSchema validation', {
+      issueCount: parsed.error.issues.length,
+      issues: parsed.error.issues.slice(0, 5).map(i => ({
+        path: i.path.join('.'),
+        code: i.code,
+        message: i.message,
+      })),
+    });
+    return null;
+  }
+
+  opts.logger.info('structuredDataToProfile: ProfileSchema validation passed', {
+    firstName: parsed.data.basics.firstName.slice(0, 30),
+    email: parsed.data.basics.email.slice(0, 50),
+  });
   return parsed.data;
 }
 
@@ -70,8 +152,65 @@ export function structuredDataToProfile(
  * Rx Resume stores its data under `.sections.basics.items[0]`,
  * `.sections.work.items[]`, etc. JSON Resume v1 uses top-level keys
  * `.basics`, `.work[]`, `.education[]`, `.skills[]`.
+ *
+ * A third shape exists: "flat Rx Resume" -- sections are at the root level
+ * (no `.sections` wrapper) but each is still a section object with an
+ * `.items` array rather than the JSON Resume field set.  Detected by
+ * `basics` being a plain object whose value carries an `items` array
+ * instead of direct string fields like `name` or `email`.
  */
-function normalizeToJsonResume(input: Record<string, unknown>): Record<string, unknown> | null {
+function normalizeToJsonResume(
+  input: Record<string, unknown>,
+  log: Logger,
+): Record<string, unknown> | null {
+  log.debug('normalizeToJsonResume: input shape', {
+    topKeys: Object.keys(input).slice(0, 15),
+    basicsIsPlainObj: isPlainObject(input.basics),
+    basicsHasItems: isPlainObject(input.basics) && Array.isArray((input.basics as Record<string,unknown>).items),
+    workIsArray: Array.isArray(input.work),
+    educationIsArray: Array.isArray(input.education),
+    skillsIsArray: Array.isArray(input.skills),
+    hasSectionsObj: isPlainObject(input.sections),
+  });
+
+  // Flat Rx Resume: sections at root level, each with an `items` array.
+  // Must be checked BEFORE the JSON-Resume heuristic because both share
+  // `isPlainObject(input.basics)` -- but only this variant has `basics.items`.
+  if (isPlainObject(input.basics) && Array.isArray((input.basics).items)) {
+    log.info('normalizeToJsonResume: detected FLAT RX-RESUME (basics.items exists)');
+    const basics = extractRxSingleton(input.basics);
+    const work = extractRxArray(input.work);
+    const education = extractRxArray(input.education);
+    const skills = extractRxArray(input.skills);
+    const projects = extractRxArray(input.projects);
+    const awards = extractRxArray(input.awards);
+    const languages = extractRxArray(input.languages);
+
+    log.debug('normalizeToJsonResume: flat-rx extraction results', {
+      gotBasics: basics !== null,
+      basicsKeys: basics ? Object.keys(basics).slice(0, 15) : [],
+      workCount: work.length,
+      educationCount: education.length,
+      skillsCount: skills.length,
+    });
+
+    if (!basics && work.length === 0 && education.length === 0 && skills.length === 0) {
+      log.warn('normalizeToJsonResume: flat-rx -- all sections empty, returning null');
+      return null;
+    }
+
+    const out: Record<string, unknown> = {};
+    if (basics) out.basics = basics;
+    if (work.length > 0) out.work = work;
+    if (education.length > 0) out.education = education;
+    if (skills.length > 0) out.skills = skills;
+    if (projects.length > 0) out.projects = projects;
+    if (awards.length > 0) out.awards = awards;
+    if (languages.length > 0) out.languages = languages;
+    log.info('normalizeToJsonResume: flat-rx path produced output', { outKeys: Object.keys(out) });
+    return out;
+  }
+
   // Already JSON Resume-shaped?
   if (
     isPlainObject(input.basics) ||
@@ -79,13 +218,27 @@ function normalizeToJsonResume(input: Record<string, unknown>): Record<string, u
     Array.isArray(input.education) ||
     Array.isArray(input.skills)
   ) {
+    log.info('normalizeToJsonResume: detected JSON-RESUME shape -- returning input as-is', {
+      triggerBasics: isPlainObject(input.basics),
+      triggerWork: Array.isArray(input.work),
+      triggerEducation: Array.isArray(input.education),
+      triggerSkills: Array.isArray(input.skills),
+    });
     return input;
   }
 
   // Rx Resume shape: `.sections.{basics,work,education,skills}`.
   const sections = input.sections;
-  if (!isPlainObject(sections)) return null;
+  if (!isPlainObject(sections)) {
+    log.warn('normalizeToJsonResume: no recognized shape -- basics not plain obj, work/edu/skills not arrays, no .sections obj', {
+      topKeys: Object.keys(input).slice(0, 15),
+      basicsType: typeof input.basics,
+      basicsIsNull: input.basics === null,
+    });
+    return null;
+  }
 
+  log.info('normalizeToJsonResume: detected RX-RESUME with .sections wrapper');
   const basics = extractRxSingleton(sections.basics);
   const work = extractRxArray(sections.work);
   const education = extractRxArray(sections.education);
@@ -94,7 +247,16 @@ function normalizeToJsonResume(input: Record<string, unknown>): Record<string, u
   const awards = extractRxArray(sections.awards);
   const languages = extractRxArray(sections.languages);
 
+  log.debug('normalizeToJsonResume: rx-sections extraction results', {
+    gotBasics: basics !== null,
+    basicsKeys: basics ? Object.keys(basics).slice(0, 15) : [],
+    workCount: work.length,
+    educationCount: education.length,
+    skillsCount: skills.length,
+  });
+
   if (!basics && work.length === 0 && education.length === 0 && skills.length === 0) {
+    log.warn('normalizeToJsonResume: rx-sections -- all sections empty, returning null');
     return null;
   }
 
@@ -106,6 +268,7 @@ function normalizeToJsonResume(input: Record<string, unknown>): Record<string, u
   if (projects.length > 0) out.projects = projects;
   if (awards.length > 0) out.awards = awards;
   if (languages.length > 0) out.languages = languages;
+  log.info('normalizeToJsonResume: rx-sections path produced output', { outKeys: Object.keys(out) });
   return out;
 }
 
@@ -130,4 +293,64 @@ function extractRxArray(section: unknown): Record<string, unknown>[] {
   if (!isPlainObject(section)) return [];
   const items = Array.isArray(section.items) ? section.items : [];
   return items.filter(isPlainObject);
+}
+
+function isValidUrl(s: unknown): boolean {
+  if (typeof s !== 'string' || s.length === 0) return false;
+  try {
+    new URL(s);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const VALID_DATE_RE = /^\d{4}(-\d{2}(-\d{2})?)?$|^Present$/;
+
+function isValidDateStr(s: unknown): boolean {
+  return typeof s === 'string' && VALID_DATE_RE.test(s);
+}
+
+/**
+ * Normalize fields that would cause ProfileSchema.safeParse to fail:
+ *   - work[].url that is not a well-formed URL: strip the field (url is optional in schema)
+ *   - education[] entries where startDate is missing or invalid: filter the entry out
+ *     (startDate is required in ProfileSchema; stripping it would still fail validation)
+ *
+ * All mutations produce new objects (immutable path).
+ */
+function sanitizeDraftForSchema(draft: unknown, log: Logger): unknown {
+  if (!isPlainObject(draft)) return draft;
+  const out: Record<string, unknown> = { ...draft };
+
+  if (Array.isArray(out.work)) {
+    out.work = (out.work as unknown[]).map((item) => {
+      if (!isPlainObject(item)) return item;
+      if ('url' in item && !isValidUrl(item.url)) {
+        const { url: _url, ...rest } = item;
+        void _url;
+        log.debug('sanitizeDraftForSchema: stripped invalid work.url', {
+          original: typeof item.url === 'string' ? item.url.slice(0, 80) : String(item.url),
+        });
+        return rest;
+      }
+      return item;
+    });
+  }
+
+  if (Array.isArray(out.education)) {
+    out.education = (out.education as unknown[]).filter((item) => {
+      if (!isPlainObject(item)) return false;
+      if (!isValidDateStr(item.startDate)) {
+        log.debug('sanitizeDraftForSchema: dropping education entry with missing/invalid startDate', {
+          startDate: typeof item.startDate === 'string' ? item.startDate.slice(0, 40) : String(item.startDate),
+          institution: typeof item.institution === 'string' ? item.institution.slice(0, 60) : '',
+        });
+        return false;
+      }
+      return true;
+    });
+  }
+
+  return out;
 }

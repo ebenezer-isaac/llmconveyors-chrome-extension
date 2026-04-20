@@ -75,6 +75,21 @@ export async function loadAdapter(
   deps: AdapterLoaderDeps,
 ): Promise<AtsAdapter | null> {
   const kind = resolveAtsKind(url);
+  let hostForLog = '<invalid-url>';
+  let pathForLog = '';
+  try {
+    const parsed = new URL(url);
+    hostForLog = parsed.host.toLowerCase();
+    pathForLog = parsed.pathname;
+  } catch {
+    // Keep fallback values for diagnostics when URL parsing fails.
+  }
+  deps.logger.debug('resolveAtsKind completed', {
+    url,
+    host: hostForLog,
+    path: pathForLog,
+    resolvedKind: kind,
+  });
   if (!kind) {
     deps.logger.debug('no ATS match for URL', { url });
     return null;
@@ -92,6 +107,11 @@ export async function loadAdapter(
     });
     return null;
   }
+  deps.logger.debug('adapter module import resolved', {
+    kind,
+    specifier,
+    moduleKeys: Object.keys(mod),
+  });
 
   const adapter = mod.adapter;
   if (!adapter) {

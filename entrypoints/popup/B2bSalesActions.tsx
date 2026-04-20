@@ -16,6 +16,7 @@ import React from 'react';
 import type { ClientCreditsSnapshot } from '@/src/background/messaging/protocol';
 import { GenerateButton } from './GenerateButton';
 import { GetCreditsLink } from './GetCreditsLink';
+import { useGenerationLock } from '@/entrypoints/shared/useGenerationLock';
 
 export interface B2bSalesActionsProps {
   readonly tabUrl: string | null;
@@ -61,17 +62,27 @@ export function B2bSalesActions({
   tabUrl,
   credits,
 }: B2bSalesActionsProps): React.ReactElement {
+  const generationLock = useGenerationLock({
+    agentId: 'b2b-sales',
+    tabUrl,
+  });
+
   const outOfCredits = (credits?.credits ?? 0) <= 0;
   const hasTabUrl =
     tabUrl !== null && (tabUrl.startsWith('http://') || tabUrl.startsWith('https://'));
   const isProfile = isLinkedInProfileUrl(tabUrl);
+  const generationBlocked = generationLock.active;
 
-  const researchDisabledReason: string | undefined = hasTabUrl
-    ? undefined
-    : 'Open a company web page first';
-  const outreachDisabledReason: string | undefined = isProfile
-    ? undefined
-    : 'Open a LinkedIn profile to draft outreach';
+  const lockReason = generationLock.active
+    ? 'Generation already running for this page'
+    : undefined;
+
+  const researchDisabledReason: string | undefined = !hasTabUrl
+    ? 'Open a company web page first'
+    : lockReason;
+  const outreachDisabledReason: string | undefined = !isProfile
+    ? 'Open a LinkedIn profile to draft outreach'
+    : lockReason;
 
   const companyWebsite = deriveCompanyWebsite(tabUrl);
   const companyName = deriveCompanyNameFromUrl(tabUrl);
@@ -84,7 +95,7 @@ export function B2bSalesActions({
     >
       <GenerateButton
         agentId="b2b-sales"
-        disabled={!hasTabUrl}
+        disabled={!hasTabUrl || generationBlocked}
         disabledReason={researchDisabledReason}
         primaryLabel="Research company"
         payload={{
@@ -98,7 +109,7 @@ export function B2bSalesActions({
       />
       <GenerateButton
         agentId="b2b-sales"
-        disabled={!isProfile}
+        disabled={!isProfile || generationBlocked}
         disabledReason={outreachDisabledReason}
         primaryLabel="Draft outreach email"
         payload={{

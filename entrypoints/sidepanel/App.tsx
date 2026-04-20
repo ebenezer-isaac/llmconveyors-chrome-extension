@@ -16,6 +16,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createLogger } from '@/src/background/log';
 import { ErrorBoundary } from '../popup/ErrorBoundary';
 import { useAgentPreference } from '../popup/useAgentPreference';
 import { useAuthState } from '../popup/useAuthState';
@@ -380,14 +381,65 @@ function BoundSessionPanel(props: {
   }, [resumeArtifact]);
 
   async function handleAutofill(): Promise<void> {
+    const spLog = createLogger('sidepanel.autofill');
+    spLog.info('handleAutofill: start', {
+      targetTabId,
+      targetTabUrl,
+      hasResumeArtifact: resumeArtifact !== null,
+      resumeArtifactType: resumeArtifact?.type ?? null,
+      hasResumeAttachment: resumeAttachment !== null,
+    });
     setAutofill({ kind: 'pending' });
+
+    // useActiveTabUrl resolves asynchronously; if targetTabUrl is still null
+    // at click time, fetch it directly so the fill can proceed immediately.
+    let resolvedTabUrl = targetTabUrl;
+    if (resolvedTabUrl === null && targetTabId !== null) {
+      spLog.info('handleAutofill: targetTabUrl null at click time -- fetching from chrome.tabs');
+      resolvedTabUrl = await new Promise<string | null>((resolve) => {
+        const g = globalThis as unknown as {
+          chrome?: { tabs?: { get: (id: number, cb: (tab: { url?: string } | undefined) => void) => void } };
+        };
+        const tabs = g.chrome?.tabs;
+        if (!tabs || typeof tabs.get !== 'function') { resolve(null); return; }
+        try { tabs.get(targetTabId, (tab) => resolve(tab?.url ?? null)); }
+        catch { resolve(null); }
+      });
+      spLog.info('handleAutofill: on-demand tab URL fetch result', { resolvedTabUrl });
+    }
+
     let payload = resumeAttachment;
     if (payload === null && resumeArtifact !== null) {
+      spLog.debug('handleAutofill: resumeAttachment null, preloading from artifact');
       payload = await getOrPreloadResumeAttachment(resumeArtifact);
       setResumeAttachment(payload);
+      spLog.info('handleAutofill: resume attachment preload result', {
+        gotPayload: payload !== null,
+        fileName: payload?.fileName ?? null,
+        mimeType: payload?.mimeType ?? null,
+      });
     }
+    spLog.debug('handleAutofill: fetching profile data from artifact');
     const profileData = await getProfileDataFromArtifact(resumeArtifact);
-    const result = await runAutofill(targetTabId, targetTabUrl, payload, profileData);
+    spLog.info('handleAutofill: profileData result', {
+      gotProfileData: profileData !== null,
+      profileDataTopKeys: profileData ? Object.keys(profileData).slice(0, 15) : [],
+      profileDataHasBasics: profileData ? 'basics' in profileData : false,
+      profileDataBasicsIsNull: profileData ? (profileData.basics === null) : false,
+      profileDataBasicsType: profileData ? typeof profileData.basics : 'undefined',
+    });
+    spLog.debug('handleAutofill: calling runAutofill', {
+      tabId: targetTabId ?? undefined,
+      tabUrl: resolvedTabUrl,
+      hasPayload: payload !== null,
+      hasProfileData: profileData !== null,
+    });
+    const result = await runAutofill(targetTabId, resolvedTabUrl, payload, profileData);
+    spLog.info('handleAutofill: runAutofill complete', {
+      resultKind: result.kind,
+      message: result.kind === 'error' ? result.message : undefined,
+      filled: result.kind === 'success' ? result.filled : undefined,
+    });
     setAutofill(result);
   }
 
@@ -689,6 +741,7 @@ function SidepanelBody(): React.ReactElement {
             ) : null}
             <GenerationView
               activeAgentType={agentType}
+              tabUrl={tabUrl}
               mode={showBoundPanel ? 'active-only' : 'both'}
             />
             {/*

@@ -7,6 +7,13 @@ import type { FillRequestResponse } from '@/src/background/messaging/protocol-ty
 
 const log = createLogger('popup:fill-button');
 
+function summarizeKeys(value: unknown, limit = 12): readonly string[] {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return [];
+  }
+  return Object.keys(value as Record<string, unknown>).slice(0, limit);
+}
+
 type FillOutcome =
   | { readonly kind: 'idle' }
   | { readonly kind: 'pending' }
@@ -65,10 +72,15 @@ export function FillButton({
         tabId: tab.id,
         url: tab.url,
       });
-      const response: FillRequestResponse = await sendMessage('FILL_REQUEST', {
+      const rawResponse: unknown = await sendMessage('FILL_REQUEST', {
         tabId: tab.id,
         url: tab.url,
       });
+      log.debug('raw FILL_REQUEST response received', {
+        tabId: tab.id,
+        rawKeys: summarizeKeys(rawResponse),
+      });
+      const response = rawResponse as FillRequestResponse;
       log.info('received FILL_REQUEST response', {
         ok: response.ok,
         aborted: response.aborted,
@@ -76,6 +88,7 @@ export function FillButton({
         filled: response.ok ? response.filled.length : undefined,
         skipped: response.ok ? response.skipped.length : undefined,
         failed: response.ok ? response.failed.length : undefined,
+        responseKeys: summarizeKeys(response),
       });
       if (response.ok) {
         setOutcome({

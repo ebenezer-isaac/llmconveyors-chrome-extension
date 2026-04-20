@@ -23,6 +23,7 @@ import { FillButton } from './FillButton';
 import { HighlightToggle } from './HighlightToggle';
 import { GenerateButton } from './GenerateButton';
 import { GetCreditsLink } from './GetCreditsLink';
+import { useGenerationLock } from '@/entrypoints/shared/useGenerationLock';
 
 export interface JobHunterActionsProps {
   readonly intent: DetectedIntent | null;
@@ -89,15 +90,24 @@ export function JobHunterActions({
   credits,
   boundSessionTitle = null,
 }: JobHunterActionsProps): React.ReactElement {
+  const generationLock = useGenerationLock({
+    agentId: 'job-hunter',
+    tabUrl: tabUrl ?? null,
+  });
+
   const isJobPosting = intent?.pageKind === 'job-posting' && intent.kind !== 'unknown';
   const isApplicationForm =
     intent?.pageKind === 'application-form' && intent.kind !== 'unknown';
   const jdAvailable = isJobPosting || hasGenericJd;
   const outOfCredits = (credits?.credits ?? 0) <= 0;
+  const generationBlocked = generationLock.active;
 
-  const generateDisabledReason: string | undefined = jdAvailable
-    ? undefined
-    : 'Open a job description to generate';
+  const generateDisabledReason: string | undefined =
+    !jdAvailable
+      ? 'Open a job description to generate'
+      : generationLock.active
+      ? 'Generation already running for this page'
+      : undefined;
   const highlightDisabledReason: string | undefined = jdAvailable
     ? undefined
     : 'Open a job posting to highlight keywords';
@@ -137,7 +147,7 @@ export function JobHunterActions({
           </button>
           <GenerateButton
             agentId="job-hunter"
-            disabled={!jdAvailable}
+            disabled={!jdAvailable || generationBlocked}
             disabledReason={generateDisabledReason}
             primaryLabel="Regenerate"
             payload={{
@@ -154,7 +164,7 @@ export function JobHunterActions({
       ) : (
         <GenerateButton
           agentId="job-hunter"
-          disabled={!jdAvailable}
+          disabled={!jdAvailable || generationBlocked}
           disabledReason={generateDisabledReason}
           primaryLabel="Generate CV + Cover Letter"
           payload={{

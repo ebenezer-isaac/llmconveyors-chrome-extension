@@ -229,31 +229,89 @@ function extractStructuredDataFromPayload(
   payload: Record<string, unknown> | undefined,
 ): Record<string, unknown> | null {
   if (!payload) return null;
+  log.debug('extractStructuredDataFromPayload: input shape', {
+    topKeys: Object.keys(payload).slice(0, 15),
+    hasStructuredData: isPlainObject(payload.structuredData),
+    hasBasics: 'basics' in payload,
+    basicsType: typeof payload.basics,
+    basicsIsNull: payload.basics === null,
+    hasWork: 'work' in payload,
+    workIsArray: Array.isArray(payload.work),
+    hasSections: isPlainObject(payload.sections),
+  });
   if (isPlainObject(payload.structuredData)) {
-    return payload.structuredData;
+    const sd = payload.structuredData;
+    log.debug('extractStructuredDataFromPayload: returning .structuredData', {
+      sdKeys: Object.keys(sd).slice(0, 15),
+      sdHasBasics: 'basics' in sd,
+      sdBasicsType: typeof sd.basics,
+      sdBasicsIsNull: sd.basics === null,
+      sdHasSections: 'sections' in sd,
+      sdHasWork: 'work' in sd,
+    });
+    return sd;
   }
   if (isPlainObject(payload.basics) || Array.isArray(payload.work)) {
+    log.debug('extractStructuredDataFromPayload: returning payload as JSON-Resume', {
+      basicsIsPlainObj: isPlainObject(payload.basics),
+      workIsArray: Array.isArray(payload.work),
+    });
     return payload;
   }
   if (isPlainObject(payload.sections)) {
+    log.debug('extractStructuredDataFromPayload: returning payload as Rx-Resume (has .sections)');
     return payload;
   }
+  log.debug('extractStructuredDataFromPayload: no recognizable shape -- returning null', {
+    topKeys: Object.keys(payload).slice(0, 15),
+  });
   return null;
 }
 
 export async function getProfileDataFromArtifact(
   artifact: ArtifactPreview | null,
 ): Promise<Record<string, unknown> | null> {
-  if (!artifact || artifact.type !== 'cv') return null;
+  log.debug('getProfileDataFromArtifact: entry', {
+    hasArtifact: artifact !== null,
+    artifactType: artifact?.type ?? null,
+    artifactKind: typeof (artifact as unknown as Record<string, unknown> | null)?.kind === 'string'
+      ? (artifact as unknown as Record<string, unknown>).kind
+      : null,
+  });
+  if (!artifact || artifact.type !== 'cv') {
+    log.debug('getProfileDataFromArtifact: skipping -- artifact null or not cv', {
+      artifactType: artifact?.type ?? null,
+    });
+    return null;
+  }
 
-  const fromPayload = extractStructuredDataFromPayload(artifact.payload);
+  log.debug('getProfileDataFromArtifact: trying payload extraction', {
+    hasPayload: artifact.payload !== undefined && artifact.payload !== null,
+    payloadType: typeof artifact.payload,
+  });
+  const fromPayload = extractStructuredDataFromPayload(
+    artifact.payload as Record<string, unknown> | undefined,
+  );
   if (fromPayload) {
+    const basics = fromPayload.basics;
+    const basicsObj = isPlainObject(basics) ? basics : null;
     log.info('profile data extracted from artifact payload', {
+      topKeys: Object.keys(fromPayload).slice(0, 15),
       hasBasics: 'basics' in fromPayload,
+      basicsIsNull: basics === null,
+      basicsType: typeof basics,
+      basicsKeys: basicsObj ? Object.keys(basicsObj).slice(0, 15) : [],
+      basicsHasItems: basicsObj ? Array.isArray(basicsObj.items) : false,
+      basicsHasName: basicsObj ? typeof basicsObj.name === 'string' : false,
+      basicsHasEmail: basicsObj ? typeof basicsObj.email === 'string' : false,
+      basicsHasFirstName: basicsObj ? typeof basicsObj.firstName === 'string' : false,
       hasSections: 'sections' in fromPayload,
+      hasWork: 'work' in fromPayload,
+      workIsArray: Array.isArray(fromPayload.work),
     });
     return fromPayload;
   }
+  log.debug('getProfileDataFromArtifact: payload extraction returned null, trying blob fetch');
 
   const sessionId =
     typeof artifact.sessionId === 'string' && artifact.sessionId.length > 0
@@ -264,13 +322,25 @@ export async function getProfileDataFromArtifact(
       ? artifact.storageKey
       : null;
 
-  if (!sessionId || !storageKey) return null;
+  log.debug('getProfileDataFromArtifact: blob fetch params', {
+    hasSessionId: sessionId !== null,
+    hasStorageKey: storageKey !== null,
+    storageKeySuffix: storageKey ? storageKey.slice(-20) : null,
+  });
+  if (!sessionId || !storageKey) {
+    log.warn('getProfileDataFromArtifact: missing sessionId or storageKey -- cannot fetch blob');
+    return null;
+  }
 
   const runtime = getRuntime();
-  if (runtime === null) return null;
+  if (runtime === null) {
+    log.warn('getProfileDataFromArtifact: chrome runtime unavailable');
+    return null;
+  }
 
   let raw: unknown;
   try {
+    log.debug('getProfileDataFromArtifact: sending ARTIFACT_FETCH_BLOB', { sessionId, storageKey });
     raw = await runtime.sendMessage({
       key: 'ARTIFACT_FETCH_BLOB',
       data: { sessionId, storageKey },
@@ -282,34 +352,78 @@ export async function getProfileDataFromArtifact(
     return null;
   }
 
-  if (!raw || typeof raw !== 'object') return null;
+  log.debug('getProfileDataFromArtifact: ARTIFACT_FETCH_BLOB response', {
+    rawType: typeof raw,
+    rawIsNull: raw === null,
+    rawKeys: (raw !== null && typeof raw === 'object') ? Object.keys(raw as Record<string,unknown>).slice(0, 10) : [],
+  });
+  if (!raw || typeof raw !== 'object') {
+    log.warn('getProfileDataFromArtifact: blob response not an object');
+    return null;
+  }
   const env = raw as { ok?: boolean; content?: string; mimeType?: string };
-  if (env.ok !== true || typeof env.content !== 'string') return null;
+  log.debug('getProfileDataFromArtifact: blob envelope', {
+    ok: env.ok,
+    mimeType: env.mimeType,
+    contentLength: typeof env.content === 'string' ? env.content.length : null,
+  });
+  if (env.ok !== true || typeof env.content !== 'string') {
+    log.warn('getProfileDataFromArtifact: blob envelope not ok or no content', { ok: env.ok });
+    return null;
+  }
 
   const mimeType = typeof env.mimeType === 'string' ? env.mimeType : '';
   const isJson = mimeType.includes('json') || storageKey.endsWith('.json');
-  if (!isJson) return null;
+  log.debug('getProfileDataFromArtifact: content type check', { mimeType, isJson });
+  if (!isJson) {
+    log.warn('getProfileDataFromArtifact: blob is not JSON -- cannot use as profile', { mimeType, storageKey });
+    return null;
+  }
 
   try {
     const parsed = JSON.parse(env.content);
-    if (!isPlainObject(parsed)) return null;
+    log.debug('getProfileDataFromArtifact: parsed blob JSON', {
+      parsedType: typeof parsed,
+      parsedIsNull: parsed === null,
+      parsedIsArray: Array.isArray(parsed),
+      parsedTopKeys: isPlainObject(parsed) ? Object.keys(parsed as Record<string,unknown>).slice(0, 15) : [],
+    });
+    if (!isPlainObject(parsed)) {
+      log.warn('getProfileDataFromArtifact: parsed blob is not a plain object');
+      return null;
+    }
 
-    const extracted = extractStructuredDataFromPayload(parsed);
+    const extracted = extractStructuredDataFromPayload(parsed as Record<string, unknown>);
     if (extracted) {
+      const basics = extracted.basics;
+      const basicsObj = isPlainObject(basics) ? basics : null;
       log.info('profile data fetched from storage', {
+        topKeys: Object.keys(extracted).slice(0, 15),
         hasBasics: 'basics' in extracted,
+        basicsIsNull: basics === null,
+        basicsType: typeof basics,
+        basicsKeys: basicsObj ? Object.keys(basicsObj).slice(0, 15) : [],
+        basicsHasItems: basicsObj ? Array.isArray(basicsObj.items) : false,
+        basicsHasName: basicsObj ? typeof basicsObj.name === 'string' : false,
+        basicsHasEmail: basicsObj ? typeof basicsObj.email === 'string' : false,
+        basicsHasFirstName: basicsObj ? typeof basicsObj.firstName === 'string' : false,
         hasSections: 'sections' in extracted,
+        hasWork: 'work' in extracted,
+        workIsArray: Array.isArray(extracted.work),
       });
       return extracted;
     }
 
+    log.warn('getProfileDataFromArtifact: extractStructuredDataFromPayload returned null from blob', {
+      parsedTopKeys: Object.keys(parsed as Record<string,unknown>).slice(0, 15),
+    });
     if (isPlainObject(parsed)) {
       log.info('profile data using fetched JSON as-is');
-      return parsed;
+      return parsed as Record<string, unknown>;
     }
     return null;
-  } catch {
-    log.warn('profile data JSON parse failed');
+  } catch (err: unknown) {
+    log.warn('profile data JSON parse failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }

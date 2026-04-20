@@ -19,6 +19,7 @@ import type {
   GenerationUpdateBroadcast,
 } from '@/src/background/messaging/protocol';
 import { InteractionPrompt } from './InteractionPrompt';
+import { useGenerationLock } from '../shared/useGenerationLock';
 
 type RuntimeMessenger = {
   sendMessage: (msg: unknown) => Promise<unknown>;
@@ -38,6 +39,7 @@ function getRuntime(): RuntimeMessenger | null {
 
 export interface GenerationViewProps {
   readonly activeAgentType: 'job-hunter' | 'b2b-sales';
+  readonly tabUrl: string | null;
   /**
    * Controls what the view renders when no generation is in flight.
    *   'both' (default) - show the idle "Click a Generate button" message.
@@ -124,11 +126,33 @@ function openDashboard(_generationId: string, agentId: AgentId): void {
 
 export function GenerationView({
   activeAgentType,
+  tabUrl,
   mode = 'both',
 }: GenerationViewProps): React.ReactElement | null {
   const [generationId, setGenerationId] = useState<string | null>(null);
   const [latest, setLatest] = useState<GenerationUpdateBroadcast | null>(null);
   const [phases, setPhases] = useState<readonly PhaseEntry[]>([]);
+  const generationLock = useGenerationLock({
+    agentId: activeAgentType,
+    tabUrl,
+    enabled: mode !== 'idle-only',
+  });
+
+  useEffect(() => {
+    if (mode === 'idle-only') return;
+    if (generationId !== null) return;
+    if (!generationLock.active || generationLock.generationId === null) return;
+    const runtime = getRuntime();
+    if (runtime === null) return;
+    const id = generationLock.generationId;
+    setGenerationId(id);
+    setLatest(null);
+    setPhases([]);
+    void runtime.sendMessage({
+      key: 'GENERATION_SUBSCRIBE',
+      data: { generationId: id },
+    });
+  }, [generationId, generationLock.active, generationLock.generationId, mode]);
 
   useEffect(() => {
     if (mode === 'idle-only') return;

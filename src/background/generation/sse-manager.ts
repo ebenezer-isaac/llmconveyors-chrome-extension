@@ -183,11 +183,12 @@ export function createSseManager(deps: SseManagerDeps): {
       typeof envelope.payload === 'object' && envelope.payload !== null
         ? (envelope.payload as Record<string, unknown>)
         : envelope;
+    if (typeof payload.phase !== 'string' || payload.phase.length === 0) return;
     const candidate: Record<string, unknown> = {
       generationId: typeof payload.generationId === 'string' ? payload.generationId : generationId,
       sessionId:
         typeof payload.sessionId === 'string' ? payload.sessionId : 'unknown',
-      phase: typeof payload.phase === 'string' ? payload.phase : 'unknown',
+      phase: payload.phase,
       status:
         typeof payload.status === 'string' &&
         ['running', 'completed', 'failed', 'awaiting_input', 'cancelled'].includes(

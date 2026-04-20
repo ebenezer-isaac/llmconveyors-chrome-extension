@@ -997,7 +997,12 @@ Request schema:
         "b2b-sales"
       ]
     },
-    "payload": {}
+    "payload": {},
+    "tabUrl": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    }
   },
   "required": [
     "agent"
@@ -2112,6 +2117,9 @@ Request schema:
     },
     "companyName": {
       "type": "string"
+    },
+    "activeOnly": {
+      "type": "boolean"
     }
   },
   "required": [

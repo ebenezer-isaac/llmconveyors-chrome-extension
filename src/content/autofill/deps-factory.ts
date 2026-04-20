@@ -44,21 +44,35 @@ export function createProductionDeps(): AutofillControllerDeps {
   const profileReaderLogger = createLogger('profile-reader');
   const controllerLogger = createLogger('autofill-controller');
   const broadcastLogger = createLogger('autofill-broadcast');
+  controllerLogger.debug('createProductionDeps: constructing autofill dependencies');
 
   return {
-    loadAdapter: (url) =>
-      loadAdapter(url, {
+    loadAdapter: (url) => {
+      controllerLogger.debug('deps.loadAdapter invoked', { url });
+      return loadAdapter(url, {
         logger: adapterLoaderLogger,
         dynamicImport: staticAdapterImport,
-      }),
-    scanGenericForm: (root) => scanForm(root),
-    fillGenericField: (instruction, root) => fillField(instruction, root),
-    readProfile: () =>
-      readProfile({
+      });
+    },
+    scanGenericForm: (root) => {
+      controllerLogger.debug('deps.scanGenericForm invoked');
+      return scanForm(root);
+    },
+    fillGenericField: (instruction, root) => {
+      controllerLogger.debug('deps.fillGenericField invoked', {
+        selector: instruction.selector,
+        fieldType: instruction.fieldType,
+      });
+      return fillField(instruction, root);
+    },
+    readProfile: () => {
+      controllerLogger.debug('deps.readProfile invoked');
+      return readProfile({
         logger: profileReaderLogger,
         now: () => Date.now(),
         requestMasterResume: defaultRequestMasterResume,
-      }),
+      });
+    },
     // Resume file attach is out of scope for A8 single-pass happy path;
     // the plan-builder routes file fields to plan.skipped so this is
     // never called in the greenhouse/lever branch today. A placeholder
@@ -66,6 +80,12 @@ export function createProductionDeps(): AutofillControllerDeps {
     // records a failed entry if ever invoked.
     resolveFile: async () => null,
     broadcastIntent: (payload) => {
+      broadcastLogger.debug('broadcastIntent invoked', {
+        tabId: payload.tabId,
+        kind: payload.kind,
+        pageKind: payload.pageKind,
+        url: payload.url,
+      });
       void sendMessage('INTENT_DETECTED', payload).catch((err: unknown) => {
         broadcastLogger.warn('INTENT_DETECTED sendMessage failed', {
           err: err instanceof Error ? err.message : String(err),

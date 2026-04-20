@@ -87,8 +87,11 @@ function install(opts: {
         return { agentId: 'job-hunter', selectedAt: 1 };
       case 'AUTH_STATUS':
         return opts.signedIn ? { signedIn: true, userId: 'u1' } : { signedIn: false };
-      case 'SESSION_BINDING_GET':
+      case 'SESSION_BINDING_GET': {
+        const data = (env as { data?: { activeOnly?: boolean } }).data;
+        if (data?.activeOnly) return null;
         return opts.binding;
+      }
       case 'SESSION_HYDRATE_GET':
         return hydrateReply();
       default:
