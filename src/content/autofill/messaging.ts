@@ -22,10 +22,12 @@ export function registerFillListener(controller: AutofillController): void {
       tabId: message.data.tabId,
       url: message.data.url,
       hasResumeAttachment: Boolean(message.data.resumeAttachment),
+      hasProfileData: Boolean(message.data.profileData),
     });
     try {
       const response = await controller.executeFill({
         resumeAttachment: message.data.resumeAttachment,
+        profileData: message.data.profileData,
       });
       log.info('returning FillRequestResponse', {
         ok: response.ok,

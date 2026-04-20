@@ -35,6 +35,8 @@ export default defineContentScript({
     'https://*.greenhouse.io/*',
     'https://jobs.lever.co/*',
     'https://*.myworkdayjobs.com/*',
+    'https://*.metacareers.com/*',
+    'https://www.metacareers.com/*',
     ...E2E_MATCHES,
   ],
   runAt: 'document_idle',

@@ -19,6 +19,9 @@ export const FillRequestSchema = z
       })
       .strict()
       .optional(),
+    profileData: z
+      .record(z.unknown())
+      .optional(),
   })
   .strict();
 

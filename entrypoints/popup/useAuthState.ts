@@ -57,7 +57,13 @@ const MANUAL_SIGN_IN_EXCHANGE_INTERVAL_MS = 30_000;
 
 function shouldAutoSyncAfterSignInFailure(reason: string): boolean {
   const normalized = reason.toLowerCase();
-  return normalized === 'sign-in-window-opened';
+  // Poll for auth sync when:
+  // - 'sign-in-window-opened': explicit web flow started
+  // - 'usercancelledorerror': native OAuth failed, web fallback opened
+  return (
+    normalized === 'sign-in-window-opened' ||
+    normalized === 'usercancelledorerror'
+  );
 }
 
 export interface UseAuthStateResult {

@@ -46,11 +46,13 @@ import type {
   DetectedIntentPayload,
 } from '@/src/background/messaging/protocol-types';
 import { isEmptyProfile } from './profile-reader';
+import { structuredDataToProfile } from './rx-resume-to-profile';
 
 type ResumeAttachment = NonNullable<FillRequest['resumeAttachment']>;
 
 export interface ExecuteFillOptions {
   readonly resumeAttachment?: ResumeAttachment;
+  readonly profileData?: Record<string, unknown>;
 }
 
 /** Abort reasons aligned with FillRequestResponseSchema. */
@@ -200,7 +202,21 @@ export class AutofillController {
       adapterKind: adapter?.kind ?? null,
     });
 
-    const profile = await this.deps.readProfile();
+    let profile: Profile | null = null;
+
+    if (options.profileData) {
+      this.deps.logger.info('executeFill: using provided profileData');
+      profile = structuredDataToProfile(
+        options.profileData,
+        { logger: this.deps.logger, nowMs: this.deps.now() },
+      );
+    }
+
+    if (isEmptyProfile(profile)) {
+      this.deps.logger.info('executeFill: provided profileData empty or invalid, falling back to MASTER_RESUME_GET');
+      profile = await this.deps.readProfile();
+    }
+
     if (isEmptyProfile(profile)) {
       this.deps.logger.info('executeFill: no profile or profile empty');
       return aborted('profile-missing');
@@ -553,7 +569,7 @@ export class AutofillController {
     const resumeSkips = args.plan.skipped.filter(
       (entry) => entry.instruction.fieldType === 'resume-upload',
     );
-    if (resumeSkips.length === 0) return null;
+
     if (args.file === null) {
       this.deps.logger.warn('resume attachment decode failed; skipping upload');
       return null;
@@ -562,6 +578,28 @@ export class AutofillController {
     const consumedSelectors = new Set<string>();
     const filled: FilledEntry[] = [];
     const failed: FailedEntry[] = [];
+
+    if (resumeSkips.length === 0) {
+      this.deps.logger.info('no resume-upload fields in plan; trying fallback file input detection');
+      const fallbackResult = this.attachResumeToAnyFileInput(args.file);
+      if (fallbackResult) {
+        if (fallbackResult.ok) {
+          filled.push({
+            ok: true,
+            selector: fallbackResult.selector,
+            value: truncateForWire(args.file.name),
+            fieldType: 'resume-upload',
+          });
+        } else {
+          failed.push({
+            selector: fallbackResult.selector,
+            reason: fallbackResult.reason,
+          });
+        }
+        return { consumedSelectors, filled, failed };
+      }
+      return null;
+    }
 
     for (const skipped of resumeSkips) {
       consumedSelectors.add(skipped.instruction.selector);
@@ -586,6 +624,61 @@ export class AutofillController {
     }
 
     return { consumedSelectors, filled, failed };
+  }
+
+  private attachResumeToAnyFileInput(file: File): FillResult | null {
+    const fileInputs = this.deps.document.querySelectorAll('input[type="file"]');
+    this.deps.logger.info('fallback file input search', { count: fileInputs.length });
+
+    if (fileInputs.length === 0) {
+      return null;
+    }
+
+    for (const input of fileInputs) {
+      if (!(input instanceof HTMLInputElement)) continue;
+      if (input.disabled) continue;
+
+      const accept = input.accept?.toLowerCase() ?? '';
+      const isResumeInput = !accept ||
+        accept.includes('pdf') ||
+        accept.includes('doc') ||
+        accept.includes('application') ||
+        accept.includes('*');
+
+      if (!isResumeInput) {
+        this.deps.logger.debug('skipping file input with non-resume accept', { accept });
+        continue;
+      }
+
+      this.deps.logger.info('attempting fallback resume attach', {
+        selector: input.id ? `#${input.id}` : input.name ? `[name="${input.name}"]` : 'input[type="file"]',
+      });
+
+      try {
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        if (input.files !== null && input.files.length > 0) {
+          const selector = input.id ? `#${input.id}` : `input[type="file"]`;
+          this.deps.logger.info('fallback resume attach succeeded', { selector });
+          return { ok: true, selector };
+        }
+      } catch (err: unknown) {
+        this.deps.logger.warn('fallback resume attach failed', {
+          error: serializeError(err).message,
+        });
+      }
+    }
+
+    return {
+      ok: false,
+      selector: 'input[type="file"]',
+      reason: 'write-failed',
+      error: 'no suitable file input found',
+    };
   }
 
   private async attachResumeForInstruction(

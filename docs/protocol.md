@@ -447,6 +447,10 @@ Request schema:
         "contentBase64"
       ],
       "additionalProperties": false
+    },
+    "profileData": {
+      "type": "object",
+      "additionalProperties": {}
     }
   },
   "required": [
@@ -2102,6 +2106,12 @@ Request schema:
         "job-hunter",
         "b2b-sales"
       ]
+    },
+    "jobTitle": {
+      "type": "string"
+    },
+    "companyName": {
+      "type": "string"
     }
   },
   "required": [

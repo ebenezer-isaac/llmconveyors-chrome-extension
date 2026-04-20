@@ -45,6 +45,10 @@ export function resolveAtsKind(url: string): AtsKind | null {
   if (host === 'myworkdayjobs.com' || host.endsWith('.myworkdayjobs.com')) {
     return 'workday';
   }
+  // Meta Careers - no dedicated adapter, uses generic fill
+  if (host === 'metacareers.com' || host.endsWith('.metacareers.com')) {
+    return null;
+  }
   // Test fixture host (localhost:5174) routes by filename prefix so the
   // E2E suite can exercise real adapters against local HTML files. In
   // production (non-localhost) there is no fallback.

@@ -401,6 +401,7 @@ export function createHandlers(deps: HandlerDeps): Handlers {
       tabId,
       url: parsed.data.url,
       hasResumeAttachment: Boolean(parsed.data.resumeAttachment),
+      hasProfileData: Boolean(parsed.data.profileData),
     });
     const message = {
       id: deps.now(),

@@ -220,3 +220,96 @@ export async function getOrPreloadResumeAttachment(
   if (artifact === null) return null;
   return fetchAttachment(artifact, artifactKey);
 }
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function extractStructuredDataFromPayload(
+  payload: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+  if (!payload) return null;
+  if (isPlainObject(payload.structuredData)) {
+    return payload.structuredData;
+  }
+  if (isPlainObject(payload.basics) || Array.isArray(payload.work)) {
+    return payload;
+  }
+  if (isPlainObject(payload.sections)) {
+    return payload;
+  }
+  return null;
+}
+
+export async function getProfileDataFromArtifact(
+  artifact: ArtifactPreview | null,
+): Promise<Record<string, unknown> | null> {
+  if (!artifact || artifact.type !== 'cv') return null;
+
+  const fromPayload = extractStructuredDataFromPayload(artifact.payload);
+  if (fromPayload) {
+    log.info('profile data extracted from artifact payload', {
+      hasBasics: 'basics' in fromPayload,
+      hasSections: 'sections' in fromPayload,
+    });
+    return fromPayload;
+  }
+
+  const sessionId =
+    typeof artifact.sessionId === 'string' && artifact.sessionId.length > 0
+      ? artifact.sessionId
+      : null;
+  const storageKey =
+    typeof artifact.storageKey === 'string' && artifact.storageKey.length > 0
+      ? artifact.storageKey
+      : null;
+
+  if (!sessionId || !storageKey) return null;
+
+  const runtime = getRuntime();
+  if (runtime === null) return null;
+
+  let raw: unknown;
+  try {
+    raw = await runtime.sendMessage({
+      key: 'ARTIFACT_FETCH_BLOB',
+      data: { sessionId, storageKey },
+    });
+  } catch (err: unknown) {
+    log.warn('profile data fetch failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  if (!raw || typeof raw !== 'object') return null;
+  const env = raw as { ok?: boolean; content?: string; mimeType?: string };
+  if (env.ok !== true || typeof env.content !== 'string') return null;
+
+  const mimeType = typeof env.mimeType === 'string' ? env.mimeType : '';
+  const isJson = mimeType.includes('json') || storageKey.endsWith('.json');
+  if (!isJson) return null;
+
+  try {
+    const parsed = JSON.parse(env.content);
+    if (!isPlainObject(parsed)) return null;
+
+    const extracted = extractStructuredDataFromPayload(parsed);
+    if (extracted) {
+      log.info('profile data fetched from storage', {
+        hasBasics: 'basics' in extracted,
+        hasSections: 'sections' in extracted,
+      });
+      return extracted;
+    }
+
+    if (isPlainObject(parsed)) {
+      log.info('profile data using fetched JSON as-is');
+      return parsed;
+    }
+    return null;
+  } catch {
+    log.warn('profile data JSON parse failed');
+    return null;
+  }
+}
