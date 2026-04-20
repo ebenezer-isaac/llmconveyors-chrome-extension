@@ -23,6 +23,15 @@ import { ColdEmailBody } from './ColdEmailBody';
 
 type DownloadState = 'idle' | 'loading' | 'success' | 'error';
 
+function isValidHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 type RuntimeMessenger = {
   sendMessage: (msg: unknown) => Promise<unknown>;
 };
@@ -149,13 +158,22 @@ export function ArtifactCard({
         }
       }
 
-      // Priority 2: Signed download URL
-      if (artifact.downloadUrl !== null) {
+      // Priority 2: Signed download URL (skip if malformed or content is available as fallback)
+      if (artifact.downloadUrl !== null && isValidHttpUrl(artifact.downloadUrl)) {
         const success = await downloadUrl(artifact.downloadUrl, artifact.filename);
-        setDownloadState(success ? 'success' : 'error');
-        if (success) timeoutRef.current = setTimeout(() => setDownloadState('idle'), 1500);
-        downloadingRef.current = false;
-        return;
+        if (success) {
+          setDownloadState('success');
+          timeoutRef.current = setTimeout(() => setDownloadState('idle'), 1500);
+          downloadingRef.current = false;
+          return;
+        }
+        // Fall through to content fallback if available
+        if (artifact.content === null) {
+          setDownloadState('error');
+          timeoutRef.current = setTimeout(() => setDownloadState('idle'), 2000);
+          downloadingRef.current = false;
+          return;
+        }
       }
 
       // Priority 3: Inline content (Company Research, Cover Letter)
