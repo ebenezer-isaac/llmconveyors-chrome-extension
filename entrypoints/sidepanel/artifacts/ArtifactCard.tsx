@@ -12,9 +12,14 @@
  * and the other web dashboard cards.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ArtifactPreview } from '@/src/background/messaging/schemas/artifact-preview.schema';
 import { downloadBlob, downloadUrl, downloadBase64 } from '../lib/download';
+import { copyToClipboard } from '../lib/clipboard';
+import { TextArtifactBody } from './TextArtifactBody';
+import { CvArtifactBody } from './CvArtifactBody';
+import { AtsComparisonBody } from './AtsComparisonBody';
+import { ColdEmailBody } from './ColdEmailBody';
 
 type DownloadState = 'idle' | 'loading' | 'success' | 'error';
 
@@ -64,12 +69,6 @@ async function fetchArtifactBlob(
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
 }
-import { copyToClipboard } from '../lib/clipboard';
-import { TextArtifactBody } from './TextArtifactBody';
-import { CvArtifactBody } from './CvArtifactBody';
-import { AtsComparisonBody } from './AtsComparisonBody';
-import { ColdEmailBody } from './ColdEmailBody';
-
 export interface ArtifactCardProps {
   readonly artifact: ArtifactPreview;
   readonly defaultOpen?: boolean;
@@ -119,10 +118,22 @@ export function ArtifactCard({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [downloadState, setDownloadState] = useState<DownloadState>('idle');
 
+  const downloadingRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   const toggle = useCallback(() => setOpen((v) => !v), []);
 
   const handleDownload = useCallback(async () => {
-    if (downloadState === 'loading') return;
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
     setDownloadState('loading');
 
     try {
@@ -132,7 +143,8 @@ export function ArtifactCard({
         if (result.ok) {
           const success = await downloadBase64(result.content, artifact.filename, result.mimeType);
           setDownloadState(success ? 'success' : 'error');
-          if (success) setTimeout(() => setDownloadState('idle'), 1500);
+          if (success) timeoutRef.current = setTimeout(() => setDownloadState('idle'), 1500);
+          downloadingRef.current = false;
           return;
         }
       }
@@ -141,7 +153,8 @@ export function ArtifactCard({
       if (artifact.downloadUrl !== null) {
         const success = await downloadUrl(artifact.downloadUrl, artifact.filename);
         setDownloadState(success ? 'success' : 'error');
-        if (success) setTimeout(() => setDownloadState('idle'), 1500);
+        if (success) timeoutRef.current = setTimeout(() => setDownloadState('idle'), 1500);
+        downloadingRef.current = false;
         return;
       }
 
@@ -150,7 +163,8 @@ export function ArtifactCard({
         const mimeType = artifact.mimeType ?? 'text/plain';
         const success = await downloadBlob(artifact.content, artifact.filename, mimeType);
         setDownloadState(success ? 'success' : 'error');
-        if (success) setTimeout(() => setDownloadState('idle'), 1500);
+        if (success) timeoutRef.current = setTimeout(() => setDownloadState('idle'), 1500);
+        downloadingRef.current = false;
         return;
       }
 
@@ -166,18 +180,21 @@ export function ArtifactCard({
             ? await downloadBase64(result.content, artifact.filename, result.mimeType)
             : await downloadBlob(result.content, artifact.filename, result.mimeType);
           setDownloadState(success ? 'success' : 'error');
-          if (success) setTimeout(() => setDownloadState('idle'), 1500);
+          if (success) timeoutRef.current = setTimeout(() => setDownloadState('idle'), 1500);
+          downloadingRef.current = false;
           return;
         }
       }
 
       setDownloadState('error');
-      setTimeout(() => setDownloadState('idle'), 2000);
+      timeoutRef.current = setTimeout(() => setDownloadState('idle'), 2000);
+      downloadingRef.current = false;
     } catch {
       setDownloadState('error');
-      setTimeout(() => setDownloadState('idle'), 2000);
+      timeoutRef.current = setTimeout(() => setDownloadState('idle'), 2000);
+      downloadingRef.current = false;
     }
-  }, [artifact, downloadState]);
+  }, [artifact]);
 
   const handleCopy = useCallback(async () => {
     const text = artifact.content;
