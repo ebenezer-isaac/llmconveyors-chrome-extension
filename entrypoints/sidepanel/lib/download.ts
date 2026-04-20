@@ -103,3 +103,57 @@ export async function downloadBlob(
     }
   }
 }
+
+/**
+ * Save base64-encoded binary content as a file. Decodes base64 to bytes,
+ * wraps in a Blob, and hands to chrome.downloads.
+ */
+export async function downloadBase64(
+  base64Content: string,
+  filename: string,
+  mimeType: string,
+  opts: { saveAs?: boolean } = {},
+): Promise<boolean> {
+  const api = getDownloads();
+  if (api === null) {
+    log.warn('chrome.downloads unavailable', { filename });
+    return false;
+  }
+  let blobUrl: string | null = null;
+  try {
+    // Decode base64 to bytes
+    const U8 = Uint8Array as unknown as {
+      fromBase64?: (b: string) => Uint8Array;
+    };
+    let bytes: Uint8Array;
+    if (typeof U8.fromBase64 === 'function') {
+      bytes = U8.fromBase64(base64Content);
+    } else {
+      const binary = atob(base64Content);
+      const len = binary.length;
+      bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+    blobUrl = URL.createObjectURL(blob);
+    await api.download({ url: blobUrl, filename, saveAs: opts.saveAs === true });
+    return true;
+  } catch (err: unknown) {
+    log.warn('downloadBase64 failed', {
+      filename,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  } finally {
+    if (blobUrl !== null) {
+      const toRevoke = blobUrl;
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(toRevoke);
+        } catch {
+          // nothing to do
+        }
+      }, 30_000);
+    }
+  }
+}
