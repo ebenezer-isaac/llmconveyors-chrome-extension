@@ -332,6 +332,34 @@ describe('ArtifactCard download', () => {
     });
   });
 
+  it('ignores concurrent download clicks (re-entry guard)', async () => {
+    let resolveFirst!: (v: number) => void;
+    const { downloadFn } = mountChromeWithRuntime({
+      downloadImpl: () =>
+        new Promise<number>((res) => {
+          resolveFirst = res;
+        }),
+    });
+
+    render(<ArtifactCard artifact={textArtifact} />);
+
+    const btn = screen.getByTestId('artifact-card-download');
+
+    // First click starts the download
+    fireEvent.click(btn);
+    // Button is now disabled -- second click must be a no-op
+    fireEvent.click(btn);
+
+    // Resolve the first download
+    resolveFirst(1);
+    await vi.waitFor(() => {
+      expect(btn.textContent).not.toBe('Downloading...');
+    });
+
+    // Only one call despite two clicks
+    expect(downloadFn).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to storageKey fetch when pdfStorageKey fetch fails', async () => {
     // Artifact with no inline content so Priority 3 (content) is skipped and
     // Priority 4 (storageKey via ARTIFACT_FETCH_BLOB) is reached after pdfStorageKey fails.
@@ -350,8 +378,11 @@ describe('ArtifactCard download', () => {
     let callCount = 0;
     const { downloadFn, sendMessageFn } = mountChromeWithRuntime({
       sendMessageImpl: async (msg: unknown) => {
+        if (typeof msg !== 'object' || msg === null) {
+          return { ok: false, reason: 'invalid' };
+        }
         callCount += 1;
-        const m = msg as { data?: { storageKey?: string } };
+        const m = msg as { key?: string; data?: { storageKey?: string } };
         if (m?.data?.storageKey === 'resume.pdf') {
           // pdfStorageKey fetch fails -- fall through to storageKey
           return { ok: false, reason: 'not-found' };
