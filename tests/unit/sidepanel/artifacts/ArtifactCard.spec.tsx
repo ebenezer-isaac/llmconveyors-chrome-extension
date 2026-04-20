@@ -255,10 +255,11 @@ describe('ArtifactCard download', () => {
       expect(downloadFn).toHaveBeenCalledTimes(1);
     });
 
-    const call = downloadFn.mock.calls[0][0] as { url: string; filename: string };
-    expect(call.filename).toBe('company-research.txt');
+    const call = downloadFn.mock.calls[0]?.[0] as { url: string; filename: string } | undefined;
+    expect(call).toBeDefined();
+    expect(call!.filename).toBe('company-research.txt');
     // Inline-content path uses downloadBlob, which wraps in a blob URL
-    expect(call.url).toBe('blob:fake');
+    expect(call!.url).toBe('blob:fake');
   });
 
   it('downloads PDF artifact via ARTIFACT_FETCH_BLOB (pdfStorageKey)', async () => {
@@ -285,9 +286,10 @@ describe('ArtifactCard download', () => {
       expect(downloadFn).toHaveBeenCalledTimes(1);
     });
 
-    const call = downloadFn.mock.calls[0][0] as { url: string; filename: string };
-    expect(call.filename).toBe('resume.pdf');
-    expect(call.url).toBe('blob:fake');
+    const call = downloadFn.mock.calls[0]?.[0] as { url: string; filename: string } | undefined;
+    expect(call).toBeDefined();
+    expect(call!.filename).toBe('resume.pdf');
+    expect(call!.url).toBe('blob:fake');
   });
 
   it('shows loading state during download', async () => {
