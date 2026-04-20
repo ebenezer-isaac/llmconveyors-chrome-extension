@@ -21,6 +21,7 @@ import { useAgentPreference } from '../popup/useAgentPreference';
 import { useAuthState } from '../popup/useAuthState';
 import { useCredits } from '../popup/useCredits';
 import { useProfile } from '../popup/useProfile';
+import { SignInButton } from '../popup/SignInButton';
 import { SurfaceHeader } from '@/entrypoints/shared/SurfaceHeader';
 import { SurfaceFooter } from '@/entrypoints/shared/SurfaceFooter';
 import { GenerationView } from './GenerationView';
@@ -482,7 +483,7 @@ function BoundSessionPanel(props: {
 
 function SidepanelBody(): React.ReactElement {
   const { agents, activeAgentId, setActiveAgent, loading, error } = useAgentPreference();
-  const { state: authState, signOut, loading: authLoading } = useAuthState();
+  const { state: authState, signIn, signOut, loading: authLoading, error: authError } = useAuthState();
   const {
     credits,
     loading: creditsLoading,
@@ -705,22 +706,65 @@ function SidepanelBody(): React.ReactElement {
           <SidepanelGenerationSubmitBar />
         </SidepanelGenerationFormProvider>
       ) : (
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          {showBoundPanel && binding.session !== null ? (
-            <BoundSessionPanel
-              session={binding.session}
-              logs={binding.logs}
-              artifacts={binding.artifacts}
-              urlBound={
-                binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
-              }
-              agentId={agent.id}
+        <div className="flex flex-1 flex-col overflow-y-auto p-4">
+          <section
+            data-testid="sidepanel-signed-out-panel"
+            className="rounded-card border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800"
+          >
+            <div className="mb-3 flex items-center gap-2">
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-zinc-400"
+              >
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <polyline points="10 17 15 12 10 7" />
+                <line x1="15" y1="12" x2="3" y2="12" />
+              </svg>
+              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                Sign in to get started
+              </h2>
+            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              {activeAgentId === 'b2b-sales'
+                ? 'Sign in to research companies, generate personalized outreach, and run B2B sales agents.'
+                : 'Sign in to generate tailored resumes, cover letters, and auto-fill job applications.'}
+            </p>
+            <SignInButton
+              onClick={() => {
+                void signIn();
+              }}
+              disabled={authLoading}
             />
+          </section>
+
+          {authError !== null ? (
+            <div
+              data-testid="sidepanel-auth-error"
+              className="mt-3 flex items-start gap-2 rounded-card bg-red-50 px-3 py-2 dark:bg-red-900/40"
+            >
+              <p className="flex-1 text-xs text-red-800 dark:text-red-100">
+                {authError}
+              </p>
+              <button
+                type="button"
+                data-testid="sidepanel-auth-retry"
+                onClick={() => {
+                  void signIn();
+                }}
+                disabled={authLoading}
+                className="shrink-0 text-xs font-medium text-red-700 underline hover:text-red-900 disabled:opacity-50 dark:text-red-200 dark:hover:text-red-50"
+              >
+                Retry
+              </button>
+            </div>
           ) : null}
-          <GenerationView
-            activeAgentType={agentType}
-            mode={showBoundPanel ? 'active-only' : 'both'}
-          />
         </div>
       )}
       <SurfaceFooter
