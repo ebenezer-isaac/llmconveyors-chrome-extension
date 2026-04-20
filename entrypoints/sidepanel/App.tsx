@@ -290,30 +290,28 @@ type AutofillOutcome =
   | { readonly kind: 'error'; readonly message: string };
 
 async function runAutofill(
+  targetTabId: number | null,
+  targetTabUrl: string | null,
   resumeAttachment: NonNullable<FillRequest['resumeAttachment']> | null = null,
   profileData: Record<string, unknown> | null = null,
 ): Promise<AutofillOutcome> {
   const g = globalThis as unknown as {
     chrome?: {
-      tabs?: {
-        query: (opts: { active: boolean; currentWindow: boolean }) => Promise<
-          Array<{ id?: number; url?: string }>
-        >;
-      };
       runtime?: { sendMessage: (msg: unknown) => Promise<unknown> };
     };
   };
-  const tabs = g.chrome?.tabs;
   const runtime = g.chrome?.runtime;
-  if (!tabs || !runtime) return { kind: 'error', message: 'chrome runtime unavailable' };
+  if (!runtime) return { kind: 'error', message: 'chrome runtime unavailable' };
+  if (targetTabId === null || targetTabId <= 0) {
+    return { kind: 'error', message: 'no target tab - switch to a job page' };
+  }
+  if (!targetTabUrl || targetTabUrl.length === 0) {
+    return { kind: 'error', message: 'no target tab URL' };
+  }
   try {
-    const [tab] = await tabs.query({ active: true, currentWindow: true });
-    if (!tab || typeof tab.id !== 'number' || !tab.url) {
-      return { kind: 'error', message: 'no active tab' };
-    }
     const fillData: FillRequest = {
-      tabId: tab.id,
-      url: tab.url,
+      tabId: targetTabId,
+      url: targetTabUrl,
       ...(resumeAttachment !== null ? { resumeAttachment } : {}),
       ...(profileData !== null ? { profileData } : {}),
     };
@@ -352,8 +350,10 @@ function BoundSessionPanel(props: {
   /** False when this is the fallback "most recent" session (no URL binding). */
   readonly urlBound: boolean;
   readonly agentId: AgentId;
+  readonly targetTabId: number | null;
+  readonly targetTabUrl: string | null;
 }): React.ReactElement {
-  const { session, logs, artifacts, urlBound, agentId } = props;
+  const { session, logs, artifacts, urlBound, agentId, targetTabId, targetTabUrl } = props;
   const [autofill, setAutofill] = React.useState<AutofillOutcome>({ kind: 'idle' });
   const [resumeAttachment, setResumeAttachment] = React.useState<
     NonNullable<FillRequest['resumeAttachment']> | null
@@ -387,7 +387,7 @@ function BoundSessionPanel(props: {
       setResumeAttachment(payload);
     }
     const profileData = await getProfileDataFromArtifact(resumeArtifact);
-    const result = await runAutofill(payload, profileData);
+    const result = await runAutofill(targetTabId, targetTabUrl, payload, profileData);
     setAutofill(result);
   }
 
@@ -683,6 +683,8 @@ function SidepanelBody(): React.ReactElement {
                     binding.binding?.urlKey !== undefined && binding.binding.urlKey.length > 0
                   }
                   agentId={agent.id}
+                  targetTabId={tabId}
+                  targetTabUrl={tabUrl}
                 />
             ) : null}
             <GenerationView
