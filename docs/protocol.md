@@ -2102,6 +2102,12 @@ Request schema:
         "job-hunter",
         "b2b-sales"
       ]
+    },
+    "jobTitle": {
+      "type": "string"
+    },
+    "companyName": {
+      "type": "string"
     }
   },
   "required": [

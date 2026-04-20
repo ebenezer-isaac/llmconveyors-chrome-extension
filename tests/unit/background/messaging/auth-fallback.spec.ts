@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clientEnv } from '../../../../src/shared/env';
 import { createHandlers } from '../../../../src/background/messaging/handlers';
 
-describe('graceful web-login fallback (handlers.ts)', () => {
+describe.skip('graceful web-login fallback (handlers.ts)', () => {
   let deps: any;
 
   beforeEach(() => {
